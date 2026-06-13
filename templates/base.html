@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MyFinances{% endblock %}</title>
+  {% load static %}
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=2"></script>
+  <script defer src="{% static 'js/app.js' %}"></script>
+  <script defer src="{% static 'js/gastos.js' %}"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="dark-theme{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %}">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
+    <div class="sidebar-brand" data-toggle-sidebar title="Recolher menu">
+      <i data-lucide="piggy-bank" style="width:22px;height:22px;stroke:var(--accent);flex-shrink:0;"></i>
+      <span class="sidebar-brand-name">MyFinances</span>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;">
+      <div class="sidebar-section">Menu</div>
+
+      <a class="sidebar-item {% if request.path == '/' %}active{% endif %}" href="{% url 'dashboard' %}">
+        <span class="sidebar-icon"><i data-lucide="layout-dashboard"></i></span>
+        <span class="sidebar-text">Dashboard</span>
+      </a>
+
+      <a class="sidebar-item {% if 'gastos' in request.path and 'entradas' not in request.path %}active{% endif %}" href="{% url 'gasto-list' %}">
+        <span class="sidebar-icon"><i data-lucide="banknote-arrow-down"></i></span>
+        <span class="sidebar-text">Gastos</span>
+      </a>
+
+      <a class="sidebar-item {% if 'entradas' in request.path %}active{% endif %}" href="{% url 'entrada-list' %}">
+        <span class="sidebar-icon"><i data-lucide="banknote-arrow-up"></i></span>
+        <span class="sidebar-text">Entradas</span>
+      </a>
+
+      <a class="sidebar-item {% if 'cartoes' in request.path %}active{% endif %}" href="{% url 'cartao-list' %}">
+        <span class="sidebar-icon"><i data-lucide="credit-card"></i></span>
+        <span class="sidebar-text">Cartões</span>
+      </a>
+
+      <div class="sidebar-section">Configurações</div>
+
+      <a class="sidebar-item {% if 'responsaveis' in request.path %}active{% endif %}" href="{% url 'responsavel-list' %}">
+        <span class="sidebar-icon"><i data-lucide="users"></i></span>
+        <span class="sidebar-text">Responsáveis</span>
+      </a>
+
+      <a class="sidebar-item {% if 'categorias' in request.path %}active{% endif %}" href="{% url 'categoria-list' %}">
+        <span class="sidebar-icon"><i data-lucide="tag"></i></span>
+        <span class="sidebar-text">Categorias</span>
+      </a>
+
+      <div class="sidebar-section">Sistema</div>
+
+      <a class="sidebar-item" href="/admin/" target="_blank">
+        <span class="sidebar-icon"><i data-lucide="shield-check"></i></span>
+        <span class="sidebar-text">Admin</span>
+      </a>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding:8px;">
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="sidebar-item" style="width:100%;background:none;border:none;cursor:pointer;text-align:left;color:var(--danger);">
+          <span class="sidebar-icon"><i data-lucide="log-out"></i></span>
+          <span class="sidebar-text">Sair</span>
+        </button>
+      </form>
+    </div>
+
+  </aside>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-title">{% block page_title %}MyFinances{% endblock %}</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button type="button" onclick="openFormModal('modal-nova-entrada')"
+              class="btn" style="font-size:12px;padding:6px 14px;background:#22c55e;color:#fff;border-color:#22c55e;">
+        <i data-lucide="banknote-arrow-up"></i> Nova Entrada
+      </button>
+      <button type="button" onclick="openFormModal('modal-novo-gasto')"
+              class="btn btn-danger" style="font-size:12px;padding:6px 14px;">
+        <i data-lucide="banknote-arrow-down"></i> Novo Gasto
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO -->
+  <main class="main-content">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block extra_js %}{% endblock %}
+
+  {% include "includes/modal_novo_gasto.html" %}
+  {% include "includes/modal_nova_entrada.html" %}
+
+  <!-- Modal de confirmação de exclusão em massa -->
+  <div id="modal-delete-all"
+       style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);
+              align-items:center;justify-content:center;padding:24px;">
+    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+                padding:36px 32px;max-width:420px;width:100%;text-align:center;
+                box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+      <div style="width:64px;height:64px;border-radius:50%;background:#ef444420;
+                  display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="triangle-alert" style="width:30px;height:30px;color:#ef4444;"></i>
+      </div>
+      <h3 style="margin:0 0 10px;font-size:19px;font-weight:700;color:var(--text);">Excluir tudo?</h3>
+      <p id="modal-delete-msg" style="margin:0 0 28px;color:var(--text-muted);font-size:14px;line-height:1.65;"></p>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button type="button" data-cancel onclick="closeDeleteModal()"
+                class="btn btn-danger" style="min-width:130px;font-size:14px;">
+          Cancelar
+        </button>
+        <form id="modal-delete-form" method="post" style="display:contents;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-danger" style="min-width:160px;font-size:14px;">
+            <i data-lucide="trash-2"></i> Confirmar exclusão
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

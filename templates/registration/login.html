@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — MyFinances</title>
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
+  <script defer src="{% static 'js/lucide.min.js' %}"></script>
+  <script defer>document.addEventListener('DOMContentLoaded', () => lucide.createIcons())</script>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg-primary); }
+    .login-wrap { width:100%; max-width:380px; padding:24px; }
+    .login-logo { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:32px; }
+    .login-logo-icon { width:48px; height:48px; border-radius:12px; background:var(--accent)22; display:flex; align-items:center; justify-content:center; }
+    .login-logo-name { font-size:22px; font-weight:700; color:var(--text); }
+    .login-card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:28px; }
+    .login-title { font-size:17px; font-weight:600; color:var(--text); margin:0 0 6px; }
+    .login-sub { font-size:13px; color:var(--text-muted); margin:0 0 24px; }
+    .login-btn { width:100%; padding:10px; font-size:15px; margin-top:4px; }
+    .login-error { background:var(--danger)18; border:1px solid var(--danger)44; color:var(--danger); border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; }
+  </style>
+</head>
+<body class="dark-theme">
+
+<div class="login-wrap">
+  <div class="login-logo">
+    <div class="login-logo-icon">
+      <i data-lucide="piggy-bank" style="width:26px;height:26px;stroke:var(--accent);"></i>
+    </div>
+    <span class="login-logo-name">MyFinances</span>
+  </div>
+
+  <div class="login-card">
+    <div class="login-title">Bem-vindo de volta</div>
+    <div class="login-sub">Entre com sua conta para continuar</div>
+
+    {% if form.errors %}
+    <div class="login-error">
+      <i data-lucide="alert-circle" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"></i>
+      Usuário ou senha incorretos. Tente novamente.
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+      <div class="form-group">
+        <label class="form-label">Usuário</label>
+        <input type="text" name="username" class="form-control" autofocus autocomplete="username"
+               value="{{ form.username.value|default:'' }}" placeholder="Digite seu usuário">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <input type="password" name="password" class="form-control" autocomplete="current-password"
+               placeholder="••••••••">
+      </div>
+
+      <button type="submit" class="btn btn-primary login-btn">
+        <i data-lucide="log-in"></i> Entrar
+      </button>
+    </form>
+  </div>
+</div>
+
+</body>
+</html>

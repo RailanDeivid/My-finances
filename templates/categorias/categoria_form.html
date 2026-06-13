@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} — MyFinances{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.icone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.icone-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 4px 6px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  gap: 4px;
+  transition: border-color .15s, background .15s;
+}
+.icone-btn svg { width: 20px; height: 20px; stroke: var(--text-muted); }
+.icone-btn:hover { border-color: var(--accent); }
+.icone-btn:hover svg { stroke: var(--accent); }
+.icone-btn.selecionado { border-color: var(--accent); background: var(--accent)22; }
+.icone-btn.selecionado svg { stroke: var(--accent); }
+.icone-btn .label { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.2; }
+
+.cor-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.cor-swatch {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 3px solid transparent; cursor: pointer;
+  transition: border-color .15s, transform .1s;
+}
+.cor-swatch:hover { transform: scale(1.12); }
+.cor-swatch.selecionada { border-color: var(--text-primary); transform: scale(1.12); }
+
+.preview-cat {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.preview-icon-wrap {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.preview-icon-wrap svg { width: 22px; height: 22px; stroke: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width:580px;">
+  {% if form.errors %}
+  <div class="form-errors">
+    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.icone }}
+    {{ form.cor }}
+
+    <div class="form-group">
+      <label class="form-label">Nome *</label>
+      {{ form.nome }}
+      {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
+    </div>
+
+    <!-- Preview ao vivo -->
+    <div class="preview-cat" id="preview-cat">
+      <div class="preview-icon-wrap" id="preview-wrap" style="background:{{ form.instance.cor|default:'#888888' }};">
+        {% if form.instance.icone %}<i data-lucide="{{ form.instance.icone }}"></i>
+        {% else %}<i data-lucide="tag"></i>{% endif %}
+      </div>
+      <div>
+        <div style="font-weight:600;font-size:14px;" id="preview-nome">{{ form.instance.nome|default:"Nome da categoria" }}</div>
+        <div style="font-size:11px;color:var(--text-muted);">Prévia da categoria</div>
+      </div>
+    </div>
+
+    <!-- Seletor de ícone -->
+    <div class="form-group">
+      <label class="form-label">Ícone</label>
+      <div class="icone-grid" id="icone-grid">
+        {% for valor, nome in icones %}
+        <button type="button" class="icone-btn {% if form.instance.icone == valor %}selecionado{% endif %}"
+                data-valor="{{ valor }}" title="{{ nome }}" onclick="selecionarIcone(this)">
+          <i data-lucide="{{ valor }}"></i>
+          <span class="label">{{ nome|truncatechars:12 }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Seletor de cor -->
+    <div class="form-group">
+      <label class="form-label">Cor</label>
+      <div class="cor-grid">
+        {% for hex, nome in cores %}
+        <div class="cor-swatch {% if form.instance.cor == hex %}selecionada{% elif not form.instance.pk and hex == '#888888' %}selecionada{% endif %}"
+             style="background:{{ hex }};" title="{{ nome }}" data-hex="{{ hex }}"
+             onclick="selecionarCor(this)"></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <div class="form-check">
+        {{ form.ativo }}
+        <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativa</label>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
+      <a href="{% url 'categoria-list' %}" class="btn btn-danger">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var PRESETS = {
+  {% for nome, icone, cor in icones_presets %}"{{ nome }}": {"icone": "{{ icone }}", "cor": "{{ cor }}"},
+  {% endfor %}
+};
+
+function selecionarIcone(btn) {
+  document.querySelectorAll('.icone-btn').forEach(b => b.classList.remove('selecionado'));
+  btn.classList.add('selecionado');
+  var valor = btn.dataset.valor;
+  document.getElementById('id_icone').value = valor;
+
+  // Atualiza preview
+  var wrap = document.getElementById('preview-wrap');
+  wrap.innerHTML = '<i data-lucide="' + valor + '"></i>';
+  if (window.lucide) lucide.createIcons({ nodes: [wrap] });
+}
+
+function selecionarCor(el) {
+  document.querySelectorAll('.cor-swatch').forEach(s => s.classList.remove('selecionada'));
+  el.classList.add('selecionada');
+  var hex = el.dataset.hex;
+  document.getElementById('id_cor').value = hex;
+  document.getElementById('preview-wrap').style.background = hex;
+}
+
+(function() {
+  var corAtual = document.getElementById('id_cor').value;
+  if (!corAtual) document.getElementById('id_cor').value = '#888888';
+
+  var nomeSelect = document.getElementById('id_nome');
+  if (nomeSelect) {
+    nomeSelect.addEventListener('change', function() {
+      var nome = this.options[this.selectedIndex].text.replace(/^[^\s]+\s/, '').trim();
+      var nomeVal = this.value;
+      document.getElementById('preview-nome').textContent = nomeVal || 'Nome da categoria';
+      var p = PRESETS[nomeVal];
+      if (p) {
+        var btnIcone = document.querySelector('.icone-btn[data-valor="' + p.icone + '"]');
+        if (btnIcone) selecionarIcone(btnIcone);
+        var swatchCor = document.querySelector('.cor-swatch[data-hex="' + p.cor + '"]');
+        if (swatchCor) selecionarCor(swatchCor);
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

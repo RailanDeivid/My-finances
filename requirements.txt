@@ -1,0 +1,14 @@
+# Django + servidor + driver
+django==4.2.18
+gunicorn==23.0.0
+psycopg2-binary==2.9.12
+whitenoise==6.8.2
+
+# Configuração
+python-dotenv==1.0.1
+
+# UI do admin (tema moderno tailwind-based) — mesma do CAIXINHA
+django-unfold==0.44.0
+
+# Datas para cálculo de parcelas
+python-dateutil==2.9.0

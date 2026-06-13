@@ -1,0 +1,63 @@
+<!-- Modal: Nova Entrada -->
+<div id="modal-nova-entrada"
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);
+            align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+              width:100%;max-width:480px;margin:auto;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 24px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:36px;height:36px;border-radius:8px;background:#22c55e20;
+                     display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="banknote-arrow-up" style="width:18px;height:18px;stroke:#22c55e;"></i>
+        </span>
+        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text);">Nova Entrada</h3>
+      </div>
+      <button onclick="closeFormModal('modal-nova-entrada')"
+              style="background:none;border:none;cursor:pointer;color:var(--text-muted);
+                     font-size:24px;line-height:1;padding:0 4px;">&times;</button>
+    </div>
+
+    <form method="post" action="{% url 'entrada-create' %}" style="padding:20px 24px;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+
+      <div class="form-group">
+        <label class="form-label" for="me_tipo">Tipo *</label>
+        <select name="tipo" id="me_tipo" class="form-control" required>
+          {% for val, label in modal_entrada_form.tipo.field.choices %}
+          {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-group">
+          <label class="form-label" for="me_valor">Valor (R$) *</label>
+          <input type="number" name="valor" id="me_valor" class="form-control"
+                 step="0.01" placeholder="0,00" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="me_data">Data *</label>
+          <input type="date" name="data" id="me_data" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="me_descricao">Descrição</label>
+        <input type="text" name="descricao" id="me_descricao" class="form-control"
+               placeholder="Ex: Salário junho...">
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+        <button type="button" onclick="closeFormModal('modal-nova-entrada')" class="btn btn-danger">
+          Cancelar
+        </button>
+        <button type="submit" class="btn" style="background:#22c55e;color:#fff;border-color:#22c55e;">
+          <i data-lucide="save"></i> Salvar Entrada
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

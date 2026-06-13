@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Excluir Entrada — MyFinances{% endblock %}
+{% block page_title %}Excluir Entrada{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width:480px;">
+  <div style="text-align:center;padding:16px 0;">
+    <div style="font-size:40px;margin-bottom:12px;">🗑️</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:8px;">Confirmar exclusão</div>
+    <div style="color:var(--text-muted);margin-bottom:20px;">
+      Excluir a entrada <strong>{{ object.get_tipo_display }}</strong>
+      — R$ {{ object.valor|floatformat:2 }} ({{ object.data|date:"d/m/Y" }})?
+      <br>Esta ação não pode ser desfeita.
+    </div>
+    <form method="post" style="display:flex;gap:10px;justify-content:center;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger"><i data-lucide="trash-2"></i> Excluir</button>
+      <a href="{% url 'entrada-list' %}" class="btn btn-danger">Cancelar</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

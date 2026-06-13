@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Responsáveis — MyFinances{% endblock %}
+{% block page_title %}Responsáveis{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Responsáveis</h1>
+  <a href="{% url 'responsavel-create' %}" class="btn btn-primary">
+    <i data-lucide="plus"></i> Novo Responsável
+  </a>
+</div>
+
+<div class="tabela-wrapper" style="max-width:600px;">
+  <table class="tabela-dados">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th style="text-align:center;">Status</th>
+        <th style="text-align:right;">Cadastrado em</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in responsaveis %}
+      <tr>
+        <td style="font-weight:500;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--accent)22;color:var(--accent);font-weight:700;font-size:13px;flex-shrink:0;">
+              {{ r.nome|first|upper }}
+            </span>
+            {{ r.nome }}
+          </div>
+        </td>
+        <td style="text-align:center;">
+          {% if r.ativo %}<span class="badge badge-success">Ativo</span>{% else %}<span class="badge badge-danger">Inativo</span>{% endif %}
+        </td>
+        <td style="text-align:right;color:var(--text-muted);font-size:12px;">{{ r.criado_em|date:"d/m/Y" }}</td>
+        <td style="white-space:nowrap;">
+          <a href="{% url 'responsavel-update' r.pk %}" class="btn btn-sm" title="Editar">
+            <i data-lucide="pencil"></i>
+          </a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="4">
+          {% url 'responsavel-create' as create_url %}
+          {% with es_icon="users" es_title="Nenhum responsável cadastrado" es_description="Adicione os responsáveis pelos gastos para organizar suas finanças por pessoa." es_url=create_url es_button="Adicionar primeiro responsável" %}
+            {% include "includes/empty_state.html" %}
+          {% endwith %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

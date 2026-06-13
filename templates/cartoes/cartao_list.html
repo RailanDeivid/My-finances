@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Cartões — MyFinances{% endblock %}
+{% block page_title %}Cartões{% endblock %}
+
+{% block content %}
+
+{% with filtro_label="Mês/Ano da Fatura:" %}
+  {% include "includes/mes_ano_filtro.html" %}
+{% endwith %}
+
+<div class="page-header">
+  <h1>Cartões</h1>
+  <div style="display:flex;gap:8px;">
+    <button type="button" class="btn btn-danger" style="font-size:12px;padding:6px 14px;"
+            onclick="openDeleteModal('{% url 'cartao-delete-all' %}', 'Todos os cartões e seus gastos vinculados serão excluídos permanentemente. Esta ação não pode ser desfeita.')">
+      <i data-lucide="trash-2"></i> Excluir Tudo
+    </button>
+    <a href="{% url 'cartao-create' %}" class="btn btn-primary">
+      <i data-lucide="plus"></i> Novo Cartão
+    </a>
+  </div>
+</div>
+
+{% if cartoes %}
+<div class="cartoes-grid">
+  {% for cartao in cartoes %}
+  <a href="{% url 'cartao-detail' cartao.pk %}?mes={{ mes }}&amp;ano={{ ano }}" class="cartao-card" style="text-decoration:none;display:block;">
+    <div class="cartao-card-stripe" style="background:{{ cartao.cor }};"></div>
+    <div style="margin-top:8px;">
+      <div class="cartao-card-nome">{{ cartao.nome }}</div>
+      <div class="cartao-card-info">
+        {{ cartao.get_bandeira_display }}
+        <span class="bandeira-badge">{{ cartao.get_tipo_display }}</span>
+      </div>
+    </div>
+    {% if cartao.tipo == "credito" %}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+      <div class="cartao-card-label">Fatura {{ mes }}/{{ ano }}</div>
+      <div class="cartao-card-fatura" style="color:{{ cartao.cor }};">R$ {{ cartao.fatura_mes|floatformat:2 }}</div>
+      {% if cartao.limite %}
+      <div class="cartao-card-label" style="margin-top:4px;">Limite: R$ {{ cartao.limite|floatformat:2 }}</div>
+      {% endif %}
+      {% if cartao.dia_fechamento %}
+      <div class="cartao-card-label">Fecha dia {{ cartao.dia_fechamento }}{% if cartao.dia_vencimento %} · Vence dia {{ cartao.dia_vencimento }}{% endif %}</div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+      <div class="cartao-card-label">Débito {{ mes }}/{{ ano }}</div>
+      <div class="cartao-card-fatura" style="color:{{ cartao.cor }};">R$ {{ cartao.debito_mes|floatformat:2 }}</div>
+    </div>
+    {% endif %}
+    <div style="margin-top:10px;text-align:right;">
+      <span style="font-size:11px;color:var(--text-muted);">Clique para ver detalhes →</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+{% url 'cartao-create' as create_url %}
+{% with es_icon="credit-card" es_title="Nenhum cartão cadastrado" es_description="Adicione seus cartões de crédito e débito para acompanhar faturas e gastos por cartão." es_url=create_url es_button="Adicionar primeiro cartão" %}
+  {% include "includes/empty_state.html" %}
+{% endwith %}
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}{{ cartao.nome }} — MyFinances{% endblock %}
+{% block page_title %}{{ cartao.nome }}{% endblock %}
+
+{% block content %}
+
+<!-- Botão Voltar + Ações -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <a href="{% url 'cartao-list' %}?mes={{ mes }}&amp;ano={{ ano }}" class="btn">
+    <i data-lucide="arrow-left"></i> Voltar para Cartões
+  </a>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'cartao-update' cartao.pk %}" class="btn">
+      <i data-lucide="pencil"></i> Editar Cartão
+    </a>
+    <a href="{% url 'cartao-delete' cartao.pk %}" class="btn btn-danger"
+       data-confirm="Excluir o cartão '{{ cartao.nome }}'?">
+      <i data-lucide="trash-2"></i> Excluir
+    </a>
+  </div>
+</div>
+
+<!-- Filtro mês -->
+<form method="get" class="mes-filtro">
+  <label>Mês/Ano:</label>
+  <select name="mes" class="auto-submit">
+    <option value="1"  {% if mes == 1  %}selected{% endif %}>Janeiro</option>
+    <option value="2"  {% if mes == 2  %}selected{% endif %}>Fevereiro</option>
+    <option value="3"  {% if mes == 3  %}selected{% endif %}>Março</option>
+    <option value="4"  {% if mes == 4  %}selected{% endif %}>Abril</option>
+    <option value="5"  {% if mes == 5  %}selected{% endif %}>Maio</option>
+    <option value="6"  {% if mes == 6  %}selected{% endif %}>Junho</option>
+    <option value="7"  {% if mes == 7  %}selected{% endif %}>Julho</option>
+    <option value="8"  {% if mes == 8  %}selected{% endif %}>Agosto</option>
+    <option value="9"  {% if mes == 9  %}selected{% endif %}>Setembro</option>
+    <option value="10" {% if mes == 10 %}selected{% endif %}>Outubro</option>
+    <option value="11" {% if mes == 11 %}selected{% endif %}>Novembro</option>
+    <option value="12" {% if mes == 12 %}selected{% endif %}>Dezembro</option>
+  </select>
+  <select name="ano" class="auto-submit">
+    <option value="2024" {% if ano == 2024 %}selected{% endif %}>2024</option>
+    <option value="2025" {% if ano == 2025 %}selected{% endif %}>2025</option>
+    <option value="2026" {% if ano == 2026 %}selected{% endif %}>2026</option>
+    <option value="2027" {% if ano == 2027 %}selected{% endif %}>2027</option>
+  </select>
+</form>
+
+<!-- Info do cartão -->
+<div class="stat-card" style="margin-bottom:20px;max-width:540px;border-left:4px solid {{ cartao.cor }};">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div>
+      <div class="stat-label">{{ cartao.get_bandeira_display }} · {{ cartao.get_tipo_display }}</div>
+      <div class="stat-value" style="color:{{ cartao.cor }};">{{ cartao.nome }}</div>
+      {% if cartao.limite %}<div class="stat-sub">Limite: R$ {{ cartao.limite|floatformat:2 }}</div>{% endif %}
+      {% if cartao.dia_fechamento %}<div class="stat-sub">Fecha dia {{ cartao.dia_fechamento }}{% if cartao.dia_vencimento %} · Vence dia {{ cartao.dia_vencimento }}{% endif %}</div>{% endif %}
+    </div>
+    <div style="margin-left:auto;text-align:right;">
+      <div class="stat-label">Total {{ mes }}/{{ ano }}</div>
+      <div class="stat-value" style="color:{{ cartao.cor }};">R$ {{ total_fatura|floatformat:2 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-header">
+  <h1>Gastos do Cartão</h1>
+  <a href="{% url 'gasto-create' %}" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Novo Gasto</a>
+</div>
+
+<div class="tabela-wrapper">
+  <table class="tabela-dados">
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Descrição</th>
+        <th>Categoria</th>
+        <th>Responsável</th>
+        <th>Tipo</th>
+        <th>Parcelas</th>
+        <th style="text-align:right;">Valor</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in gastos %}
+      <tr>
+        <td style="white-space:nowrap;">{{ g.data_compra|date:"d/m/Y" }}</td>
+        <td style="font-weight:500;">{{ g.descricao }}</td>
+        <td>
+          {% if g.categoria %}
+            <span style="display:inline-flex;align-items:center;gap:6px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:{{ g.categoria.cor }}22;flex-shrink:0;">
+                <i data-lucide="{{ g.categoria.icone }}" style="width:11px;height:11px;stroke:{{ g.categoria.cor }};"></i>
+              </span>{{ g.categoria.nome }}
+            </span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td>{{ g.responsavel }}</td>
+        <td>
+          {% if g.tipo_pagamento == "debito" %}<span class="badge badge-debito">Débito</span>
+          {% elif g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
+          {% else %}<span class="badge badge-parcelado">Parcelado</span>{% endif %}
+        </td>
+        <td style="text-align:center;">{% if g.tipo_pagamento == "credito_parcelado" %}{{ g.total_parcelas }}x{% else %}—{% endif %}</td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|floatformat:2 }}</td>
+        <td style="white-space:nowrap;">
+          <a href="{% url 'gasto-update' g.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
+          <a href="{% url 'gasto-delete' g.pk %}" class="btn btn-sm btn-danger"
+             data-confirm="Excluir '{{ g.descricao }}'?"><i data-lucide="trash-2"></i></a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:32px;">Nenhum gasto neste período.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

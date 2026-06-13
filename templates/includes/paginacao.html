@@ -1,0 +1,11 @@
+{% if is_paginated %}
+<div class="pag-container" style="margin-top:16px;display:flex;gap:6px;justify-content:center;">
+  {% if page_obj.has_previous %}
+  <a href="?page={{ page_obj.previous_page_number }}&{{ filtros.urlencode }}" class="pag-btn">‹ Anterior</a>
+  {% endif %}
+  <span class="pag-btn" style="cursor:default;">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a href="?page={{ page_obj.next_page_number }}&{{ filtros.urlencode }}" class="pag-btn">Próxima ›</a>
+  {% endif %}
+</div>
+{% endif %}

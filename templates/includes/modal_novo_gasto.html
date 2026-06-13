@@ -1,0 +1,125 @@
+<!-- Modal: Novo Gasto -->
+<div id="modal-novo-gasto"
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);
+            align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
+  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+              width:100%;max-width:540px;margin:auto;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:18px 24px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:36px;height:36px;border-radius:8px;background:#ef444420;
+                     display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i data-lucide="banknote-arrow-down" style="width:18px;height:18px;stroke:#ef4444;"></i>
+        </span>
+        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text);">Novo Gasto</h3>
+      </div>
+      <button onclick="closeFormModal('modal-novo-gasto')"
+              style="background:none;border:none;cursor:pointer;color:var(--text-muted);
+                     font-size:24px;line-height:1;padding:0 4px;">&times;</button>
+    </div>
+
+    <form method="post" action="{% url 'gasto-create' %}" style="padding:20px 24px;">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-group">
+          <label class="form-label" for="mg_responsavel">Responsável *</label>
+          <select name="responsavel" id="mg_responsavel" class="form-control" required>
+            <option value="">— Selecione —</option>
+            {% for r in modal_gasto_form.responsavel.field.queryset %}
+            <option value="{{ r.pk }}">{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mg_cartao">Cartão *</label>
+          <select name="cartao" id="mg_cartao" class="form-control" required>
+            <option value="">— Selecione —</option>
+            {% for c in modal_gasto_form.cartao.field.queryset %}
+            <option value="{{ c.pk }}">{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="mg_descricao">Descrição *</label>
+        <input type="text" name="descricao" id="mg_descricao" class="form-control"
+               placeholder="Ex: Mercado, Farmácia..." required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="mg_tipo_pagamento">Tipo de Pagamento *</label>
+        <select name="tipo_pagamento" id="mg_tipo_pagamento" class="form-control" required>
+          {% for val, label in modal_gasto_form.tipo_pagamento.field.choices %}
+          {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div class="form-group">
+          <label class="form-label" for="mg_valor_total" id="mg_label_valor">Valor Total (R$) *</label>
+          <input type="number" name="valor_total" id="mg_valor_total" class="form-control"
+                 step="0.01" placeholder="0,00" required>
+        </div>
+        <div class="form-group" id="mg-parcelas-row" style="display:none;">
+          <label class="form-label" for="mg_total_parcelas">Nº de Parcelas *</label>
+          <input type="number" name="total_parcelas" id="mg_total_parcelas" class="form-control"
+                 min="2" max="60">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="mg_data_compra">Data da Compra *</label>
+          <input type="date" name="data_compra" id="mg_data_compra" class="form-control" required>
+        </div>
+      </div>
+
+      <div id="mg-inicio-row" style="display:none;margin-bottom:16px;">
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">
+            Mês de início das parcelas
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <label class="form-label" for="mg_mes_inicio">Mês da 1ª Parcela</label>
+              <select name="mes_inicio" id="mg_mes_inicio" class="form-control">
+                {% for val, label in modal_gasto_form.mes_inicio.field.choices %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="mg_ano_inicio">Ano</label>
+              <select name="ano_inicio" id="mg_ano_inicio" class="form-control">
+                {% for val, label in modal_gasto_form.ano_inicio.field.choices %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="mg_categoria">Categoria</label>
+        <select name="categoria" id="mg_categoria" class="form-control">
+          <option value="">— Sem categoria —</option>
+          {% for c in modal_gasto_form.categoria.field.queryset %}
+          <option value="{{ c.pk }}">{{ c.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+        <button type="button" onclick="closeFormModal('modal-novo-gasto')" class="btn btn-danger">
+          Cancelar
+        </button>
+        <button type="submit" class="btn btn-danger">
+          <i data-lucide="save"></i> Salvar Gasto
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

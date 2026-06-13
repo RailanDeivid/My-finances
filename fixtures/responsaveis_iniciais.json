@@ -1,0 +1,12 @@
+[
+  {
+    "model": "gastos.responsavel",
+    "pk": 1,
+    "fields": {
+      "nome": "Railan",
+      "apelido": "Railan",
+      "ativo": true,
+      "criado_em": "2025-01-01T00:00:00Z"
+    }
+  }
+]

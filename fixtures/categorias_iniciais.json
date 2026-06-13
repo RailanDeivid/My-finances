@@ -1,0 +1,13 @@
+[
+  {"model": "gastos.categoria", "pk": 1,  "fields": {"nome": "Alimentação",  "icone": "ti-tools-kitchen-2",       "cor": "#FF6B6B", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 2,  "fields": {"nome": "Transporte",   "icone": "ti-car",                   "cor": "#4ECDC4", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 3,  "fields": {"nome": "Saúde",        "icone": "ti-heart-rate-monitor",    "cor": "#45B7D1", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 4,  "fields": {"nome": "Lazer",        "icone": "ti-device-gamepad-2",      "cor": "#96CEB4", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 5,  "fields": {"nome": "Moradia",      "icone": "ti-home",                  "cor": "#FFEAA7", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 6,  "fields": {"nome": "Educação",     "icone": "ti-school",                "cor": "#DDA0DD", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 7,  "fields": {"nome": "Vestuário",    "icone": "ti-shirt",                 "cor": "#98D8C8", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 8,  "fields": {"nome": "Supermercado", "icone": "ti-shopping-cart",         "cor": "#F7DC6F", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 9,  "fields": {"nome": "Serviços",     "icone": "ti-settings",              "cor": "#AEB6BF", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 10, "fields": {"nome": "Assinaturas",  "icone": "ti-refresh",               "cor": "#85C1E9", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}},
+  {"model": "gastos.categoria", "pk": 11, "fields": {"nome": "Outros",       "icone": "ti-dots-circle-horizontal","cor": "#D5DBDB", "ativo": true, "criado_em": "2025-01-01T00:00:00Z"}}
+]

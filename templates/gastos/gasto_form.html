@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} — MyFinances{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+
+<div class="form-card">
+
+  {% if form.errors %}
+  <div class="form-errors">
+    <strong>Corrija os erros abaixo:</strong>
+    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+    {% for e in form.non_field_errors %}<div>• {{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="form-section-title">Informações do Gasto</div>
+
+    <div class="form-group">
+      <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição *</label>
+      {{ form.descricao }}
+      {% if form.descricao.errors %}<div class="field-error">{{ form.descricao.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="{{ form.tipo_pagamento.id_for_label }}">Tipo de Pagamento *</label>
+      {{ form.tipo_pagamento }}
+      {% if form.tipo_pagamento.errors %}<div class="field-error">{{ form.tipo_pagamento.errors.0 }}</div>{% endif %}
+    </div>
+
+    <!-- Linha: Valor + Parcelas + Data -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" id="valor-parcelas-grid">
+      <div class="form-group">
+        <label class="form-label" for="{{ form.valor_total.id_for_label }}" id="label-valor">Valor Total (R$) *</label>
+        {{ form.valor_total }}
+        <div id="total-calculado" style="display:none;margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
+        {% if form.valor_total.errors %}<div class="field-error">{{ form.valor_total.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group" id="parcelas-row" style="display:none;">
+        <label class="form-label" for="{{ form.total_parcelas.id_for_label }}">Número de Parcelas *</label>
+        {{ form.total_parcelas }}
+        {% if form.total_parcelas.errors %}<div class="field-error">{{ form.total_parcelas.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group" id="data-row">
+        <label class="form-label" for="{{ form.data_compra.id_for_label }}" id="label-data">Data da Compra *</label>
+        {{ form.data_compra }}
+        {% if form.data_compra.errors %}<div class="field-error">{{ form.data_compra.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <!-- Linha extra: Mês/Ano da 1ª Parcela (só parcelado) -->
+    <div id="inicio-parcelas-row" style="display:none;margin-bottom:16px;">
+      <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">
+          Mês de início das parcelas
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;">
+          <div>
+            <label class="form-label" for="id_mes_inicio">Mês da 1ª Parcela *</label>
+            {{ form.mes_inicio }}
+          </div>
+          <div>
+            <label class="form-label" for="id_ano_inicio">Ano</label>
+            {{ form.ano_inicio }}
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">
+          <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;stroke:var(--text-muted);"></i>
+          Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.
+          As demais parcelas serão criadas automaticamente a partir deste mês.
+        </div>
+        <div id="preview-parcelas" style="margin-top:10px;font-size:12px;color:var(--accent);display:none;"></div>
+      </div>
+    </div>
+
+    <div class="form-section-title">Responsável e Cartão</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="form-group">
+        <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável *</label>
+        {{ form.responsavel }}
+        {% if form.responsavel.errors %}<div class="field-error">{{ form.responsavel.errors.0 }}</div>{% endif %}
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="{{ form.cartao.id_for_label }}">Cartão *</label>
+        <select name="cartao" id="id_cartao" class="form-control"
+                data-selected-id="{{ form.cartao.value }}">
+          <option value="">— Selecione um cartão —</option>
+        </select>
+        {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="{{ form.categoria.id_for_label }}">Categoria</label>
+      {{ form.categoria }}
+      {% if form.categoria.errors %}<div class="field-error">{{ form.categoria.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
+      {{ form.observacao }}
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        <i data-lucide="save"></i> Salvar
+      </button>
+      <a href="{% url 'gasto-list' %}" class="btn btn-danger">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  var tipoSelect    = document.getElementById('id_tipo_pagamento');
+  var parcelasRow   = document.getElementById('parcelas-row');
+  var inicioRow     = document.getElementById('inicio-parcelas-row');
+  var labelValor    = document.getElementById('label-valor');
+  var totalCalc     = document.getElementById('total-calculado');
+  var previewParc   = document.getElementById('preview-parcelas');
+  var inputValor    = document.getElementById('id_valor_total');
+  var inputParcelas = document.getElementById('id_total_parcelas');
+  var inputData     = document.getElementById('id_data_compra');
+  var selMes        = document.getElementById('id_mes_inicio');
+  var selAno        = document.getElementById('id_ano_inicio');
+  var grid          = document.getElementById('valor-parcelas-grid');
+
+  var mesesNomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  // Sincroniza seletores de mês/ano com o campo data quando usuário não editou manualmente
+  var inicioDirty = false;
+  selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+  selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+
+  inputData.addEventListener('change', function() {
+    if (!inicioDirty) sincronizarInicio();
+    atualizarPreview();
+  });
+
+  function sincronizarInicio() {
+    var val = inputData.value; // YYYY-MM-DD
+    if (!val) return;
+    var partes = val.split('-');
+    if (partes.length < 2) return;
+    var mes = parseInt(partes[1], 10);
+    var ano = parseInt(partes[0], 10);
+    selMes.value = mes;
+    selAno.value = ano;
+  }
+
+  function atualizarLayout() {
+    var tipo = tipoSelect.value;
+    var isParcelado = tipo === 'credito_parcelado';
+
+    if (isParcelado) {
+      parcelasRow.style.display = 'block';
+      inicioRow.style.display = 'block';
+      labelValor.textContent = 'Valor da Parcela (R$) *';
+      grid.style.gridTemplateColumns = '1fr 1fr 1fr';
+      if (!inicioDirty) sincronizarInicio();
+    } else {
+      parcelasRow.style.display = 'none';
+      inicioRow.style.display = 'none';
+      labelValor.textContent = 'Valor Total (R$) *';
+      grid.style.gridTemplateColumns = '1fr 1fr';
+    }
+    atualizarTotal();
+    atualizarPreview();
+  }
+
+  function atualizarTotal() {
+    var tipo = tipoSelect.value;
+    if (tipo !== 'credito_parcelado') {
+      totalCalc.style.display = 'none';
+      return;
+    }
+    var parcela = parseFloat(inputValor.value) || 0;
+    var n       = parseInt(inputParcelas.value) || 0;
+    if (parcela > 0 && n > 1) {
+      var total = (parcela * n).toLocaleString('pt-BR', {minimumFractionDigits: 2});
+      totalCalc.textContent = 'Total: R$ ' + total + ' (' + n + 'x de R$ ' + parcela.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ')';
+      totalCalc.style.display = 'block';
+    } else {
+      totalCalc.style.display = 'none';
+    }
+  }
+
+  function atualizarPreview() {
+    var tipo = tipoSelect.value;
+    if (tipo !== 'credito_parcelado') { previewParc.style.display = 'none'; return; }
+    var n   = parseInt(inputParcelas.value) || 0;
+    var mes = parseInt(selMes.value) || 0;
+    var ano = parseInt(selAno.value) || 0;
+    if (!n || !mes || !ano) { previewParc.style.display = 'none'; return; }
+
+    var partes = [];
+    for (var i = 0; i < Math.min(n, 4); i++) {
+      var m = ((mes - 1 + i) % 12) + 1;
+      var a = ano + Math.floor((mes - 1 + i) / 12);
+      partes.push(mesesNomes[m - 1] + '/' + a);
+    }
+    var txt = 'Parcelas: ' + partes.join(' → ');
+    if (n > 4) txt += ' → ... (até ' + mesesNomes[((mes - 1 + n - 1) % 12)] + '/' + (ano + Math.floor((mes - 1 + n - 1) / 12)) + ')';
+    previewParc.textContent = txt;
+    previewParc.style.display = 'block';
+  }
+
+  inputValor.addEventListener('input', atualizarTotal);
+  inputParcelas.addEventListener('input', function(){ atualizarTotal(); atualizarPreview(); });
+  tipoSelect.addEventListener('change', atualizarLayout);
+
+  atualizarLayout();
+})();
+</script>
+{% endblock %}
