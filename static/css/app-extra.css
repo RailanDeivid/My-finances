@@ -10,6 +10,7 @@
   text-decoration: none;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s;

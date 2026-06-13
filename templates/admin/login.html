@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+{% load i18n static %}
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Interno — MyFinances</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=2">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=2"></script>
+  <script defer>document.addEventListener('DOMContentLoaded', function(){ lucide.createIcons(); })</script>
+  <script>
+    function toggleSenha(id, btn) {
+      var inp = document.getElementById(id);
+      var mostrar = inp.type === 'password';
+      inp.type = mostrar ? 'text' : 'password';
+      btn.querySelector('i').setAttribute('data-lucide', mostrar ? 'eye-off' : 'eye');
+      lucide.createIcons();
+    }
+  </script>
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg-primary); }
+    .login-wrap { width:100%; max-width:380px; padding:24px; }
+    .login-logo { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:32px; }
+    .login-logo-icon { width:48px; height:48px; border-radius:12px; background:rgba(245,158,11,0.15); display:flex; align-items:center; justify-content:center; }
+    .login-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:28px; }
+    .login-title { font-size:17px; font-weight:600; color:var(--text-primary); margin:0 0 6px; }
+    .login-sub { font-size:13px; color:var(--text-muted); margin:0 0 24px; }
+    .login-error { background:rgba(231,76,60,.1); border:1px solid rgba(231,76,60,.3); color:#e74c3c; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; }
+    .restricted-badge {
+      display:flex; align-items:center; gap:6px; justify-content:center;
+      font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px;
+      color:#f59e0b; margin-bottom:28px;
+    }
+    .btn-admin { background:#f59e0b; border-color:#f59e0b; color:#000; width:100%; padding:10px; font-size:15px; margin-top:4px; font-weight:600; }
+    .btn-admin:hover { background:#d97706; border-color:#d97706; color:#000; }
+    .back-link { display:flex; align-items:center; justify-content:center; gap:6px; margin-top:18px; font-size:12px; color:var(--text-muted); text-decoration:none; }
+    .back-link:hover { color:var(--text-primary); }
+  </style>
+</head>
+<body class="dark-theme">
+
+<div class="login-wrap">
+  <div class="login-logo">
+    <div class="login-logo-icon">
+      <i data-lucide="shield-check" style="width:26px;height:26px;stroke:#f59e0b;"></i>
+    </div>
+    <span style="font-size:22px;font-weight:700;color:var(--text-primary);">Painel Interno</span>
+  </div>
+
+  <div class="restricted-badge">
+    <i data-lucide="lock" style="width:12px;height:12px;"></i>
+    Acesso restrito
+  </div>
+
+  <div class="login-card">
+    <div class="login-title">Área administrativa</div>
+    <div class="login-sub">Somente usuários autorizados</div>
+
+    {% if error %}
+    <div class="login-error">
+      <i data-lucide="alert-circle" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"></i>
+      Credenciais inválidas ou sem permissão de acesso.
+    </div>
+    {% endif %}
+
+    <form action="{{ app_path }}" method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div class="form-group">
+        <label class="form-label">Usuário</label>
+        <input type="text" name="username" class="form-control" autofocus autocomplete="username"
+               placeholder="Usuário administrador">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <div style="position:relative;">
+          <input type="password" name="password" id="adm-password" class="form-control"
+                 autocomplete="current-password" placeholder="••••••••" style="padding-right:40px;">
+          <button type="button" onclick="toggleSenha('adm-password', this)"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;cursor:pointer;padding:0;
+                         color:var(--text-muted);display:flex;align-items:center;">
+            <i data-lucide="eye" style="width:16px;height:16px;"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-admin">
+        <i data-lucide="shield-check"></i> Acessar painel
+      </button>
+    </form>
+  </div>
+
+  <a href="/" class="back-link">
+    <i data-lucide="arrow-left" style="width:13px;height:13px;"></i>
+    Voltar para o app
+  </a>
+</div>
+
+</body>
+</html>

@@ -54,4 +54,3 @@ python manage.py runserver
 | App web | 8001  |
 | Banco (PostgreSQL) | 5433 |
 
-> Portas diferentes do projeto CAIXINHA (8000 / 5434) para não conflitar.

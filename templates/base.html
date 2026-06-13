@@ -6,8 +6,8 @@
   <title>{% block title %}MyFinances{% endblock %}</title>
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=2">
   <script defer src="{% static 'js/lucide.min.js' %}?v=2"></script>
   <script defer src="{% static 'js/app.js' %}"></script>
   <script defer src="{% static 'js/gastos.js' %}"></script>
@@ -59,7 +59,7 @@
 
       <div class="sidebar-section">Sistema</div>
 
-      <a class="sidebar-item" href="/admin/" target="_blank">
+      <a class="sidebar-item" href="/painel-interno/" target="_blank">
         <span class="sidebar-icon"><i data-lucide="shield-check"></i></span>
         <span class="sidebar-text">Admin</span>
       </a>
@@ -109,9 +109,9 @@
 
   <!-- Modal de confirmação de exclusão em massa -->
   <div id="modal-delete-all"
-       style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);
+       style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
               align-items:center;justify-content:center;padding:24px;">
-    <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
                 padding:36px 32px;max-width:420px;width:100%;text-align:center;
                 box-shadow:0 24px 48px rgba(0,0,0,0.4);">
       <div style="width:64px;height:64px;border-radius:50%;background:#ef444420;
@@ -127,7 +127,7 @@
         </button>
         <form id="modal-delete-form" method="post" style="display:contents;">
           {% csrf_token %}
-          <button type="submit" class="btn btn-danger" style="min-width:160px;font-size:14px;">
+          <button type="submit" class="btn btn-primary" style="min-width:160px;font-size:14px;">
             <i data-lucide="trash-2"></i> Confirmar exclusão
           </button>
         </form>

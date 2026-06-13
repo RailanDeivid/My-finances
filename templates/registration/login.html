@@ -5,19 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login — MyFinances</title>
   {% load static %}
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=2">
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
   <script defer src="{% static 'js/lucide.min.js' %}"></script>
   <script defer>document.addEventListener('DOMContentLoaded', () => lucide.createIcons())</script>
+  <script>
+    function toggleSenha(id, btn) {
+      var inp = document.getElementById(id);
+      var mostrar = inp.type === 'password';
+      inp.type = mostrar ? 'text' : 'password';
+      btn.querySelector('i').setAttribute('data-lucide', mostrar ? 'eye-off' : 'eye');
+      lucide.createIcons();
+    }
+  </script>
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg-primary); }
     .login-wrap { width:100%; max-width:380px; padding:24px; }
     .login-logo { display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:32px; }
     .login-logo-icon { width:48px; height:48px; border-radius:12px; background:var(--accent)22; display:flex; align-items:center; justify-content:center; }
-    .login-logo-name { font-size:22px; font-weight:700; color:var(--text); }
-    .login-card { background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:28px; }
-    .login-title { font-size:17px; font-weight:600; color:var(--text); margin:0 0 6px; }
+    .login-logo-name { font-size:22px; font-weight:700; color:var(--text-primary); }
+    .login-card { background:var(--bg-card); border:1px solid var(--border); border-radius:14px; padding:28px; }
+    .login-title { font-size:17px; font-weight:600; color:var(--text-primary); margin:0 0 6px; }
     .login-sub { font-size:13px; color:var(--text-muted); margin:0 0 24px; }
     .login-btn { width:100%; padding:10px; font-size:15px; margin-top:4px; }
     .login-error { background:var(--danger)18; border:1px solid var(--danger)44; color:var(--danger); border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:16px; }
@@ -56,8 +65,16 @@
 
       <div class="form-group">
         <label class="form-label">Senha</label>
-        <input type="password" name="password" class="form-control" autocomplete="current-password"
-               placeholder="••••••••">
+        <div style="position:relative;">
+          <input type="password" name="password" id="app-password" class="form-control"
+                 autocomplete="current-password" placeholder="••••••••" style="padding-right:40px;">
+          <button type="button" onclick="toggleSenha('app-password', this)"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                         background:none;border:none;cursor:pointer;padding:0;
+                         color:var(--text-muted);display:flex;align-items:center;">
+            <i data-lucide="eye" style="width:16px;height:16px;"></i>
+          </button>
+        </div>
       </div>
 
       <button type="submit" class="btn btn-primary login-btn">

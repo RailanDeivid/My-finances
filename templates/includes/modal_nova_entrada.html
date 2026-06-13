@@ -1,8 +1,8 @@
 <!-- Modal: Nova Entrada -->
 <div id="modal-nova-entrada"
-     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
             align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;">
-  <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:16px;
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
               width:100%;max-width:480px;margin:auto;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
 
     <div style="display:flex;align-items:center;justify-content:space-between;
@@ -12,7 +12,7 @@
                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <i data-lucide="banknote-arrow-up" style="width:18px;height:18px;stroke:#22c55e;"></i>
         </span>
-        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text);">Nova Entrada</h3>
+        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Nova Entrada</h3>
       </div>
       <button onclick="closeFormModal('modal-nova-entrada')"
               style="background:none;border:none;cursor:pointer;color:var(--text-muted);
@@ -54,7 +54,7 @@
         <button type="button" onclick="closeFormModal('modal-nova-entrada')" class="btn btn-danger">
           Cancelar
         </button>
-        <button type="submit" class="btn" style="background:#22c55e;color:#fff;border-color:#22c55e;">
+        <button type="submit" class="btn btn-primary">
           <i data-lucide="save"></i> Salvar Entrada
         </button>
       </div>
