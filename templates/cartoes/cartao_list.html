@@ -44,11 +44,6 @@
       <div class="cartao-card-label">Fecha dia {{ cartao.dia_fechamento }}{% if cartao.dia_vencimento %} · Vence dia {{ cartao.dia_vencimento }}{% endif %}</div>
       {% endif %}
     </div>
-    {% else %}
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
-      <div class="cartao-card-label">Débito {{ mes }}/{{ ano }}</div>
-      <div class="cartao-card-fatura" style="color:{{ cartao.cor }};">R$ {{ cartao.debito_mes|floatformat:2 }}</div>
-    </div>
     {% endif %}
     <div style="margin-top:10px;text-align:right;">
       <span style="font-size:11px;color:var(--text-muted);">Clique para ver detalhes →</span>

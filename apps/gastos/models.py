@@ -1,11 +1,26 @@
 from decimal import Decimal
 from django.db import models
+from django.contrib.auth import get_user_model
 from dateutil.relativedelta import relativedelta
+
+User = get_user_model()
 
 
 class Responsavel(models.Model):
     nome = models.CharField(max_length=100)
     ativo = models.BooleanField(default=True)
+    is_principal = models.BooleanField(
+        default=False,
+        help_text="Responsável principal gerado automaticamente para o dono da conta.",
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, related_name="responsaveis",
+    )
+    usuario_vinculado = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="responsaveis_vinculados",
+        help_text="Gastos deste responsável aparecem no dashboard do login vinculado com uma tag.",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -20,7 +35,6 @@ class Responsavel(models.Model):
 class Cartao(models.Model):
     TIPO_CHOICES = [
         ("credito", "Crédito"),
-        ("debito", "Débito"),
     ]
     BANDEIRA_CHOICES = [
         ("visa", "Visa"),
@@ -45,6 +59,9 @@ class Cartao(models.Model):
     )
     cor = models.CharField(max_length=7, default="#6C63FF", help_text="Cor hex para exibição no app")
     ativo = models.BooleanField(default=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, related_name="cartoes",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -158,6 +175,9 @@ class Categoria(models.Model):
     icone = models.CharField(max_length=50, blank=True, choices=ICONE_CHOICES)
     cor = models.CharField(max_length=7, default="#888888", choices=CORES_CHOICES)
     ativo = models.BooleanField(default=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, related_name="categorias",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -181,10 +201,17 @@ class Entrada(models.Model):
     descricao = models.CharField(max_length=255, blank=True)
     valor = models.DecimalField(max_digits=10, decimal_places=2)
     data = models.DateField()
+    conta = models.ForeignKey(
+        "Conta", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="entradas", help_text="Conta bancária de recebimento.",
+    )
     responsavel = models.ForeignKey(
         "Responsavel", on_delete=models.SET_NULL, null=True, blank=True, related_name="entradas"
     )
     auto_gerada = models.BooleanField(default=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, related_name="entradas_proprias",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -198,16 +225,24 @@ class Entrada(models.Model):
 
 class Gasto(models.Model):
     TIPO_PAGAMENTO_CHOICES = [
-        ("debito", "Débito"),
         ("credito_avista", "Crédito à Vista"),
         ("credito_parcelado", "Crédito Parcelado"),
+        ("pix", "Pix / Transferência"),
+        ("emprestimo", "Empréstimo"),
     ]
+
+    TIPOS_CARTAO = {"credito_avista", "credito_parcelado"}
 
     descricao = models.CharField(max_length=255)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2)
     tipo_pagamento = models.CharField(max_length=25, choices=TIPO_PAGAMENTO_CHOICES)
     cartao = models.ForeignKey(
-        "Cartao", on_delete=models.PROTECT, related_name="gastos"
+        "Cartao", on_delete=models.PROTECT, related_name="gastos",
+        null=True, blank=True,
+    )
+    nome_pessoa = models.CharField(
+        max_length=150, blank=True, default="",
+        help_text="Nome da pessoa destinatária (para 'Pagamento a Pessoa').",
     )
     responsavel = models.ForeignKey(
         "Responsavel", on_delete=models.PROTECT, related_name="gastos"
@@ -221,6 +256,9 @@ class Gasto(models.Model):
         null=True, blank=True,
         help_text="Número total de parcelas. Preencher apenas se parcelado."
     )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, related_name="gastos_proprios",
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -231,19 +269,6 @@ class Gasto(models.Model):
 
     def __str__(self):
         return f"{self.descricao} — R$ {self.valor_total} ({self.data_compra})"
-
-    def _gerar_parcelas(self):
-        self.parcelas.all().delete()
-        valor_parcela = (Decimal(str(self.valor_total)) / self.total_parcelas).quantize(Decimal("0.01"))
-        for i in range(self.total_parcelas):
-            data_venc = self.data_compra + relativedelta(months=i + 1)
-            Parcela.objects.create(
-                gasto=self,
-                numero=i + 1,
-                valor=valor_parcela,
-                data_vencimento=data_venc,
-            )
-
 
 class Parcela(models.Model):
     gasto = models.ForeignKey(
@@ -262,3 +287,73 @@ class Parcela(models.Model):
 
     def __str__(self):
         return f"Parcela {self.numero}/{self.gasto.total_parcelas} — {self.gasto.descricao}"
+
+
+class FaturaPaga(models.Model):
+    cartao = models.ForeignKey(
+        Cartao, on_delete=models.CASCADE, related_name="faturas_pagas"
+    )
+    mes = models.PositiveSmallIntegerField()
+    ano = models.PositiveSmallIntegerField()
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="faturas_pagas"
+    )
+
+    class Meta:
+        verbose_name = "Fatura Paga"
+        verbose_name_plural = "Faturas Pagas"
+        unique_together = ("cartao", "mes", "ano", "user")
+
+    def __str__(self):
+        return f"{self.cartao.nome} — {self.mes}/{self.ano}"
+
+
+class Conta(models.Model):
+    TIPO_CHOICES = [
+        ("corrente", "Conta Corrente"),
+        ("poupanca", "Poupança"),
+        ("salario", "Conta Salário"),
+        ("investimento", "Investimento"),
+        ("digital", "Conta Digital"),
+        ("outro", "Outro"),
+    ]
+
+    nome = models.CharField(max_length=100)
+    banco = models.CharField(max_length=100, blank=True)
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="corrente")
+    saldo_atual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cor = models.CharField(max_length=7, default="#3b82f6")
+    ativo = models.BooleanField(default=True)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="contas"
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Conta"
+        verbose_name_plural = "Contas"
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class PagamentoFeito(models.Model):
+    TIPO_CHOICES = [("pix", "Pix"), ("emprestimo", "Empréstimo")]
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    responsavel = models.ForeignKey(
+        Responsavel, on_delete=models.CASCADE, related_name="pagamentos_feitos"
+    )
+    mes = models.PositiveSmallIntegerField()
+    ano = models.PositiveSmallIntegerField()
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="pagamentos_feitos"
+    )
+
+    class Meta:
+        verbose_name = "Pagamento Feito"
+        verbose_name_plural = "Pagamentos Feitos"
+        unique_together = ("tipo", "responsavel", "mes", "ano", "user")
+
+    def __str__(self):
+        return f"{self.tipo} — {self.responsavel.nome} {self.mes}/{self.ano}"

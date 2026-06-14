@@ -3,7 +3,8 @@ from datetime import date
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
-from django.db.models import Sum
+from django.contrib.auth import update_session_auth_hash
+from django.db.models import Sum, Q
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
@@ -13,8 +14,9 @@ from django.views.generic import (
 )
 from django.contrib import messages
 
-from .models import Gasto, Cartao, Responsavel, Categoria, Parcela, Entrada
-from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, EntradaForm
+from django.shortcuts import get_object_or_404
+from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, FaturaPaga, Conta, PagamentoFeito
+from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, EntradaForm, ContaForm, PerfilForm, SenhaForm
 
 
 def _mes_ano_from_request(request):
@@ -29,32 +31,38 @@ def _mes_ano_from_request(request):
     return mes, ano
 
 
-def _calcular_saldo_mes(mes, ano):
-    """Retorna (total_entradas, total_gastos, saldo) de um determinado mês."""
-    total_gastos = (
-        Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
-        .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+def _impacto_q(user):
+    """Q que representa todos os gastos que impactam financeiramente um usuário:
+    os próprios (responsável principal) + os atribuídos por outros usuários."""
+    return (
+        Q(user=user, responsavel__is_principal=True) |
+        (Q(responsavel__usuario_vinculado=user) & ~Q(user=user))
     )
-    total_entradas = (
-        Entrada.objects.filter(data__month=mes, data__year=ano)
-        .aggregate(t=Sum("valor"))["t"] or Decimal("0")
-    )
+
+
+def _calcular_saldo_mes(mes, ano, user=None):
+    qs_gasto = Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
+    qs_entrada = Entrada.objects.filter(data__month=mes, data__year=ano)
+    if user is not None:
+        qs_gasto = qs_gasto.filter(_impacto_q(user))
+        qs_entrada = qs_entrada.filter(user=user)
+    total_gastos = qs_gasto.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+    total_entradas = qs_entrada.aggregate(t=Sum("valor"))["t"] or Decimal("0")
     return total_entradas, total_gastos, total_entradas - total_gastos
 
 
-def _auto_saldo_anterior(mes, ano):
-    """Cria ou atualiza o saldo_anterior do mês com base nos dados do mês anterior.
-    Sempre recalcula — garante que mudanças em gastos/entradas se reflitam."""
+def _auto_saldo_anterior(mes, ano, user=None):
     ref_ant = date(ano, mes, 1) - relativedelta(months=1)
     mes_ant, ano_ant = ref_ant.month, ref_ant.year
 
-    total_entradas, total_gastos, saldo = _calcular_saldo_mes(mes_ant, ano_ant)
+    total_entradas, total_gastos, saldo = _calcular_saldo_mes(mes_ant, ano_ant, user)
 
     if total_gastos > 0 or total_entradas != Decimal("0"):
+        lookup = {"tipo": "saldo_anterior", "data": date(ano, mes, 1), "auto_gerada": True}
+        if user is not None:
+            lookup["user"] = user
         Entrada.objects.update_or_create(
-            tipo="saldo_anterior",
-            data=date(ano, mes, 1),
-            auto_gerada=True,
+            **lookup,
             defaults={
                 "descricao": f"Saldo de {ref_ant.strftime('%b/%Y')}",
                 "valor": saldo,
@@ -62,23 +70,20 @@ def _auto_saldo_anterior(mes, ano):
         )
 
 
-def _recalcular_saldos_a_partir(mes, ano):
-    """Recalcula em cascata todos os saldo_anterior auto-gerados para os meses
-    seguintes ao mês informado. Chame após qualquer alteração em Gasto ou Entrada."""
+def _recalcular_saldos_a_partir(mes, ano, user=None):
     prox = date(ano, mes, 1) + relativedelta(months=1)
 
     while True:
+        qs = Entrada.objects.filter(tipo="saldo_anterior", auto_gerada=True, data=prox)
+        if user is not None:
+            qs = qs.filter(user=user)
         try:
-            entrada = Entrada.objects.get(
-                tipo="saldo_anterior",
-                auto_gerada=True,
-                data=prox,
-            )
+            entrada = qs.get()
         except Entrada.DoesNotExist:
             break
 
         ref_ant = prox - relativedelta(months=1)
-        total_entradas, total_gastos, saldo = _calcular_saldo_mes(ref_ant.month, ref_ant.year)
+        total_entradas, total_gastos, saldo = _calcular_saldo_mes(ref_ant.month, ref_ant.year, user)
 
         entrada.valor = saldo
         entrada.descricao = f"Saldo de {ref_ant.strftime('%b/%Y')}"
@@ -92,11 +97,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        user = self.request.user
         mes, ano = _mes_ano_from_request(self.request)
         ctx["mes"] = mes
         ctx["ano"] = ano
 
-        _auto_saldo_anterior(mes, ano)
+        # Garante que todo usuário tem um responsável principal
+        if not Responsavel.objects.filter(user=user, is_principal=True).exists():
+            nome = user.get_full_name().strip() or user.username
+            Responsavel.objects.get_or_create(
+                user=user,
+                is_principal=True,
+                defaults={"nome": nome, "ativo": True},
+            )
+
+        _auto_saldo_anterior(mes, ano, user)
+
+        ctx["anos_lista"] = list(range(2026, 2037))
 
         # Filtros
         responsavel_id = self.request.GET.get("responsavel")
@@ -104,17 +121,17 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         tipo_filtro = self.request.GET.get("tipo")
         categoria_id = self.request.GET.get("categoria")
 
-        ctx["responsaveis_lista"] = Responsavel.objects.filter(ativo=True)
-        ctx["cartoes_lista"] = Cartao.objects.filter(ativo=True)
-        ctx["categorias_lista"] = Categoria.objects.filter(ativo=True)
+        ctx["responsaveis_lista"] = Responsavel.objects.filter(ativo=True, user=user)
+        ctx["cartoes_lista"] = Cartao.objects.filter(ativo=True, user=user)
+        ctx["categorias_lista"] = Categoria.objects.filter(ativo=True, user=user)
         ctx["tipos_lista"] = Gasto.TIPO_PAGAMENTO_CHOICES
         ctx["filtro_responsavel"] = responsavel_id
         ctx["filtro_cartao"] = cartao_id
         ctx["filtro_tipo"] = tipo_filtro
         ctx["filtro_categoria"] = categoria_id
 
-        # Gastos do mês com filtros (responsável filtra só gastos)
-        gastos_mes = Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
+        # Gastos do mês do próprio user
+        gastos_mes = Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
         if responsavel_id:
             gastos_mes = gastos_mes.filter(responsavel_id=responsavel_id)
         if cartao_id:
@@ -124,36 +141,84 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if categoria_id:
             gastos_mes = gastos_mes.filter(categoria_id=categoria_id)
 
-        # Entradas e saldo são sempre globais — não filtram por nada
-        entradas_mes = Entrada.objects.filter(data__month=mes, data__year=ano)
-        gastos_mes_total = Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
+        # Gastos atribuídos ao user (onde o responsavel está vinculado a este login)
+        gastos_atribuidos = Gasto.objects.filter(
+            responsavel__usuario_vinculado=user,
+            data_compra__month=mes, data_compra__year=ano,
+        ).exclude(user=user).select_related("responsavel", "cartao", "categoria", "user")
+
+        entradas_mes = Entrada.objects.filter(user=user, data__month=mes, data__year=ano)
+        # Gastos que impactam este usuário: próprios (principal) + atribuídos por outros
+        gastos_mes_proprios = Gasto.objects.filter(
+            _impacto_q(user),
+            data_compra__month=mes,
+            data_compra__year=ano,
+        )
 
         total_entradas = entradas_mes.aggregate(t=Sum("valor"))["t"] or Decimal("0")
-        total_gasto    = gastos_mes.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        total_gasto_geral = gastos_mes_total.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        saldo = total_entradas - total_gasto_geral
+        total_gasto = gastos_mes_proprios.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        saldo = total_entradas - total_gasto
 
         ctx["total_entradas"] = total_entradas
         ctx["total_gasto"] = total_gasto
         ctx["saldo"] = saldo
-        ctx["qtd_gastos"] = gastos_mes.count()
+        ctx["qtd_gastos"] = gastos_mes_proprios.count()
 
-        # Tabela por responsável e por cartão — sem filtros (só mes/ano)
-        gastos_mes_base = Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
+        # Tabela por responsável e por cartão — inclui atribuídos
+        gastos_mes_base = Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
         ctx["tabela_por_responsavel"] = (
             gastos_mes_base.values("responsavel__id", "responsavel__nome")
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
         ctx["tabela_por_cartao"] = (
-            gastos_mes_base.values("cartao__id", "cartao__nome", "cartao__cor", "cartao__tipo")
+            gastos_mes_base.filter(cartao__isnull=False)
+            .values("cartao__id", "cartao__nome", "cartao__cor", "cartao__tipo")
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
+        ctx["tabela_por_emprestimo"] = (
+            gastos_mes_base.filter(tipo_pagamento="emprestimo")
+            .values("responsavel__id", "responsavel__nome")
+            .annotate(total=Sum("valor_total"))
+            .order_by("-total")
+        )
+        ctx["tabela_por_pix"] = (
+            gastos_mes_base.filter(tipo_pagamento="pix")
+            .values("responsavel__id", "responsavel__nome")
+            .annotate(total=Sum("valor_total"))
+            .order_by("-total")
+        )
+        ctx["faturas_pagas_ids"] = set(
+            FaturaPaga.objects.filter(user=user, mes=mes, ano=ano)
+            .values_list("cartao_id", flat=True)
+        )
+        ctx["pagamentos_pix_ids"] = set(
+            PagamentoFeito.objects.filter(user=user, mes=mes, ano=ano, tipo="pix")
+            .values_list("responsavel_id", flat=True)
+        )
+        ctx["pagamentos_emp_ids"] = set(
+            PagamentoFeito.objects.filter(user=user, mes=mes, ano=ano, tipo="emprestimo")
+            .values_list("responsavel_id", flat=True)
+        )
 
-        # Por categoria (gráfico pizza)
+        contas = Conta.objects.filter(user=user, ativo=True)
+        total_contas = contas.aggregate(t=Sum("saldo_atual"))["t"] or Decimal("0")
+        ctx["contas"] = contas
+        ctx["total_contas"] = total_contas
+
+        # Por categoria (gráfico pizza) — inclui atribuídos, respeita filtros ativos
+        gastos_cat_qs = Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
+        if responsavel_id:
+            gastos_cat_qs = gastos_cat_qs.filter(responsavel_id=responsavel_id)
+        if cartao_id:
+            gastos_cat_qs = gastos_cat_qs.filter(cartao_id=cartao_id)
+        if tipo_filtro:
+            gastos_cat_qs = gastos_cat_qs.filter(tipo_pagamento=tipo_filtro)
+        if categoria_id:
+            gastos_cat_qs = gastos_cat_qs.filter(categoria_id=categoria_id)
         por_categoria = (
-            gastos_mes.values("categoria__nome", "categoria__cor")
+            gastos_cat_qs.values("categoria__nome", "categoria__cor")
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
@@ -165,8 +230,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             c["categoria__cor"] or "#888888" for c in por_categoria
         ])
 
-        # Gráfico de período: todos os meses com gastos (travado, não muda com filtro de mês)
-        periodo_qs = Gasto.objects.values("data_compra__month", "data_compra__year")
+        # Gráfico de período — inclui atribuídos
+        periodo_qs = Gasto.objects.filter(_impacto_q(user)).values("data_compra__month", "data_compra__year")
         if responsavel_id:
             periodo_qs = periodo_qs.filter(responsavel_id=responsavel_id)
         if cartao_id:
@@ -202,7 +267,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["periodo_labels"] = json.dumps(periodo_labels)
         ctx["periodo_valores"] = json.dumps(periodo_valores)
 
-        # Tabela combinada: entradas + gastos do mês (para "Entradas e Saídas")
+        # Tabela combinada: entradas + gastos + gastos atribuídos
         gastos_lista = list(
             gastos_mes.select_related("responsavel", "cartao", "categoria")
             .order_by("-data_compra", "-criado_em")
@@ -214,15 +279,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             transacoes.append({
                 "data": g.data_compra,
                 "tipo": "gasto",
+                "tipo_pag": g.tipo_pagamento,
                 "tipo_label": g.get_tipo_pagamento_display(),
                 "descricao": g.descricao,
                 "categoria": g.categoria,
                 "responsavel": str(g.responsavel),
-                "cartao": g.cartao.nome,
+                "cartao": g.cartao.nome if g.cartao else "",
                 "valor": float(g.valor_total),
                 "pk": g.pk,
                 "parcelas": g.total_parcelas if g.tipo_pagamento == "credito_parcelado" else None,
                 "auto_gerada": False,
+                "atribuido": False,
+                "atribuido_por": "",
             })
         for e in entradas_lista:
             transacoes.append({
@@ -237,40 +305,58 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 "pk": e.pk,
                 "parcelas": None,
                 "auto_gerada": e.auto_gerada,
+                "atribuido": False,
+                "atribuido_por": "",
+            })
+        for g in gastos_atribuidos:
+            owner_name = g.user.get_full_name() if g.user else "outro usuário"
+            if not owner_name.strip():
+                owner_name = g.user.username if g.user else "outro usuário"
+            transacoes.append({
+                "data": g.data_compra,
+                "tipo": "gasto",
+                "tipo_pag": g.tipo_pagamento,
+                "tipo_label": g.get_tipo_pagamento_display(),
+                "descricao": g.descricao,
+                "categoria": g.categoria,
+                "responsavel": str(g.responsavel),
+                "cartao": g.cartao.nome if g.cartao else "",
+                "valor": float(g.valor_total),
+                "pk": None,
+                "parcelas": g.total_parcelas if g.tipo_pagamento == "credito_parcelado" else None,
+                "auto_gerada": False,
+                "atribuido": True,
+                "atribuido_por": owner_name,
             })
 
         transacoes.sort(key=lambda x: x["data"], reverse=True)
         ctx["transacoes_mes"] = transacoes
-        ctx["entradas_mes"] = entradas_lista
 
-        ctx["meses_nomes"] = meses_nomes
-
-        # ── Tabela + Gráfico: Gastos vs Entradas — Visão Mensal ──────────
+        # Tabela: Gastos vs Entradas — Visão Mensal
         saldo_ant_qs = (
-            Entrada.objects.filter(tipo="saldo_anterior")
+            Entrada.objects.filter(user=user, tipo="saldo_anterior")
             .values("data__year", "data__month")
             .annotate(t=Sum("valor"))
         )
         entradas_qs = (
-            Entrada.objects.exclude(tipo="saldo_anterior")
+            Entrada.objects.filter(user=user).exclude(tipo="saldo_anterior")
             .values("data__year", "data__month")
             .annotate(t=Sum("valor"))
         )
-        gastos_qs = (
-            Gasto.objects.values("data_compra__year", "data_compra__month")
+        # Gastos que impactam o usuário (próprios principal + atribuídos) por mês
+        gastos_principal_qs = (
+            Gasto.objects.filter(_impacto_q(user))
+            .values("data_compra__year", "data_compra__month")
             .annotate(t=Sum("valor_total"))
         )
 
-        saldo_ant_map  = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in saldo_ant_qs}
-        entradas_map   = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in entradas_qs}
-        gastos_map     = {(r["data_compra__year"], r["data_compra__month"]): float(r["t"] or 0) for r in gastos_qs}
+        saldo_ant_map = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in saldo_ant_qs}
+        entradas_map  = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in entradas_qs}
+        gastos_map    = {(r["data_compra__year"], r["data_compra__month"]): float(r["t"] or 0) for r in gastos_principal_qs}
 
-        todos_meses = sorted(
-            set(list(saldo_ant_map) + list(entradas_map) + list(gastos_map))
-        )
+        # Apenas os 12 meses do ano selecionado, independente de ter dados
+        todos_meses = [(ano, m) for m in range(1, 13)]
 
-        # Cálculo encadeado: saldo_atual[M] vira saldo_anterior[M+1]
-        # Para o primeiro mês, usa o saldo_anterior armazenado (se existir)
         tabela_mensal = []
         running = Decimal(str(saldo_ant_map.get(todos_meses[0], 0.0))) if todos_meses else Decimal("0")
 
@@ -288,26 +374,42 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 "saldo_atual": float(saldo_atual),
                 "atual":       (y == ano and m == mes),
             })
-            running = saldo_atual  # saldo deste mês é o saldo_anterior do próximo
+            running = saldo_atual
 
         ctx["tabela_mensal"] = tabela_mensal
 
-        # Dados para o gráfico comparativo (derivado da mesma tabela)
-        ctx["comp_labels"]   = json.dumps([c["label"]       for c in tabela_mensal])
-        ctx["comp_gastos"]   = json.dumps([c["gastos"]      for c in tabela_mensal])
+        # Gráfico ⑥ "Gastos vs Receitas" — inclui atribuídos, segue filtros ativos
+        gastos_filtrado_qs = Gasto.objects.filter(_impacto_q(user))
+        if responsavel_id:
+            gastos_filtrado_qs = gastos_filtrado_qs.filter(responsavel_id=responsavel_id)
+        if cartao_id:
+            gastos_filtrado_qs = gastos_filtrado_qs.filter(cartao_id=cartao_id)
+        if tipo_filtro:
+            gastos_filtrado_qs = gastos_filtrado_qs.filter(tipo_pagamento=tipo_filtro)
+        if categoria_id:
+            gastos_filtrado_qs = gastos_filtrado_qs.filter(categoria_id=categoria_id)
+
+        gastos_filtrado_map = {
+            (r["data_compra__year"], r["data_compra__month"]): float(r["t"] or 0)
+            for r in gastos_filtrado_qs.values("data_compra__year", "data_compra__month").annotate(t=Sum("valor_total"))
+        }
+
+        ctx["comp_labels"]   = json.dumps([c["label"] for c in tabela_mensal])
+        ctx["comp_gastos"]   = json.dumps([gastos_filtrado_map.get(k, 0.0) for k in todos_meses])
         ctx["comp_entradas"] = json.dumps([c["entradas"] + c["saldo_ant"] for c in tabela_mensal])
         ctx["comp_saldo"]    = json.dumps([c["saldo_atual"] for c in tabela_mensal])
+        ctx["comp_receitas"] = json.dumps([c["entradas"] for c in tabela_mensal])
 
-        # ── Tabela Responsáveis × Meses ───────────────────────────────────
+        # Tabela Responsáveis × Meses — inclui atribuídos
         resp_qs = (
-            Gasto.objects.values(
+            Gasto.objects.filter(_impacto_q(user)).values(
                 "responsavel__id", "responsavel__nome",
                 "data_compra__year", "data_compra__month",
             ).annotate(t=Sum("valor_total"))
         )
 
-        resp_map = {}   # {resp_id: {(y,m): total}}
-        resp_nome_map = {}  # {resp_id: nome}
+        resp_map = {}
+        resp_nome_map = {}
         for item in resp_qs:
             rid   = item["responsavel__id"]
             rname = item["responsavel__nome"]
@@ -336,7 +438,7 @@ class GastoListView(LoginRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        qs = Gasto.objects.select_related("responsavel", "cartao", "categoria")
+        qs = Gasto.objects.filter(user=self.request.user).select_related("responsavel", "cartao", "categoria")
         mes = self.request.GET.get("mes")
         ano = self.request.GET.get("ano")
         responsavel = self.request.GET.get("responsavel")
@@ -364,9 +466,9 @@ class GastoListView(LoginRequiredMixin, ListView):
         hoje = date.today()
         ctx["mes"] = self.request.GET.get("mes", hoje.month)
         ctx["ano"] = self.request.GET.get("ano", hoje.year)
-        ctx["responsaveis"] = Responsavel.objects.filter(ativo=True)
-        ctx["cartoes"] = Cartao.objects.filter(ativo=True)
-        ctx["categorias"] = Categoria.objects.filter(ativo=True)
+        ctx["responsaveis"] = Responsavel.objects.filter(ativo=True, user=self.request.user)
+        ctx["cartoes"] = Cartao.objects.filter(ativo=True, user=self.request.user)
+        ctx["categorias"] = Categoria.objects.filter(ativo=True, user=self.request.user)
         ctx["tipos"] = Gasto.TIPO_PAGAMENTO_CHOICES
         ctx["filtros"] = self.request.GET
         ctx["total_filtrado"] = self.get_queryset().aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
@@ -379,11 +481,20 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
 
+    def get_initial(self):
+        hoje = date.today()
+        return {"mes_inicio": hoje.month, "ano_inicio": hoje.year}
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         gasto = form.save(commit=False)
+        gasto.user = self.request.user
         n = gasto.total_parcelas if gasto.tipo_pagamento == "credito_parcelado" else None
 
-        # Calcula data de início das parcelas
         data_inicio = gasto.data_compra
         if n:
             mes_ini = form.cleaned_data.get("mes_inicio")
@@ -410,11 +521,16 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
                     data_compra=data_inicio + relativedelta(months=i - 1),
                     observacao=gasto.observacao,
                     total_parcelas=n,
+                    user=self.request.user,
                 )
         else:
             gasto.save()
 
-        _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year)
+        _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, self.request.user)
+        # Recalcula saldo do usuário atribuído, se houver
+        usuario_atribuido = gasto.responsavel.usuario_vinculado
+        if usuario_atribuido and usuario_atribuido != self.request.user:
+            _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, usuario_atribuido)
         messages.success(self.request, "Gasto registrado com sucesso.")
         next_url = self.request.POST.get("next") or self.success_url
         return HttpResponseRedirect(next_url)
@@ -431,12 +547,25 @@ class GastoUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
 
+    def get_queryset(self):
+        return Gasto.objects.filter(user=self.request.user)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         data_antiga = self.get_object().data_compra
         gasto = form.save()
-        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year)
+        usuario_atribuido = gasto.responsavel.usuario_vinculado
+        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
         if gasto.data_compra != data_antiga:
-            _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year)
+            _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, self.request.user)
+        if usuario_atribuido and usuario_atribuido != self.request.user:
+            _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, usuario_atribuido)
+            if gasto.data_compra != data_antiga:
+                _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, usuario_atribuido)
         messages.success(self.request, "Gasto atualizado com sucesso.")
         return HttpResponseRedirect(self.success_url)
 
@@ -451,10 +580,16 @@ class GastoDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "gastos/gasto_confirm_delete.html"
     success_url = reverse_lazy("gasto-list")
 
+    def get_queryset(self):
+        return Gasto.objects.filter(user=self.request.user)
+
     def form_valid(self, form):
         mes, ano = self.object.data_compra.month, self.object.data_compra.year
+        usuario_atribuido = self.object.responsavel.usuario_vinculado
         response = super().form_valid(form)
-        _recalcular_saldos_a_partir(mes, ano)
+        _recalcular_saldos_a_partir(mes, ano, self.request.user)
+        if usuario_atribuido and usuario_atribuido != self.request.user:
+            _recalcular_saldos_a_partir(mes, ano, usuario_atribuido)
         messages.success(self.request, "Gasto excluído com sucesso.")
         return response
 
@@ -467,25 +602,21 @@ class CartaoListView(LoginRequiredMixin, ListView):
     context_object_name = "cartoes"
 
     def get_queryset(self):
-        return Cartao.objects.filter(ativo=True)
+        return Cartao.objects.filter(ativo=True, user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         mes, ano = _mes_ano_from_request(self.request)
         ctx["mes"] = mes
         ctx["ano"] = ano
+        user = self.request.user
         for cartao in ctx["cartoes"]:
             cartao.fatura_mes = Gasto.objects.filter(
                 cartao=cartao,
+                user=user,
                 data_compra__month=mes,
                 data_compra__year=ano,
                 tipo_pagamento__in=["credito_avista", "credito_parcelado"],
-            ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-            cartao.debito_mes = Gasto.objects.filter(
-                cartao=cartao,
-                data_compra__month=mes,
-                data_compra__year=ano,
-                tipo_pagamento="debito",
             ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
         return ctx
 
@@ -495,13 +626,19 @@ class CartaoDetailView(LoginRequiredMixin, DetailView):
     template_name = "cartoes/cartao_detail.html"
     context_object_name = "cartao"
 
+    def get_queryset(self):
+        return Cartao.objects.filter(user=self.request.user)
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         mes, ano = _mes_ano_from_request(self.request)
         ctx["mes"] = mes
         ctx["ano"] = ano
         ctx["gastos"] = (
-            Gasto.objects.filter(cartao=self.object, data_compra__month=mes, data_compra__year=ano)
+            Gasto.objects.filter(
+                cartao=self.object, user=self.request.user,
+                data_compra__month=mes, data_compra__year=ano,
+            )
             .select_related("responsavel", "categoria")
             .order_by("-data_compra")
         )
@@ -516,8 +653,11 @@ class CartaoCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy("cartao-list")
 
     def form_valid(self, form):
+        cartao = form.save(commit=False)
+        cartao.user = self.request.user
+        cartao.save()
         messages.success(self.request, "Cartão criado com sucesso.")
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -530,6 +670,9 @@ class CartaoUpdateView(LoginRequiredMixin, UpdateView):
     form_class = CartaoForm
     template_name = "cartoes/cartao_form.html"
     success_url = reverse_lazy("cartao-list")
+
+    def get_queryset(self):
+        return Cartao.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Cartão atualizado com sucesso.")
@@ -546,6 +689,9 @@ class CartaoDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "cartoes/cartao_confirm_delete.html"
     success_url = reverse_lazy("cartao-list")
 
+    def get_queryset(self):
+        return Cartao.objects.filter(user=self.request.user)
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["qtd_gastos"] = self.object.gastos.count()
@@ -557,7 +703,7 @@ class CartaoDeleteView(LoginRequiredMixin, DeleteView):
         self.object.gastos.all().delete()
         response = super().form_valid(form)
         for mes, ano in datas:
-            _recalcular_saldos_a_partir(mes, ano)
+            _recalcular_saldos_a_partir(mes, ano, self.request.user)
         messages.success(self.request, "Cartão excluído com sucesso.")
         return response
 
@@ -568,7 +714,9 @@ class ResponsavelListView(LoginRequiredMixin, ListView):
     model = Responsavel
     template_name = "responsaveis/responsavel_list.html"
     context_object_name = "responsaveis"
-    queryset = Responsavel.objects.all()
+
+    def get_queryset(self):
+        return Responsavel.objects.filter(user=self.request.user, is_principal=False)
 
 
 class ResponsavelCreateView(LoginRequiredMixin, CreateView):
@@ -578,8 +726,11 @@ class ResponsavelCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy("responsavel-list")
 
     def form_valid(self, form):
+        responsavel = form.save(commit=False)
+        responsavel.user = self.request.user
+        responsavel.save()
         messages.success(self.request, "Responsável criado com sucesso.")
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -593,6 +744,9 @@ class ResponsavelUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "responsaveis/responsavel_form.html"
     success_url = reverse_lazy("responsavel-list")
 
+    def get_queryset(self):
+        return Responsavel.objects.filter(user=self.request.user)
+
     def form_valid(self, form):
         messages.success(self.request, "Responsável atualizado com sucesso.")
         return super().form_valid(form)
@@ -603,6 +757,19 @@ class ResponsavelUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
+class ResponsavelDeleteView(LoginRequiredMixin, DeleteView):
+    model = Responsavel
+    template_name = "responsaveis/responsavel_confirm_delete.html"
+    success_url = reverse_lazy("responsavel-list")
+
+    def get_queryset(self):
+        return Responsavel.objects.filter(user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Responsável excluído com sucesso.")
+        return super().form_valid(form)
+
+
 # ── Categorias ─────────────────────────────────────────────────────────
 
 class CategoriaListView(LoginRequiredMixin, ListView):
@@ -611,21 +778,24 @@ class CategoriaListView(LoginRequiredMixin, ListView):
     context_object_name = "categorias"
 
     def get_queryset(self):
-        return Categoria.objects.all()
+        return Categoria.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         mes, ano = _mes_ano_from_request(self.request)
         ctx["mes"] = mes
         ctx["ano"] = ano
+        user = self.request.user
         for cat in ctx["categorias"]:
             cat.total_gastos_mes = Gasto.objects.filter(
                 categoria=cat,
+                user=user,
                 data_compra__month=mes,
                 data_compra__year=ano,
             ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
             cat.qtd_gastos_mes = Gasto.objects.filter(
                 categoria=cat,
+                user=user,
                 data_compra__month=mes,
                 data_compra__year=ano,
             ).count()
@@ -639,8 +809,11 @@ class CategoriaCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy("categoria-list")
 
     def form_valid(self, form):
+        categoria = form.save(commit=False)
+        categoria.user = self.request.user
+        categoria.save()
         messages.success(self.request, "Categoria criada com sucesso.")
-        return super().form_valid(form)
+        return HttpResponseRedirect(self.success_url)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -657,6 +830,9 @@ class CategoriaUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "categorias/categoria_form.html"
     success_url = reverse_lazy("categoria-list")
 
+    def get_queryset(self):
+        return Categoria.objects.filter(user=self.request.user)
+
     def form_valid(self, form):
         messages.success(self.request, "Categoria atualizada com sucesso.")
         return super().form_valid(form)
@@ -670,6 +846,19 @@ class CategoriaUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
+class CategoriaDeleteView(LoginRequiredMixin, DeleteView):
+    model = Categoria
+    template_name = "categorias/categoria_confirm_delete.html"
+    success_url = reverse_lazy("categoria-list")
+
+    def get_queryset(self):
+        return Categoria.objects.filter(user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Categoria excluída com sucesso.")
+        return super().form_valid(form)
+
+
 # ── Entradas ─────────────────────────────────────────────────────────────
 
 class EntradaListView(LoginRequiredMixin, ListView):
@@ -679,7 +868,7 @@ class EntradaListView(LoginRequiredMixin, ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        qs = Entrada.objects.all()
+        qs = Entrada.objects.filter(user=self.request.user)
         mes = self.request.GET.get("mes")
         ano = self.request.GET.get("ano")
         if mes and ano:
@@ -705,9 +894,16 @@ class EntradaCreateView(LoginRequiredMixin, CreateView):
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
-        entrada = form.save()
-        _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year)
+        entrada = form.save(commit=False)
+        entrada.user = self.request.user
+        entrada.save()
+        _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
         messages.success(self.request, "Entrada registrada com sucesso.")
         next_url = self.request.POST.get("next") or self.success_url
         return HttpResponseRedirect(next_url)
@@ -724,12 +920,20 @@ class EntradaUpdateView(LoginRequiredMixin, UpdateView):
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
 
+    def get_queryset(self):
+        return Entrada.objects.filter(user=self.request.user)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         data_antiga = self.get_object().data
         entrada = form.save()
-        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year)
+        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
         if entrada.data != data_antiga:
-            _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year)
+            _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
         messages.success(self.request, "Entrada atualizada com sucesso.")
         return HttpResponseRedirect(self.success_url)
 
@@ -744,10 +948,13 @@ class EntradaDeleteView(LoginRequiredMixin, DeleteView):
     template_name = "entradas/entrada_confirm_delete.html"
     success_url = reverse_lazy("entrada-list")
 
+    def get_queryset(self):
+        return Entrada.objects.filter(user=self.request.user)
+
     def form_valid(self, form):
         mes, ano = self.object.data.month, self.object.data.year
         response = super().form_valid(form)
-        _recalcular_saldos_a_partir(mes, ano)
+        _recalcular_saldos_a_partir(mes, ano, self.request.user)
         messages.success(self.request, "Entrada excluída com sucesso.")
         return response
 
@@ -757,11 +964,14 @@ class EntradaDeleteView(LoginRequiredMixin, DeleteView):
 @login_required
 def cartao_delete_all(request):
     if request.method == "POST":
-        datas = list(Gasto.objects.values_list("data_compra__month", "data_compra__year").distinct())
-        Gasto.objects.all().delete()
-        Cartao.objects.all().delete()
+        datas = list(
+            Gasto.objects.filter(user=request.user)
+            .values_list("data_compra__month", "data_compra__year").distinct()
+        )
+        Gasto.objects.filter(user=request.user).delete()
+        Cartao.objects.filter(user=request.user).delete()
         for mes, ano in set(datas):
-            _recalcular_saldos_a_partir(mes, ano)
+            _recalcular_saldos_a_partir(mes, ano, request.user)
         messages.success(request, "Todos os cartões (e seus gastos) foram excluídos.")
     return HttpResponseRedirect(reverse_lazy("cartao-list"))
 
@@ -769,10 +979,13 @@ def cartao_delete_all(request):
 @login_required
 def gasto_delete_all(request):
     if request.method == "POST":
-        datas = list(Gasto.objects.values_list("data_compra__month", "data_compra__year").distinct())
-        Gasto.objects.all().delete()
+        datas = list(
+            Gasto.objects.filter(user=request.user)
+            .values_list("data_compra__month", "data_compra__year").distinct()
+        )
+        Gasto.objects.filter(user=request.user).delete()
         for mes, ano in set(datas):
-            _recalcular_saldos_a_partir(mes, ano)
+            _recalcular_saldos_a_partir(mes, ano, request.user)
         messages.success(request, "Todos os gastos foram excluídos.")
     return HttpResponseRedirect(reverse_lazy("gasto-list"))
 
@@ -780,15 +993,146 @@ def gasto_delete_all(request):
 @login_required
 def entrada_delete_all(request):
     if request.method == "POST":
-        Entrada.objects.filter(auto_gerada=False).delete()
-        Entrada.objects.filter(auto_gerada=True).delete()
+        Entrada.objects.filter(user=request.user, auto_gerada=False).delete()
+        Entrada.objects.filter(user=request.user, auto_gerada=True).delete()
         messages.success(request, "Todas as entradas foram excluídas.")
     return HttpResponseRedirect(reverse_lazy("entrada-list"))
+
+
+# ── Perfil ─────────────────────────────────────────────────────────────
+
+@login_required
+def perfil_update(request):
+    next_url = request.POST.get("next") or "/"
+    if request.method == "POST":
+        form = PerfilForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Perfil atualizado com sucesso.")
+        else:
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
+    return HttpResponseRedirect(next_url)
+
+
+@login_required
+def senha_update(request):
+    next_url = request.POST.get("next") or "/"
+    if request.method == "POST":
+        form = SenhaForm(request.user, request.POST)
+        if form.is_valid():
+            request.user.set_password(form.cleaned_data["nova_senha"])
+            request.user.save()
+            update_session_auth_hash(request, request.user)
+            messages.success(request, "Senha alterada com sucesso.")
+        else:
+            for field_errors in form.errors.values():
+                for error in field_errors:
+                    messages.error(request, error)
+    return HttpResponseRedirect(next_url)
 
 
 # ── API interna ─────────────────────────────────────────────────────────
 
 @login_required
 def cartoes_por_responsavel(request, responsavel_id=None):
-    cartoes = Cartao.objects.filter(ativo=True).values("id", "nome", "tipo")
+    cartoes = Cartao.objects.filter(ativo=True, user=request.user).values("id", "nome", "tipo")
     return JsonResponse(list(cartoes), safe=False)
+
+
+@login_required
+def fatura_toggle_pago(request, cartao_id):
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["POST"])
+    cartao = get_object_or_404(Cartao, pk=cartao_id, user=request.user)
+    mes, ano = _mes_ano_from_request(request)
+    obj, created = FaturaPaga.objects.get_or_create(
+        cartao=cartao, mes=mes, ano=ano, user=request.user
+    )
+    if not created:
+        obj.delete()
+    next_url = request.POST.get("next") or reverse_lazy("dashboard")
+    return HttpResponseRedirect(next_url)
+
+
+@login_required
+def pagamento_toggle(request, tipo, responsavel_id):
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["POST"])
+    if tipo not in ("pix", "emprestimo"):
+        from django.http import Http404
+        raise Http404
+    responsavel = get_object_or_404(Responsavel, pk=responsavel_id, user=request.user)
+    mes, ano = _mes_ano_from_request(request)
+    obj, created = PagamentoFeito.objects.get_or_create(
+        tipo=tipo, responsavel=responsavel, mes=mes, ano=ano, user=request.user
+    )
+    if not created:
+        obj.delete()
+    next_url = request.POST.get("next") or reverse_lazy("dashboard")
+    return HttpResponseRedirect(next_url)
+
+
+# ── Contas ─────────────────────────────────────────────────────────────
+
+class ContaListView(LoginRequiredMixin, ListView):
+    model = Conta
+    template_name = "contas/conta_list.html"
+    context_object_name = "contas"
+
+    def get_queryset(self):
+        return Conta.objects.filter(user=self.request.user, ativo=True)
+
+
+class ContaCreateView(LoginRequiredMixin, CreateView):
+    model = Conta
+    form_class = ContaForm
+    template_name = "contas/conta_form.html"
+    success_url = reverse_lazy("conta-list")
+
+    def form_valid(self, form):
+        conta = form.save(commit=False)
+        conta.user = self.request.user
+        conta.save()
+        messages.success(self.request, "Conta criada com sucesso.")
+        return HttpResponseRedirect(self.success_url)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["titulo"] = "Nova Conta"
+        return ctx
+
+
+class ContaUpdateView(LoginRequiredMixin, UpdateView):
+    model = Conta
+    form_class = ContaForm
+    template_name = "contas/conta_form.html"
+    success_url = reverse_lazy("conta-list")
+
+    def get_queryset(self):
+        return Conta.objects.filter(user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Conta atualizada com sucesso.")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["titulo"] = "Editar Conta"
+        return ctx
+
+
+class ContaDeleteView(LoginRequiredMixin, DeleteView):
+    model = Conta
+    template_name = "contas/conta_confirm_delete.html"
+    success_url = reverse_lazy("conta-list")
+
+    def get_queryset(self):
+        return Conta.objects.filter(user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Conta excluída com sucesso.")
+        return super().form_valid(form)

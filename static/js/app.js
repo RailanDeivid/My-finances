@@ -109,7 +109,7 @@
     }
 
     // Modais de formulário — fechar clicando fora ou Escape
-    ["modal-novo-gasto", "modal-nova-entrada"].forEach(function (id) {
+    ["modal-novo-gasto", "modal-nova-entrada", "modal-perfil"].forEach(function (id) {
       var fm = document.getElementById(id);
       if (!fm) return;
       fm.addEventListener("click", function (e) {
@@ -121,6 +121,7 @@
       closeDeleteModal();
       closeFormModal("modal-novo-gasto");
       closeFormModal("modal-nova-entrada");
+      closeFormModal("modal-perfil");
     });
   });
 
@@ -129,13 +130,27 @@
     if (!modal) return;
     modal.style.display = "flex";
     if (typeof lucide !== "undefined") lucide.createIcons();
-    var today = new Date().toISOString().split("T")[0];
+
+    var now = new Date();
+    var today = now.toISOString().split("T")[0];
+
     modal.querySelectorAll("input[type='date']").forEach(function (inp) {
       if (!inp.value) inp.value = today;
     });
-    // Sync parcelas toggle on open
+
+    // Mês e ano de início das parcelas: sempre inicia com mês/ano atual ao abrir
+    var selMes = modal.querySelector("#mg_mes_inicio");
+    var selAno = modal.querySelector("#mg_ano_inicio");
+    if (selMes) selMes.value = now.getMonth() + 1;
+    if (selAno) selAno.value = now.getFullYear();
+
+    // Sync tipo toggle on open
     var mgTipo = modal.querySelector("#mg_tipo_pagamento");
-    if (mgTipo) mgTipo.dispatchEvent(new Event("change"));
+    if (mgTipo && typeof window.mgGastoTipoToggle === "function") {
+      window.mgGastoTipoToggle(mgTipo.value);
+    } else if (mgTipo) {
+      mgTipo.dispatchEvent(new Event("change"));
+    }
   };
 
   window.closeFormModal = function (id) {
@@ -155,5 +170,14 @@
   window.closeDeleteModal = function () {
     var modal = document.getElementById("modal-delete-all");
     if (modal) modal.style.display = "none";
+  };
+
+  window.toggleSenha = function (id, btn) {
+    var inp = document.getElementById(id);
+    if (!inp) return;
+    var mostrar = inp.type === "password";
+    inp.type = mostrar ? "text" : "password";
+    btn.querySelector("i").setAttribute("data-lucide", mostrar ? "eye-off" : "eye");
+    if (typeof lucide !== "undefined") lucide.createIcons();
   };
 })();

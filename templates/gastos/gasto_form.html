@@ -25,12 +25,6 @@
       {% if form.descricao.errors %}<div class="field-error">{{ form.descricao.errors.0 }}</div>{% endif %}
     </div>
 
-    <div class="form-group">
-      <label class="form-label" for="{{ form.tipo_pagamento.id_for_label }}">Tipo de Pagamento *</label>
-      {{ form.tipo_pagamento }}
-      {% if form.tipo_pagamento.errors %}<div class="field-error">{{ form.tipo_pagamento.errors.0 }}</div>{% endif %}
-    </div>
-
     <!-- Linha: Valor + Parcelas + Data -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" id="valor-parcelas-grid">
       <div class="form-group">
@@ -76,22 +70,27 @@
       </div>
     </div>
 
-    <div class="form-section-title">Responsável e Cartão</div>
+    <div class="form-section-title">Responsável e Forma de Pagamento</div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div class="form-group">
-        <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável *</label>
-        {{ form.responsavel }}
-        {% if form.responsavel.errors %}<div class="field-error">{{ form.responsavel.errors.0 }}</div>{% endif %}
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="{{ form.cartao.id_for_label }}">Cartão *</label>
-        <select name="cartao" id="id_cartao" class="form-control"
-                data-selected-id="{{ form.cartao.value }}">
-          <option value="">— Selecione um cartão —</option>
-        </select>
-        {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
-      </div>
+    <div class="form-group">
+      <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável *</label>
+      {{ form.responsavel }}
+      {% if form.responsavel.errors %}<div class="field-error">{{ form.responsavel.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="{{ form.tipo_pagamento.id_for_label }}">Tipo de Pagamento *</label>
+      {{ form.tipo_pagamento }}
+      {% if form.tipo_pagamento.errors %}<div class="field-error">{{ form.tipo_pagamento.errors.0 }}</div>{% endif %}
+    </div>
+
+    <div class="form-group" id="cartao-row" style="display:none;">
+      <label class="form-label" for="{{ form.cartao.id_for_label }}">Cartão *</label>
+      <select name="cartao" id="id_cartao" class="form-control"
+              data-selected-id="{{ form.cartao.value }}">
+        <option value="">— Sem cartão —</option>
+      </select>
+      {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
     </div>
 
     <div class="form-group">
@@ -119,9 +118,11 @@
 {% block extra_js %}
 <script>
 (function() {
+  var TIPOS_CARTAO  = ['credito_avista', 'credito_parcelado'];
   var tipoSelect    = document.getElementById('id_tipo_pagamento');
   var parcelasRow   = document.getElementById('parcelas-row');
   var inicioRow     = document.getElementById('inicio-parcelas-row');
+  var cartaoRow     = document.getElementById('cartao-row');
   var labelValor    = document.getElementById('label-valor');
   var totalCalc     = document.getElementById('total-calculado');
   var previewParc   = document.getElementById('preview-parcelas');
@@ -134,30 +135,40 @@
 
   var mesesNomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
-  // Sincroniza seletores de mês/ano com o campo data quando usuário não editou manualmente
-  var inicioDirty = false;
-  selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
-  selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+  (function() {
+    var now = new Date();
+    var mesAtual = now.getMonth() + 1;
+    var anoAtual = now.getFullYear();
+    if (selMes && parseInt(selMes.value, 10) === 1 && mesAtual !== 1) selMes.value = mesAtual;
+    if (selAno) selAno.value = anoAtual;
+  })();
 
-  inputData.addEventListener('change', function() {
+  var inicioDirty = false;
+  if (selMes) selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+  if (selAno) selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+  if (inputData) inputData.addEventListener('change', function() {
     if (!inicioDirty) sincronizarInicio();
     atualizarPreview();
   });
 
   function sincronizarInicio() {
-    var val = inputData.value; // YYYY-MM-DD
+    var val = inputData ? inputData.value : '';
     if (!val) return;
     var partes = val.split('-');
     if (partes.length < 2) return;
     var mes = parseInt(partes[1], 10);
     var ano = parseInt(partes[0], 10);
-    selMes.value = mes;
-    selAno.value = ano;
+    if (selMes) selMes.value = mes;
+    if (selAno) selAno.value = ano;
   }
 
   function atualizarLayout() {
+    if (!tipoSelect) return;
     var tipo = tipoSelect.value;
     var isParcelado = tipo === 'credito_parcelado';
+    var isCartao = TIPOS_CARTAO.indexOf(tipo) !== -1;
+
+    if (cartaoRow) cartaoRow.style.display = isCartao ? 'block' : 'none';
 
     if (isParcelado) {
       parcelasRow.style.display = 'block';

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Contas — MyFinances{% endblock %}
+{% block page_title %}Contas{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Contas Bancárias</h1>
+  <a href="{% url 'conta-create' %}" class="btn btn-primary">
+    <i data-lucide="plus"></i> Nova Conta
+  </a>
+</div>
+
+{% if contas %}
+<div class="cartoes-grid">
+  {% for conta in contas %}
+  <div class="cartao-card" style="display:block;">
+    <div class="cartao-card-stripe" style="background:{{ conta.cor }};"></div>
+    <div style="margin-top:8px;">
+      <div class="cartao-card-nome">{{ conta.nome }}</div>
+      <div class="cartao-card-info">
+        {% if conta.banco %}{{ conta.banco }} · {% endif %}
+        <span class="bandeira-badge">{{ conta.get_tipo_display }}</span>
+      </div>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+      <div class="cartao-card-label">Saldo atual</div>
+      <div class="cartao-card-fatura" style="color:{{ conta.cor }};">R$ {{ conta.saldo_atual|floatformat:2 }}</div>
+    </div>
+    <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
+      <a href="{% url 'conta-update' conta.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
+      <a href="{% url 'conta-delete' conta.pk %}" class="btn btn-sm btn-danger"
+         data-confirm="Excluir conta '{{ conta.nome }}'?"><i data-lucide="trash-2"></i></a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+{% url 'conta-create' as create_url %}
+{% with es_icon="landmark" es_title="Nenhuma conta cadastrada" es_description="Adicione suas contas bancárias para acompanhar seus saldos." es_url=create_url es_button="Adicionar primeira conta" %}
+  {% include "includes/empty_state.html" %}
+{% endwith %}
+{% endif %}
+
+{% endblock %}

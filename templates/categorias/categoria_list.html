@@ -58,6 +58,9 @@
           <a href="{% url 'categoria-update' cat.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
+          <a href="{% url 'categoria-delete' cat.pk %}" class="btn btn-sm btn-danger" title="Excluir">
+            <i data-lucide="trash-2"></i>
+          </a>
         </td>
       </tr>
       {% empty %}

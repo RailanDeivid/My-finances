@@ -17,6 +17,13 @@
       {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
     </div>
     <div class="form-group">
+      <label class="form-label">{{ form.usuario_vinculado.label }}</label>
+      {{ form.usuario_vinculado }}
+      <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">
+        Gastos deste responsável aparecerão no dashboard do login vinculado com uma tag.
+      </small>
+    </div>
+    <div class="form-group">
       <div class="form-check">
         {{ form.ativo }}
         <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativo</label>

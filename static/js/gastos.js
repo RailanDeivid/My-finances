@@ -1,28 +1,39 @@
 (function () {
   "use strict";
 
+  var TIPOS_CARTAO = ["credito_avista", "credito_parcelado"];
+
   // ── Formulário de Gasto: parcelas dinâmicas + filtro de cartões ──────────
   function initGastoForm() {
-    var tipoPag   = document.getElementById("id_tipo_pagamento");
-    var parcelasRow = document.getElementById("parcelas-row");
+    var tipoPag        = document.getElementById("id_tipo_pagamento");
+    var parcelasRow    = document.getElementById("parcelas-row");
+    var cartaoRow      = document.getElementById("cartao-row");
     var responsavelSel = document.getElementById("id_responsavel");
-    var cartaoSel = document.getElementById("id_cartao");
+    var cartaoSel      = document.getElementById("id_cartao");
 
-    function toggleParcelas() {
-      if (!tipoPag || !parcelasRow) return;
-      parcelasRow.style.display = tipoPag.value === "credito_parcelado" ? "" : "none";
+    function isCartaoTipo() {
+      return tipoPag && TIPOS_CARTAO.indexOf(tipoPag.value) !== -1;
+    }
+
+    function toggleTipo() {
+      if (!tipoPag) return;
+      if (parcelasRow)
+        parcelasRow.style.display = tipoPag.value === "credito_parcelado" ? "" : "none";
+      if (cartaoRow)
+        cartaoRow.style.display = isCartaoTipo() ? "" : "none";
     }
 
     function carregarCartoes(responsavelId, selectedId) {
       if (!cartaoSel) return;
-      if (!responsavelId) {
-        cartaoSel.innerHTML = '<option value="">— Selecione um cartão —</option>';
+      var empty = '<option value="">— Sem cartão —</option>';
+      if (!responsavelId || !isCartaoTipo()) {
+        cartaoSel.innerHTML = empty;
         return;
       }
       fetch("/api/cartoes-por-responsavel/" + responsavelId + "/")
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          cartaoSel.innerHTML = '<option value="">— Selecione um cartão —</option>';
+          cartaoSel.innerHTML = empty;
           data.forEach(function (c) {
             var opt = document.createElement("option");
             opt.value = c.id;
@@ -34,8 +45,13 @@
     }
 
     if (tipoPag) {
-      tipoPag.addEventListener("change", toggleParcelas);
-      toggleParcelas();
+      tipoPag.addEventListener("change", function () {
+        toggleTipo();
+        if (responsavelSel && responsavelSel.value) {
+          carregarCartoes(responsavelSel.value, null);
+        }
+      });
+      toggleTipo();
     }
 
     if (responsavelSel) {
@@ -74,23 +90,11 @@
     });
   }
 
-  // ── Modal Novo Gasto: toggle parcelas ───────────────────────────────────
+  // ── Modal Novo Gasto: toggle inicial via função definida no template ────
   function initGastoModalForm() {
     var mgTipo = document.getElementById("mg_tipo_pagamento");
-    var mgParcelasRow = document.getElementById("mg-parcelas-row");
-    var mgInicioRow = document.getElementById("mg-inicio-row");
-    var mgLabelValor = document.getElementById("mg_label_valor");
-
-    function mgToggle() {
-      var isParcelado = mgTipo && mgTipo.value === "credito_parcelado";
-      if (mgParcelasRow) mgParcelasRow.style.display = isParcelado ? "block" : "none";
-      if (mgInicioRow)   mgInicioRow.style.display   = isParcelado ? "block" : "none";
-      if (mgLabelValor)  mgLabelValor.textContent     = isParcelado ? "Valor da Parcela (R$) *" : "Valor Total (R$) *";
-    }
-
-    if (mgTipo) {
-      mgTipo.addEventListener("change", mgToggle);
-      mgToggle();
+    if (mgTipo && typeof mgGastoTipoToggle === "function") {
+      mgGastoTipoToggle(mgTipo.value);
     }
   }
 

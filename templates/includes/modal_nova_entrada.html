@@ -45,6 +45,16 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label" for="me_conta">Conta</label>
+        <select name="conta" id="me_conta" class="form-control">
+          <option value="">— Sem conta —</option>
+          {% for c in contas_ativas %}
+          <option value="{{ c.pk }}">{{ c.nome }}{% if c.banco %} ({{ c.banco }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="me_descricao">Descrição</label>
         <input type="text" name="descricao" id="me_descricao" class="form-control"
                placeholder="Ex: Salário junho...">

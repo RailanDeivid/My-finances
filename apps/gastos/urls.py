@@ -21,11 +21,13 @@ urlpatterns = [
     path("responsaveis/", views.ResponsavelListView.as_view(), name="responsavel-list"),
     path("responsaveis/novo/", views.ResponsavelCreateView.as_view(), name="responsavel-create"),
     path("responsaveis/<int:pk>/editar/", views.ResponsavelUpdateView.as_view(), name="responsavel-update"),
+    path("responsaveis/<int:pk>/excluir/", views.ResponsavelDeleteView.as_view(), name="responsavel-delete"),
 
     # Categorias
     path("categorias/", views.CategoriaListView.as_view(), name="categoria-list"),
     path("categorias/novo/", views.CategoriaCreateView.as_view(), name="categoria-create"),
     path("categorias/<int:pk>/editar/", views.CategoriaUpdateView.as_view(), name="categoria-update"),
+    path("categorias/<int:pk>/excluir/", views.CategoriaDeleteView.as_view(), name="categoria-delete"),
 
     # Entradas
     path("entradas/", views.EntradaListView.as_view(), name="entrada-list"),
@@ -38,6 +40,22 @@ urlpatterns = [
     path("entradas/excluir-tudo/", views.entrada_delete_all, name="entrada-delete-all"),
     path("cartoes/excluir-tudo/", views.cartao_delete_all, name="cartao-delete-all"),
 
+    # Contas
+    path("contas/", views.ContaListView.as_view(), name="conta-list"),
+    path("contas/nova/", views.ContaCreateView.as_view(), name="conta-create"),
+    path("contas/<int:pk>/editar/", views.ContaUpdateView.as_view(), name="conta-update"),
+    path("contas/<int:pk>/excluir/", views.ContaDeleteView.as_view(), name="conta-delete"),
+
     # API interna
     path("api/cartoes-por-responsavel/<int:responsavel_id>/", views.cartoes_por_responsavel, name="api-cartoes"),
+
+    # Fatura paga toggle
+    path("cartoes/<int:cartao_id>/fatura-toggle/", views.fatura_toggle_pago, name="fatura-toggle-pago"),
+
+    # Pagamento feito toggle (pix / emprestimo)
+    path("pagamento/<str:tipo>/<int:responsavel_id>/toggle/", views.pagamento_toggle, name="pagamento-toggle"),
+
+    # Perfil
+    path("perfil/atualizar/", views.perfil_update, name="perfil-update"),
+    path("perfil/senha/", views.senha_update, name="senha-update"),
 ]

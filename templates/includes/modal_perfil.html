@@ -1,0 +1,136 @@
+<div id="modal-perfil"
+     style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.55);
+            align-items:center;justify-content:center;padding:24px;"
+     onclick="if(event.target===this)closeFormModal('modal-perfil')">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
+              padding:32px 28px;max-width:440px;width:100%;
+              box-shadow:0 24px 48px rgba(0,0,0,0.4);max-height:90vh;overflow-y:auto;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="width:36px;height:36px;border-radius:10px;background:var(--accent)22;
+                     display:flex;align-items:center;justify-content:center;">
+          <i data-lucide="user-circle" style="width:18px;height:18px;stroke:var(--accent);"></i>
+        </span>
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-primary);">Meu Perfil</div>
+          <div style="font-size:12px;color:var(--text-muted);">{{ request.user.username }}</div>
+        </div>
+      </div>
+      <button type="button" onclick="closeFormModal('modal-perfil')"
+              style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;">
+        <i data-lucide="x" style="width:18px;height:18px;"></i>
+      </button>
+    </div>
+
+    <!-- Seção: Informações pessoais -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
+                  color:var(--text-muted);margin-bottom:14px;">Informações pessoais</div>
+      <form method="post" action="{% url 'perfil-update' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-size:12px;">{{ perfil_form.username.label }}</label>
+          {{ perfil_form.username }}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:12px;">{{ perfil_form.first_name.label }}</label>
+            {{ perfil_form.first_name }}
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label" style="font-size:12px;">{{ perfil_form.last_name.label }}</label>
+            {{ perfil_form.last_name }}
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label" style="font-size:12px;">{{ perfil_form.email.label }}</label>
+          {{ perfil_form.email }}
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;font-size:13px;">
+          <i data-lucide="save" style="width:14px;height:14px;"></i> Salvar informações
+        </button>
+      </form>
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin-bottom:24px;"></div>
+
+    <!-- Seção: Alterar senha -->
+    <div>
+      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;
+                  color:var(--text-muted);margin-bottom:14px;">Alterar senha</div>
+      <form method="post" action="{% url 'senha-update' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.path }}">
+
+        <div class="form-group" style="margin-bottom:12px;">
+          <label class="form-label" style="font-size:12px;">{{ senha_form.senha_atual.label }}</label>
+          <div style="position:relative;">
+            {{ senha_form.senha_atual }}
+            <button type="button" onclick="toggleSenha('pf_senha_atual', this)"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                           background:none;border:none;cursor:pointer;padding:0;
+                           color:var(--text-muted);display:flex;align-items:center;">
+              <i data-lucide="eye" style="width:15px;height:15px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:4px;">
+          <label class="form-label" style="font-size:12px;">{{ senha_form.nova_senha.label }}</label>
+          <div style="position:relative;">
+            {{ senha_form.nova_senha }}
+            <button type="button" onclick="toggleSenha('pf_nova_senha', this)"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                           background:none;border:none;cursor:pointer;padding:0;
+                           color:var(--text-muted);display:flex;align-items:center;">
+              <i data-lucide="eye" style="width:15px;height:15px;"></i>
+            </button>
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <button type="button" onclick="gerarSenhaEPreencher()"
+                  style="background:none;border:none;cursor:pointer;font-size:11px;
+                         color:var(--accent);display:flex;align-items:center;gap:4px;padding:4px 0;">
+            <i data-lucide="shuffle" style="width:12px;height:12px;"></i>
+            Gerar senha segura
+          </button>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px;">
+          <label class="form-label" style="font-size:12px;">{{ senha_form.confirmar_senha.label }}</label>
+          <div style="position:relative;">
+            {{ senha_form.confirmar_senha }}
+            <button type="button" onclick="toggleSenha('pf_confirmar_senha', this)"
+                    style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+                           background:none;border:none;cursor:pointer;padding:0;
+                           color:var(--text-muted);display:flex;align-items:center;">
+              <i data-lucide="eye" style="width:15px;height:15px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;font-size:13px;">
+          <i data-lucide="key-round" style="width:14px;height:14px;"></i> Alterar senha
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function gerarSenhaEPreencher() {
+  var chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*";
+  var arr = new Uint8Array(16);
+  window.crypto.getRandomValues(arr);
+  var senha = "";
+  arr.forEach(function(b) { senha += chars[b % chars.length]; });
+
+  var novaInp = document.getElementById("pf_nova_senha");
+  var confirmarInp = document.getElementById("pf_confirmar_senha");
+  if (novaInp) { novaInp.value = senha; novaInp.type = "text"; }
+  if (confirmarInp) { confirmarInp.value = senha; confirmarInp.type = "text"; }
+}
+</script>

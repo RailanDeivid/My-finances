@@ -5,3 +5,6 @@ class GastosConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.gastos"
     verbose_name = "Gastos"
+
+    def ready(self):
+        import apps.gastos.signals  # noqa: F401

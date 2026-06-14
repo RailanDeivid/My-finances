@@ -23,40 +23,40 @@
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.path }}">
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        <div class="form-group">
-          <label class="form-label" for="mg_responsavel">Responsável *</label>
-          <select name="responsavel" id="mg_responsavel" class="form-control" required>
-            <option value="">— Selecione —</option>
-            {% for r in modal_gasto_form.responsavel.field.queryset %}
-            <option value="{{ r.pk }}">{{ r }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="mg_cartao">Cartão *</label>
-          <select name="cartao" id="mg_cartao" class="form-control" required>
-            <option value="">— Selecione —</option>
-            {% for c in modal_gasto_form.cartao.field.queryset %}
-            <option value="{{ c.pk }}">{{ c.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
+      <div class="form-group">
+        <label class="form-label" for="mg_responsavel">Responsável *</label>
+        <select name="responsavel" id="mg_responsavel" class="form-control" required>
+          <option value="">— Selecione —</option>
+          {% for r in modal_gasto_form.responsavel.field.queryset %}
+          <option value="{{ r.pk }}">{{ r }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="mg_tipo_pagamento">Tipo de Pagamento *</label>
+        <select name="tipo_pagamento" id="mg_tipo_pagamento" class="form-control" required
+                onchange="mgGastoTipoToggle(this.value)">
+          {% for val, label in modal_gasto_form.tipo_pagamento.field.choices %}
+          {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group" id="mg-cartao-row" style="display:none;">
+        <label class="form-label" for="mg_cartao">Cartão *</label>
+        <select name="cartao" id="mg_cartao" class="form-control">
+          <option value="">— Sem cartão —</option>
+          {% for c in modal_gasto_form.cartao.field.queryset %}
+          <option value="{{ c.pk }}">{{ c.nome }}</option>
+          {% endfor %}
+        </select>
       </div>
 
       <div class="form-group">
         <label class="form-label" for="mg_descricao">Descrição *</label>
         <input type="text" name="descricao" id="mg_descricao" class="form-control"
                placeholder="Ex: Mercado, Farmácia..." required>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label" for="mg_tipo_pagamento">Tipo de Pagamento *</label>
-        <select name="tipo_pagamento" id="mg_tipo_pagamento" class="form-control" required>
-          {% for val, label in modal_gasto_form.tipo_pagamento.field.choices %}
-          {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
-          {% endfor %}
-        </select>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -123,3 +123,15 @@
     </form>
   </div>
 </div>
+<script>
+function mgGastoTipoToggle(tipo) {
+  var TIPOS_C = ['credito_avista', 'credito_parcelado'];
+  var isC = TIPOS_C.indexOf(tipo) !== -1;
+  var isP = tipo === 'credito_parcelado';
+  var el;
+  el = document.getElementById('mg-cartao-row');  if (el) el.style.display = isC ? 'block' : 'none';
+  el = document.getElementById('mg-parcelas-row'); if (el) el.style.display = isP ? 'block' : 'none';
+  el = document.getElementById('mg-inicio-row');   if (el) el.style.display = isP ? 'block' : 'none';
+  el = document.getElementById('mg_label_valor');  if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
+}
+</script>

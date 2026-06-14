@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Excluir Conta — MyFinances{% endblock %}
+{% block page_title %}Excluir Conta{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width:480px;text-align:center;">
+  <div style="width:64px;height:64px;border-radius:50%;background:#ef444420;
+              display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+    <i data-lucide="triangle-alert" style="width:30px;height:30px;stroke:#ef4444;"></i>
+  </div>
+  <h3 style="margin:0 0 10px;font-size:18px;font-weight:700;">Excluir "{{ object.nome }}"?</h3>
+  <p style="color:var(--text-muted);margin-bottom:24px;">Esta ação não pode ser desfeita. As entradas vinculadas a esta conta perderão o vínculo.</p>
+  <form method="post">
+    {% csrf_token %}
+    <div style="display:flex;gap:10px;justify-content:center;">
+      <a href="{% url 'conta-list' %}" class="btn btn-danger">Cancelar</a>
+      <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

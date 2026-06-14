@@ -47,7 +47,8 @@ class CartaoAdmin(ModelAdmin):
 
 @admin.register(Responsavel)
 class ResponsavelAdmin(ModelAdmin):
-    list_display = ["nome", "ativo", "criado_em"]
+    list_display = ["nome", "ativo", "user", "usuario_vinculado", "criado_em"]
+    list_filter = ["ativo", "user"]
     search_fields = ["nome"]
 
 

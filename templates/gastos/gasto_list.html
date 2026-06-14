@@ -127,11 +127,15 @@
           {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td>{{ g.responsavel }}</td>
-        <td>{{ g.cartao.nome }}</td>
+        <td>{{ g.cartao.nome|default:"—" }}</td>
         <td>
-          {% if g.tipo_pagamento == "debito" %}<span class="badge badge-debito">Débito</span>
-          {% elif g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
-          {% else %}<span class="badge badge-parcelado">Parcelado</span>{% endif %}
+          {% if g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
+          {% elif g.tipo_pagamento == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado</span>
+          {% elif g.tipo_pagamento == "pix" %}<span class="badge" style="background:#06b6d420;color:#06b6d4;">Pix</span>
+          {% elif g.tipo_pagamento == "dinheiro" %}<span class="badge" style="background:#22c55e20;color:#22c55e;">Dinheiro</span>
+          {% elif g.tipo_pagamento == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
+          {% elif g.tipo_pagamento == "pagamento_pessoa" %}<span class="badge" style="background:#8b5cf620;color:#8b5cf6;">Pag. Pessoa</span>
+          {% else %}<span class="badge">{{ g.get_tipo_pagamento_display }}</span>{% endif %}
         </td>
         <td style="text-align:center;">
           {% if g.tipo_pagamento == "credito_parcelado" %}{{ g.total_parcelas }}x{% else %}—{% endif %}

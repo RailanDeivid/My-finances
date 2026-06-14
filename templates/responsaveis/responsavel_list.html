@@ -39,6 +39,9 @@
           <a href="{% url 'responsavel-update' r.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
+          <a href="{% url 'responsavel-delete' r.pk %}" class="btn btn-sm btn-danger" title="Excluir">
+            <i data-lucide="trash-2"></i>
+          </a>
         </td>
       </tr>
       {% empty %}
