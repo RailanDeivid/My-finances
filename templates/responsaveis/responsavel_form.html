@@ -1,38 +1,24 @@
-{% extends "base.html" %}
-{% block title %}{{ titulo }} — MyFinances{% endblock %}
-{% block page_title %}{{ titulo }}{% endblock %}
+{% extends "includes/base_form.html" %}
 
-{% block content %}
-<div class="form-card" style="max-width:480px;">
-  {% if form.errors %}
-  <div class="form-errors">
-    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+{% block cancel_url %}{% url 'responsavel-list' %}{% endblock %}
+
+{% block form_fields %}
+<div class="form-group">
+  <label class="form-label">Nome *</label>
+  {{ form.nome }}
+  {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
+</div>
+<div class="form-group">
+  <label class="form-label">{{ form.usuario_vinculado.label }}</label>
+  {{ form.usuario_vinculado }}
+  <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">
+    Gastos deste responsável aparecerão no dashboard do login vinculado com uma tag.
+  </small>
+</div>
+<div class="form-group">
+  <div class="form-check">
+    {{ form.ativo }}
+    <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativo</label>
   </div>
-  {% endif %}
-  <form method="post" novalidate>
-    {% csrf_token %}
-    <div class="form-group">
-      <label class="form-label">Nome *</label>
-      {{ form.nome }}
-      {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
-    </div>
-    <div class="form-group">
-      <label class="form-label">{{ form.usuario_vinculado.label }}</label>
-      {{ form.usuario_vinculado }}
-      <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">
-        Gastos deste responsável aparecerão no dashboard do login vinculado com uma tag.
-      </small>
-    </div>
-    <div class="form-group">
-      <div class="form-check">
-        {{ form.ativo }}
-        <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Ativo</label>
-      </div>
-    </div>
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
-      <a href="{% url 'responsavel-list' %}" class="btn btn-danger">Cancelar</a>
-    </div>
-  </form>
 </div>
 {% endblock %}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}MyFinances{% endblock %}</title>
+  {% load static %}
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=2">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=2"></script>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+    }
+    .dialog-box {
+      background: var(--bg-card);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 14px;
+      padding: 32px 28px 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      animation: dialog-in .15s ease;
+    }
+    @keyframes dialog-in {
+      from { opacity: 0; transform: scale(.95) translateY(-8px); }
+      to   { opacity: 1; transform: scale(1)  translateY(0); }
+    }
+    .dialog-icon {
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(239, 68, 68, 0.15);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .dialog-icon svg { width: 26px; height: 26px; stroke: #ef4444; }
+    .dialog-title {
+      font-size: 17px; font-weight: 700;
+      color: var(--text-primary);
+      margin: 0 0 10px; text-align: center;
+    }
+    .dialog-body {
+      font-size: 14px; color: var(--text-muted);
+      margin: 0 0 6px; text-align: center; line-height: 1.5;
+    }
+    .dialog-warn {
+      font-size: 13px; color: #ef4444;
+      margin: 10px 0 0; text-align: center;
+      background: rgba(239,68,68,.08);
+      border-radius: 8px; padding: 8px 12px;
+    }
+    .dialog-actions {
+      display: flex; gap: 10px; justify-content: center;
+      margin-top: 22px;
+    }
+    .dialog-actions .btn { min-width: 110px; justify-content: center; }
+  </style>
+</head>
+<body class="dark-theme">
+  <div class="dialog-box">
+    {% block dialog_content %}{% endblock %}
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.lucide) lucide.createIcons();
+    });
+    // Fallback após defer
+    window.addEventListener('load', function() {
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

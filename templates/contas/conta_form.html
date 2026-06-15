@@ -1,12 +1,31 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}{{ titulo }} — MyFinances{% endblock %}
 {% block page_title %}{{ titulo }}{% endblock %}
+
+{% block extra_head %}
+<style>
+.banco-preview {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  margin-top: 6px;
+}
+.banco-preview img {
+  width: 32px; height: 32px; border-radius: 8px; object-fit: contain;
+}
+.banco-preview-nome {
+  font-weight: 600; font-size: 14px; color: var(--text-primary);
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="form-card" style="max-width:480px;">
   {% if form.errors %}
   <div class="form-errors">
     {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+    {% for e in form.non_field_errors %}<div>• {{ e }}</div>{% endfor %}
   </div>
   {% endif %}
 
@@ -32,6 +51,14 @@
       </div>
     </div>
 
+    <!-- Preview do banco selecionado -->
+    <div class="banco-preview" id="banco-preview" style="{% if not form.instance.banco %}display:none;{% endif %}">
+      <img id="banco-logo"
+           src="{% if form.instance.banco_logo_path %}{% static form.instance.banco_logo_path %}{% endif %}"
+           alt="">
+      <div class="banco-preview-nome" id="banco-nome">{{ form.instance.get_banco_display }}</div>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Saldo Atual (R$) *</label>
       {{ form.saldo_atual }}
@@ -55,4 +82,33 @@
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  var BASE = "{% static 'img/banks/' %}";
+  var SVG_ONLY = {"nubank":1,"inter":1,"picpay":1,"caixa":1,"outro":1};
+
+  var sel = document.getElementById('id_banco');
+  var preview = document.getElementById('banco-preview');
+  var logo = document.getElementById('banco-logo');
+  var nome = document.getElementById('banco-nome');
+
+  function atualizar() {
+    var val = sel.value;
+    var text = sel.options[sel.selectedIndex].text;
+    if (val && val !== '') {
+      var ext = SVG_ONLY[val] ? 'svg' : 'png';
+      logo.src = BASE + val + '.' + ext;
+      nome.textContent = text;
+      preview.style.display = 'flex';
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  sel.addEventListener('change', atualizar);
+})();
+</script>
 {% endblock %}

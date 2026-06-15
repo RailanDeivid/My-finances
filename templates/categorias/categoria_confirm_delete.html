@@ -1,23 +1,23 @@
-{% extends "base.html" %}
+{% extends "base_dialog.html" %}
 {% block title %}Excluir Categoria — MyFinances{% endblock %}
-{% block page_title %}Excluir Categoria{% endblock %}
 
-{% block content %}
-<div class="delete-card">
-  <h2><i data-lucide="trash-2"></i> Excluir Categoria</h2>
-  <p>Tem certeza que deseja excluir a categoria <strong>"{{ object.nome }}"</strong>?</p>
-  {% if object.gastos.count %}
-  <p style="color:var(--text-muted);font-size:13px;">
-    <i data-lucide="info" style="width:14px;height:14px;vertical-align:-2px;"></i>
-    {{ object.gastos.count }} gasto(s) associado(s) ficarão sem categoria após a exclusão.
-  </p>
-  {% endif %}
-  <form method="post">
-    {% csrf_token %}
-    <div class="form-actions">
-      <button type="submit" class="btn btn-danger"><i data-lucide="trash-2"></i> Confirmar Exclusão</button>
-      <a href="{% url 'categoria-list' %}" class="btn btn-danger">Cancelar</a>
-    </div>
-  </form>
+{% block dialog_content %}
+<div class="dialog-icon"><i data-lucide="trash-2"></i></div>
+<div class="dialog-title">Excluir Categoria</div>
+<div class="dialog-body">
+  Tem certeza que deseja excluir a categoria <strong>"{{ object.nome }}"</strong>?
 </div>
+{% if object.gastos.count %}
+<div class="dialog-warn">
+  <i data-lucide="info" style="width:14px;height:14px;vertical-align:-2px;"></i>
+  {{ object.gastos.count }} gasto(s) ficarão sem categoria após a exclusão.
+</div>
+{% endif %}
+<form method="post">
+  {% csrf_token %}
+  <div class="dialog-actions">
+    <a href="{% url 'categoria-list' %}" class="btn btn-danger">Cancelar</a>
+    <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+  </div>
+</form>
 {% endblock %}

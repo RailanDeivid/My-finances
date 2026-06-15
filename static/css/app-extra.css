@@ -303,6 +303,19 @@
   cursor: pointer;
 }
 
+/* ========================== ICON BADGE ========================== */
+.icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+.icon-badge-xs { width: 18px; height: 18px; border-radius: 4px; }
+.icon-badge-sm { width: 20px; height: 20px; border-radius: 4px; }
+.icon-badge-md { width: 28px; height: 28px; border-radius: 6px; }
+.icon-badge-lg { width: 44px; height: 44px; border-radius: 10px; }
+
 /* ========================== BADGES ========================== */
 .badge {
   display: inline-block;
@@ -314,11 +327,16 @@
   letter-spacing: 0.4px;
 }
 
-.badge-debito       { background: rgba(74,222,128,.15);  color: #4ade80; }
-.badge-avista       { background: rgba(96,165,250,.15);  color: #60a5fa; }
-.badge-parcelado    { background: rgba(251,146,60,.15);  color: #fb923c; }
-.badge-success      { background: rgba(46,204,113,.15);  color: var(--success); }
-.badge-danger       { background: rgba(231,76,60,.15);   color: var(--danger); }
+.badge-avista       { background: rgba(96,165,250,.15);   color: #60a5fa; }
+.badge-parcelado    { background: rgba(251,146,60,.15);   color: #fb923c; }
+.badge-pix          { background: rgba(6,182,212,.15);    color: #06b6d4; }
+.badge-emprestimo   { background: rgba(249,115,22,.15);   color: #f97316; }
+.badge-salario      { background: rgba(34,197,94,.15);    color: #22c55e; }
+.badge-bonus        { background: rgba(96,165,250,.15);   color: #60a5fa; }
+.badge-outro        { background: rgba(139,92,246,.15);   color: #a78bfa; }
+.badge-saldo-ant    { background: rgba(148,163,184,.15);  color: #94a3b8; }
+.badge-success      { background: rgba(46,204,113,.15);   color: var(--success); }
+.badge-danger       { background: rgba(231,76,60,.15);    color: var(--danger); }
 
 /* ========================== RESPONSÁVEIS CARDS ========================== */
 .resp-grid {

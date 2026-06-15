@@ -3,6 +3,7 @@
 {% block page_title %}Gastos{% endblock %}
 
 {% block content %}
+{% load gastos_tags %}
 
 <!-- Filtros -->
 <form method="get" class="filtros-form" style="margin-bottom:18px;">
@@ -88,7 +89,7 @@
       Gastos
     </h1>
     {% if total_filtrado %}
-    <span style="font-size:12px;color:var(--text-muted);">Total filtrado: <strong>R$ {{ total_filtrado|floatformat:2 }}</strong></span>
+    <span style="font-size:12px;color:var(--text-muted);">Total filtrado: <strong>R$ {{ total_filtrado|brl }}</strong></span>
     {% endif %}
   </div>
   <button type="button" class="btn btn-danger" style="font-size:12px;padding:6px 14px;"
@@ -120,7 +121,7 @@
         <td>
           {% if g.categoria %}
             <span style="display:inline-flex;align-items:center;gap:6px;">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:4px;background:{{ g.categoria.cor }}22;flex-shrink:0;">
+              <span class="icon-badge icon-badge-sm" style="background:{{ g.categoria.cor }}22;">
                 <i data-lucide="{{ g.categoria.icone }}" style="width:11px;height:11px;stroke:{{ g.categoria.cor }};"></i>
               </span>{{ g.categoria.nome }}
             </span>
@@ -131,16 +132,14 @@
         <td>
           {% if g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
           {% elif g.tipo_pagamento == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado</span>
-          {% elif g.tipo_pagamento == "pix" %}<span class="badge" style="background:#06b6d420;color:#06b6d4;">Pix</span>
-          {% elif g.tipo_pagamento == "dinheiro" %}<span class="badge" style="background:#22c55e20;color:#22c55e;">Dinheiro</span>
-          {% elif g.tipo_pagamento == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
-          {% elif g.tipo_pagamento == "pagamento_pessoa" %}<span class="badge" style="background:#8b5cf620;color:#8b5cf6;">Pag. Pessoa</span>
+          {% elif g.tipo_pagamento == "pix" %}<span class="badge badge-pix">Pix</span>
+          {% elif g.tipo_pagamento == "emprestimo" %}<span class="badge badge-emprestimo">Empréstimo</span>
           {% else %}<span class="badge">{{ g.get_tipo_pagamento_display }}</span>{% endif %}
         </td>
         <td style="text-align:center;">
           {% if g.tipo_pagamento == "credito_parcelado" %}{{ g.total_parcelas }}x{% else %}—{% endif %}
         </td>
-        <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|brl }}</td>
         <td style="white-space:nowrap;">
           <a href="{% url 'gasto-update' g.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>

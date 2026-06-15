@@ -110,65 +110,136 @@ class Categoria(models.Model):
     ]
 
     ICONE_CHOICES = [
+        # Alimentação
         ("shopping-cart",   "Supermercado"),
-        ("utensils",        "Alimentação / Restaurante"),
+        ("utensils",        "Alimentação"),
         ("coffee",          "Café"),
         ("wine",            "Bar / Bebida"),
-        ("car",             "Transporte / Carro"),
+        ("pizza",           "Pizza"),
+        ("sandwich",        "Lanche"),
+        ("salad",           "Dieta"),
+        ("beef",            "Açougue"),
+        ("fish",            "Peixaria"),
+        ("cake",            "Padaria"),
+        ("ice-cream-2",     "Sorvete"),
+        ("cookie",          "Doces"),
+        # Transporte
+        ("car",             "Carro"),
         ("fuel",            "Combustível"),
         ("map-pin",         "Uber / Taxi"),
         ("plane",           "Viagem"),
-        ("building",        "Hotel / Construção"),
+        ("bus",             "Ônibus"),
+        ("train",           "Trem / Metrô"),
+        ("bike",            "Bicicleta"),
+        ("ship",            "Navio"),
+        ("navigation",      "GPS / Rota"),
+        # Moradia
+        ("home",            "Casa"),
+        ("building-2",      "Apartamento"),
+        ("wrench",          "Manutenção"),
+        ("sofa",            "Móveis"),
+        ("lamp",            "Decoração"),
+        ("thermometer",     "Climatização"),
+        ("zap",             "Energia"),
+        ("droplets",        "Água"),
+        ("flame",           "Gás"),
+        ("trash-2",         "Limpeza"),
+        # Saúde
         ("pill",            "Farmácia"),
         ("heart-pulse",     "Saúde"),
         ("heart",           "Bem-estar"),
+        ("stethoscope",     "Médico"),
+        ("dumbbell",        "Academia"),
+        ("apple",           "Nutrição"),
+        # Educação
         ("graduation-cap",  "Educação"),
         ("book-open",       "Livros"),
-        ("tv",              "Streaming / Lazer"),
+        ("pen",             "Papelaria"),
+        ("monitor",         "Curso Online"),
+        # Lazer
+        ("tv",              "Streaming"),
         ("gamepad-2",       "Games"),
         ("music",           "Música"),
+        ("headphones",      "Podcast"),
+        ("camera",          "Fotografia"),
+        ("film",            "Cinema"),
+        ("ticket",          "Shows / Eventos"),
+        ("star",            "Especial"),
+        # Vestuário
         ("shirt",           "Vestuário"),
-        ("shopping-bag",    "Calçados / Compras"),
-        ("home",            "Casa"),
-        ("wrench",          "Manutenção"),
-        ("zap",             "Energia"),
-        ("droplets",        "Água"),
+        ("shopping-bag",    "Calçados"),
+        ("watch",           "Acessórios"),
+        # Tecnologia
         ("smartphone",      "Celular"),
         ("laptop",          "Tecnologia"),
+        ("tablet",          "Tablet"),
         ("credit-card",     "Assinaturas"),
+        # Trabalho / Finanças
+        ("briefcase",       "Trabalho"),
+        ("receipt",         "Contas"),
+        ("banknote",        "Finanças"),
+        ("piggy-bank",      "Poupança"),
+        ("coins",           "Investimento"),
+        ("calculator",      "Impostos"),
+        ("shield",          "Seguro"),
+        # Família / Pessoal
+        ("baby",            "Filhos"),
         ("paw-print",       "Pet"),
         ("sparkles",        "Beleza"),
         ("gift",            "Presentes"),
-        ("dumbbell",        "Academia"),
-        ("briefcase",       "Trabalho"),
-        ("baby",            "Filhos"),
-        ("bus",             "Ônibus"),
-        ("receipt",         "Contas"),
-        ("banknote",        "Finanças"),
-        ("shield",          "Seguro"),
-        ("camera",          "Fotografia"),
-        ("star",            "Especial"),
+        ("heart-handshake", "Doação"),
+        # Viagem / Hotel
+        ("building",        "Hotel"),
+        ("map",             "Turismo"),
+        ("luggage",         "Bagagem"),
+        # Outros
         ("package",         "Encomendas"),
         ("wallet",          "Outros"),
     ]
 
     CORES_CHOICES = [
+        # Vermelhos / Laranjas
         ("#ef4444", "Vermelho"),
+        ("#dc2626", "Vermelho Escuro"),
         ("#f97316", "Laranja"),
+        ("#ea580c", "Laranja Escuro"),
+        ("#fb923c", "Salmão"),
+        # Amarelos / Âmbar
         ("#eab308", "Amarelo"),
+        ("#f59e0b", "Âmbar"),
+        ("#fbbf24", "Dourado"),
+        ("#d97706", "Caramelo"),
+        # Verdes
         ("#22c55e", "Verde"),
         ("#16a34a", "Verde Escuro"),
-        ("#06b6d4", "Ciano"),
-        ("#3b82f6", "Azul"),
-        ("#6366f1", "Índigo"),
-        ("#8b5cf6", "Roxo"),
-        ("#ec4899", "Rosa"),
-        ("#14b8a6", "Teal"),
-        ("#f59e0b", "Âmbar"),
         ("#84cc16", "Lima"),
+        ("#4ade80", "Verde Claro"),
+        ("#14b8a6", "Teal"),
+        ("#10b981", "Esmeralda"),
+        # Azuis / Ciano
+        ("#06b6d4", "Ciano"),
+        ("#0891b2", "Azul Piscina"),
+        ("#3b82f6", "Azul"),
+        ("#2563eb", "Azul Escuro"),
+        ("#60a5fa", "Azul Claro"),
+        ("#0ea5e9", "Céu"),
+        # Roxos / Índigo
+        ("#6366f1", "Índigo"),
+        ("#4f46e5", "Índigo Escuro"),
+        ("#8b5cf6", "Roxo"),
+        ("#7c3aed", "Roxo Escuro"),
+        ("#a855f7", "Lavanda"),
+        # Rosas
+        ("#ec4899", "Rosa"),
+        ("#db2777", "Rosa Escuro"),
+        ("#f472b6", "Rosa Claro"),
+        # Neutros
         ("#64748b", "Cinza Azul"),
+        ("#475569", "Ardósia"),
         ("#78716c", "Marrom"),
+        ("#57534e", "Marrom Escuro"),
         ("#888888", "Cinza"),
+        ("#6b7280", "Cinza Médio"),
     ]
 
     nome = models.CharField(max_length=100)
@@ -318,8 +389,48 @@ class Conta(models.Model):
         ("outro", "Outro"),
     ]
 
+    BANCO_CHOICES = [
+        ("",            "— Selecione —"),
+        ("nubank",      "Nubank"),
+        ("inter",       "Banco Inter"),
+        ("itau",        "Itaú"),
+        ("bradesco",    "Bradesco"),
+        ("mercadopago", "Mercado Pago"),
+        ("bb",          "Banco do Brasil"),
+        ("caixa",       "Caixa Econômica"),
+        ("santander",   "Santander"),
+        ("c6",          "C6 Bank"),
+        ("picpay",      "PicPay"),
+        ("xp",          "XP Investimentos"),
+        ("outro",       "Outro"),
+    ]
+
+    BANCO_COR = {
+        "nubank":      "#820AD1",
+        "inter":       "#FF7A00",
+        "itau":        "#EC7000",
+        "bradesco":    "#CC092F",
+        "mercadopago": "#009EE3",
+        "bb":          "#F8D000",
+        "caixa":       "#005CA9",
+        "santander":   "#EC0000",
+        "c6":          "#242424",
+        "picpay":      "#21C25E",
+        "xp":          "#000000",
+        "outro":       "#64748b",
+    }
+
+    # SVG para nubank, picpay, inter, caixa e outro
+    BANCO_LOGO_EXT = {
+        "nubank":  "svg",
+        "inter":   "svg",
+        "picpay":  "svg",
+        "caixa":   "svg",
+        "outro":   "svg",
+    }
+
     nome = models.CharField(max_length=100)
-    banco = models.CharField(max_length=100, blank=True)
+    banco = models.CharField(max_length=20, choices=BANCO_CHOICES, blank=True)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="corrente")
     saldo_atual = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     cor = models.CharField(max_length=7, default="#3b82f6")
@@ -336,6 +447,17 @@ class Conta(models.Model):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def banco_logo_path(self):
+        if not self.banco:
+            return None
+        ext = self.BANCO_LOGO_EXT.get(self.banco, "png")
+        return f"img/banks/{self.banco}.{ext}"
+
+    @property
+    def banco_cor(self):
+        return self.BANCO_COR.get(self.banco, self.cor)
 
 
 class PagamentoFeito(models.Model):

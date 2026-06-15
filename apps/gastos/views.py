@@ -92,6 +92,14 @@ def _recalcular_saldos_a_partir(mes, ano, user=None):
         prox += relativedelta(months=1)
 
 
+class UserOwnedMixin(LoginRequiredMixin):
+    """Restringe get_queryset() ao usuário autenticado em todas as CBVs."""
+    def get_queryset(self):
+        return super().get_queryset().filter(user=self.request.user)
+
+
+# ── Dashboard ────────────────────────────────────────────────────────────
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "gastos/dashboard.html"
 
@@ -431,14 +439,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
 # ── Gastos ─────────────────────────────────────────────────────────────
 
-class GastoListView(LoginRequiredMixin, ListView):
+class GastoListView(UserOwnedMixin, ListView):
     model = Gasto
     template_name = "gastos/gasto_list.html"
     context_object_name = "gastos"
     paginate_by = 25
 
     def get_queryset(self):
-        qs = Gasto.objects.filter(user=self.request.user).select_related("responsavel", "cartao", "categoria")
+        qs = super().get_queryset().select_related("responsavel", "cartao", "categoria")
         mes = self.request.GET.get("mes")
         ano = self.request.GET.get("ano")
         responsavel = self.request.GET.get("responsavel")
@@ -475,7 +483,7 @@ class GastoListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class GastoCreateView(LoginRequiredMixin, CreateView):
+class GastoCreateView(UserOwnedMixin, CreateView):
     model = Gasto
     form_class = GastoForm
     template_name = "gastos/gasto_form.html"
@@ -527,7 +535,6 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
             gasto.save()
 
         _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, self.request.user)
-        # Recalcula saldo do usuário atribuído, se houver
         usuario_atribuido = gasto.responsavel.usuario_vinculado
         if usuario_atribuido and usuario_atribuido != self.request.user:
             _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, usuario_atribuido)
@@ -541,14 +548,11 @@ class GastoCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class GastoUpdateView(LoginRequiredMixin, UpdateView):
+class GastoUpdateView(UserOwnedMixin, UpdateView):
     model = Gasto
     form_class = GastoForm
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
-
-    def get_queryset(self):
-        return Gasto.objects.filter(user=self.request.user)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -575,13 +579,10 @@ class GastoUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class GastoDeleteView(LoginRequiredMixin, DeleteView):
+class GastoDeleteView(UserOwnedMixin, DeleteView):
     model = Gasto
     template_name = "gastos/gasto_confirm_delete.html"
     success_url = reverse_lazy("gasto-list")
-
-    def get_queryset(self):
-        return Gasto.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         mes, ano = self.object.data_compra.month, self.object.data_compra.year
@@ -596,13 +597,13 @@ class GastoDeleteView(LoginRequiredMixin, DeleteView):
 
 # ── Cartões ─────────────────────────────────────────────────────────────
 
-class CartaoListView(LoginRequiredMixin, ListView):
+class CartaoListView(UserOwnedMixin, ListView):
     model = Cartao
     template_name = "cartoes/cartao_list.html"
     context_object_name = "cartoes"
 
     def get_queryset(self):
-        return Cartao.objects.filter(ativo=True, user=self.request.user)
+        return super().get_queryset().filter(ativo=True)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -621,13 +622,10 @@ class CartaoListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class CartaoDetailView(LoginRequiredMixin, DetailView):
+class CartaoDetailView(UserOwnedMixin, DetailView):
     model = Cartao
     template_name = "cartoes/cartao_detail.html"
     context_object_name = "cartao"
-
-    def get_queryset(self):
-        return Cartao.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -646,7 +644,7 @@ class CartaoDetailView(LoginRequiredMixin, DetailView):
         return ctx
 
 
-class CartaoCreateView(LoginRequiredMixin, CreateView):
+class CartaoCreateView(UserOwnedMixin, CreateView):
     model = Cartao
     form_class = CartaoForm
     template_name = "cartoes/cartao_form.html"
@@ -665,14 +663,11 @@ class CartaoCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class CartaoUpdateView(LoginRequiredMixin, UpdateView):
+class CartaoUpdateView(UserOwnedMixin, UpdateView):
     model = Cartao
     form_class = CartaoForm
     template_name = "cartoes/cartao_form.html"
     success_url = reverse_lazy("cartao-list")
-
-    def get_queryset(self):
-        return Cartao.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Cartão atualizado com sucesso.")
@@ -684,13 +679,10 @@ class CartaoUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class CartaoDeleteView(LoginRequiredMixin, DeleteView):
+class CartaoDeleteView(UserOwnedMixin, DeleteView):
     model = Cartao
     template_name = "cartoes/cartao_confirm_delete.html"
     success_url = reverse_lazy("cartao-list")
-
-    def get_queryset(self):
-        return Cartao.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -710,16 +702,16 @@ class CartaoDeleteView(LoginRequiredMixin, DeleteView):
 
 # ── Responsáveis ─────────────────────────────────────────────────────────
 
-class ResponsavelListView(LoginRequiredMixin, ListView):
+class ResponsavelListView(UserOwnedMixin, ListView):
     model = Responsavel
     template_name = "responsaveis/responsavel_list.html"
     context_object_name = "responsaveis"
 
     def get_queryset(self):
-        return Responsavel.objects.filter(user=self.request.user, is_principal=False)
+        return super().get_queryset().filter(is_principal=False)
 
 
-class ResponsavelCreateView(LoginRequiredMixin, CreateView):
+class ResponsavelCreateView(UserOwnedMixin, CreateView):
     model = Responsavel
     form_class = ResponsavelForm
     template_name = "responsaveis/responsavel_form.html"
@@ -738,14 +730,11 @@ class ResponsavelCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class ResponsavelUpdateView(LoginRequiredMixin, UpdateView):
+class ResponsavelUpdateView(UserOwnedMixin, UpdateView):
     model = Responsavel
     form_class = ResponsavelForm
     template_name = "responsaveis/responsavel_form.html"
     success_url = reverse_lazy("responsavel-list")
-
-    def get_queryset(self):
-        return Responsavel.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Responsável atualizado com sucesso.")
@@ -757,13 +746,10 @@ class ResponsavelUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class ResponsavelDeleteView(LoginRequiredMixin, DeleteView):
+class ResponsavelDeleteView(UserOwnedMixin, DeleteView):
     model = Responsavel
     template_name = "responsaveis/responsavel_confirm_delete.html"
     success_url = reverse_lazy("responsavel-list")
-
-    def get_queryset(self):
-        return Responsavel.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Responsável excluído com sucesso.")
@@ -772,13 +758,10 @@ class ResponsavelDeleteView(LoginRequiredMixin, DeleteView):
 
 # ── Categorias ─────────────────────────────────────────────────────────
 
-class CategoriaListView(LoginRequiredMixin, ListView):
+class CategoriaListView(UserOwnedMixin, ListView):
     model = Categoria
     template_name = "categorias/categoria_list.html"
     context_object_name = "categorias"
-
-    def get_queryset(self):
-        return Categoria.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -802,7 +785,7 @@ class CategoriaListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class CategoriaCreateView(LoginRequiredMixin, CreateView):
+class CategoriaCreateView(UserOwnedMixin, CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
@@ -824,14 +807,11 @@ class CategoriaCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class CategoriaUpdateView(LoginRequiredMixin, UpdateView):
+class CategoriaUpdateView(UserOwnedMixin, UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
     success_url = reverse_lazy("categoria-list")
-
-    def get_queryset(self):
-        return Categoria.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Categoria atualizada com sucesso.")
@@ -846,13 +826,10 @@ class CategoriaUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class CategoriaDeleteView(LoginRequiredMixin, DeleteView):
+class CategoriaDeleteView(UserOwnedMixin, DeleteView):
     model = Categoria
     template_name = "categorias/categoria_confirm_delete.html"
     success_url = reverse_lazy("categoria-list")
-
-    def get_queryset(self):
-        return Categoria.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Categoria excluída com sucesso.")
@@ -861,14 +838,14 @@ class CategoriaDeleteView(LoginRequiredMixin, DeleteView):
 
 # ── Entradas ─────────────────────────────────────────────────────────────
 
-class EntradaListView(LoginRequiredMixin, ListView):
+class EntradaListView(UserOwnedMixin, ListView):
     model = Entrada
     template_name = "entradas/entrada_list.html"
     context_object_name = "entradas"
     paginate_by = 25
 
     def get_queryset(self):
-        qs = Entrada.objects.filter(user=self.request.user)
+        qs = super().get_queryset()
         mes = self.request.GET.get("mes")
         ano = self.request.GET.get("ano")
         if mes and ano:
@@ -888,7 +865,7 @@ class EntradaListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class EntradaCreateView(LoginRequiredMixin, CreateView):
+class EntradaCreateView(UserOwnedMixin, CreateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
@@ -914,14 +891,11 @@ class EntradaCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class EntradaUpdateView(LoginRequiredMixin, UpdateView):
+class EntradaUpdateView(UserOwnedMixin, UpdateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
-
-    def get_queryset(self):
-        return Entrada.objects.filter(user=self.request.user)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -943,13 +917,10 @@ class EntradaUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class EntradaDeleteView(LoginRequiredMixin, DeleteView):
+class EntradaDeleteView(UserOwnedMixin, DeleteView):
     model = Entrada
     template_name = "entradas/entrada_confirm_delete.html"
     success_url = reverse_lazy("entrada-list")
-
-    def get_queryset(self):
-        return Entrada.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         mes, ano = self.object.data.month, self.object.data.year
@@ -1078,16 +1049,16 @@ def pagamento_toggle(request, tipo, responsavel_id):
 
 # ── Contas ─────────────────────────────────────────────────────────────
 
-class ContaListView(LoginRequiredMixin, ListView):
+class ContaListView(UserOwnedMixin, ListView):
     model = Conta
     template_name = "contas/conta_list.html"
     context_object_name = "contas"
 
     def get_queryset(self):
-        return Conta.objects.filter(user=self.request.user, ativo=True)
+        return super().get_queryset().filter(ativo=True)
 
 
-class ContaCreateView(LoginRequiredMixin, CreateView):
+class ContaCreateView(UserOwnedMixin, CreateView):
     model = Conta
     form_class = ContaForm
     template_name = "contas/conta_form.html"
@@ -1106,14 +1077,11 @@ class ContaCreateView(LoginRequiredMixin, CreateView):
         return ctx
 
 
-class ContaUpdateView(LoginRequiredMixin, UpdateView):
+class ContaUpdateView(UserOwnedMixin, UpdateView):
     model = Conta
     form_class = ContaForm
     template_name = "contas/conta_form.html"
     success_url = reverse_lazy("conta-list")
-
-    def get_queryset(self):
-        return Conta.objects.filter(user=self.request.user)
 
     def form_valid(self, form):
         messages.success(self.request, "Conta atualizada com sucesso.")
@@ -1125,14 +1093,28 @@ class ContaUpdateView(LoginRequiredMixin, UpdateView):
         return ctx
 
 
-class ContaDeleteView(LoginRequiredMixin, DeleteView):
+class ContaDeleteView(UserOwnedMixin, DeleteView):
     model = Conta
     template_name = "contas/conta_confirm_delete.html"
     success_url = reverse_lazy("conta-list")
 
-    def get_queryset(self):
-        return Conta.objects.filter(user=self.request.user)
-
     def form_valid(self, form):
         messages.success(self.request, "Conta excluída com sucesso.")
         return super().form_valid(form)
+
+
+class ContaDetailView(UserOwnedMixin, DetailView):
+    model = Conta
+    template_name = "contas/conta_detail.html"
+    context_object_name = "conta"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        conta = self.object
+        entradas = Entrada.objects.filter(
+            conta=conta, user=self.request.user
+        ).order_by("-data", "-criado_em").select_related("responsavel")
+        ctx["entradas"] = entradas
+        ctx["total_entradas"] = entradas.aggregate(t=Sum("valor"))["t"] or 0
+        ctx["qtd_entradas"] = entradas.count()
+        return ctx

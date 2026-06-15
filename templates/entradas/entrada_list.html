@@ -3,6 +3,7 @@
 {% block page_title %}Entradas{% endblock %}
 
 {% block content %}
+{% load gastos_tags %}
 
 {% include "includes/mes_ano_filtro.html" %}
 
@@ -23,7 +24,7 @@
 <div class="tabela-wrapper">
   <div class="tabela-header" style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
     <span style="font-size:12px;color:var(--text-muted);">{{ page_obj.paginator.count }} registro{{ page_obj.paginator.count|pluralize:",s" }}</span>
-    <span style="font-weight:700;color:#22c55e;">Total: R$ {{ total_filtrado|floatformat:2 }}</span>
+    <span style="font-weight:700;color:#22c55e;">Total: R$ {{ total_filtrado|brl }}</span>
   </div>
   <table class="tabela-dados">
     <thead>
@@ -41,17 +42,17 @@
         <td style="white-space:nowrap;">{{ e.data|date:"d/m/Y" }}</td>
         <td>
           {% if e.tipo == "saldo_anterior" %}
-            <span class="badge" style="background:var(--accent)22;color:var(--accent);">Saldo Anterior</span>
+            <span class="badge badge-saldo-ant">Saldo Ant.</span>
           {% elif e.tipo == "salario" %}
-            <span class="badge badge-success">Salário</span>
+            <span class="badge badge-salario">Salário</span>
           {% elif e.tipo == "bonus" %}
-            <span class="badge badge-avista">Bônus</span>
+            <span class="badge badge-bonus">Bônus</span>
           {% else %}
-            <span class="badge">Outros</span>
+            <span class="badge badge-outro">Outros</span>
           {% endif %}
         </td>
         <td>{{ e.descricao|default:"—" }}</td>
-        <td style="text-align:right;font-weight:600;color:{% if e.valor < 0 %}#ef4444{% else %}#22c55e{% endif %};">R$ {{ e.valor|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:600;color:{% if e.valor < 0 %}#ef4444{% else %}#22c55e{% endif %};">R$ {{ e.valor|brl }}</td>
         <td style="white-space:nowrap;">
           {% if not e.auto_gerada %}
           <a href="{% url 'entrada-update' e.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>

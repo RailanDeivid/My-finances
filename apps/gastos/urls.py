@@ -43,6 +43,7 @@ urlpatterns = [
     # Contas
     path("contas/", views.ContaListView.as_view(), name="conta-list"),
     path("contas/nova/", views.ContaCreateView.as_view(), name="conta-create"),
+    path("contas/<int:pk>/", views.ContaDetailView.as_view(), name="conta-detail"),
     path("contas/<int:pk>/editar/", views.ContaUpdateView.as_view(), name="conta-update"),
     path("contas/<int:pk>/excluir/", views.ContaDeleteView.as_view(), name="conta-delete"),
 

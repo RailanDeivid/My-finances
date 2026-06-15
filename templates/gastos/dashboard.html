@@ -4,6 +4,7 @@
 
 {% block content %}
 {% load static %}
+{% load gastos_tags %}
 
 <!-- Filtros -->
 <form method="get" class="mes-filtro" id="form-filtros" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
@@ -80,36 +81,36 @@
 <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
   <div class="stat-card" style="border-top-color:{% if total_contas > 0 %}#22c55e{% else %}#64748b{% endif %};">
     <div style="display:flex;align-items:center;gap:14px;">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;background:#22c55e18;flex-shrink:0;">
+      <span class="icon-badge icon-badge-lg" style="background:#22c55e18;">
         <i data-lucide="landmark" style="width:22px;height:22px;stroke:#22c55e;"></i>
       </span>
       <div>
         <div class="stat-label">Saldo em Contas</div>
-        <div class="stat-value" style="color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ total_contas|floatformat:2 }}</div>
+        <div class="stat-value" style="color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ total_contas|brl }}</div>
         <div class="stat-sub">{{ contas|length }} conta{{ contas|length|pluralize:",s" }}</div>
       </div>
     </div>
   </div>
   <div class="stat-card" style="border-top-color:#ef4444;">
     <div style="display:flex;align-items:center;gap:14px;">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;background:#ef444418;flex-shrink:0;">
+      <span class="icon-badge icon-badge-lg" style="background:#ef444418;">
         <i data-lucide="banknote-arrow-down" style="width:22px;height:22px;stroke:#ef4444;"></i>
       </span>
       <div>
         <div class="stat-label">Total Gasto</div>
-        <div class="stat-value" style="color:#ef4444;">R$ {{ total_gasto|floatformat:2 }}</div>
+        <div class="stat-value" style="color:#ef4444;">R$ {{ total_gasto|brl }}</div>
         <div class="stat-sub">{{ qtd_gastos }} lançamento{{ qtd_gastos|pluralize:",s" }}</div>
       </div>
     </div>
   </div>
   <div class="stat-card" style="border-top-color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
     <div style="display:flex;align-items:center;gap:14px;">
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;background:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %}18;flex-shrink:0;">
+      <span class="icon-badge icon-badge-lg" style="background:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %}18;">
         <i data-lucide="wallet" style="width:22px;height:22px;stroke:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};"></i>
       </span>
       <div>
         <div class="stat-label">Saldo do Mês</div>
-        <div class="stat-value" style="color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ saldo|floatformat:2 }}</div>
+        <div class="stat-value" style="color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ saldo|brl }}</div>
         <div class="stat-sub">Receitas − Gastos</div>
       </div>
     </div>
@@ -137,18 +138,26 @@
       <tr>
         <td>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:{{ c.cor }};flex-shrink:0;display:inline-block;"></span>
+            {% load static %}
+{% load gastos_tags %}
+            {% if c.banco_logo_path %}
+            <img src="{% static c.banco_logo_path %}"
+                 alt="{{ c.get_banco_display }}"
+                 style="width:24px;height:24px;border-radius:6px;object-fit:contain;flex-shrink:0;">
+            {% else %}
+            <span style="width:24px;height:24px;border-radius:6px;background:{{ c.cor }};flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white;">{{ c.nome|first|upper }}</span>
+            {% endif %}
             <a href="{% url 'conta-update' c.pk %}" style="color:var(--text-primary);text-decoration:none;font-weight:500;">{{ c.nome }}</a>
           </div>
         </td>
-        <td style="color:var(--text-muted);">{{ c.banco|default:"—" }}</td>
+        <td style="color:var(--text-muted);">{{ c.get_banco_display|default:"—" }}</td>
         <td><span class="badge" style="background:var(--accent)22;color:var(--accent);">{{ c.get_tipo_display }}</span></td>
-        <td style="text-align:right;font-weight:700;color:{% if c.saldo_atual >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ c.saldo_atual|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:700;color:{% if c.saldo_atual >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ c.saldo_atual|brl }}</td>
       </tr>
       {% endfor %}
       <tr style="border-top:2px solid var(--border);">
         <td colspan="3" style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</td>
-        <td style="text-align:right;font-weight:700;color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ total_contas|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:700;color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ total_contas|brl }}</td>
       </tr>
     </tbody>
   </table>
@@ -180,7 +189,7 @@
           <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>Saldo Anterior</span>
         </td>
         {% for col in tabela_mensal %}
-        <td style="text-align:right;color:{% if col.saldo_ant < 0 %}#ef4444{% else %}#3b82f6{% endif %};">R$ {{ col.saldo_ant|floatformat:2 }}</td>
+        <td style="text-align:right;color:{% if col.saldo_ant < 0 %}#ef4444{% else %}#3b82f6{% endif %};">R$ {{ col.saldo_ant|brl }}</td>
         {% endfor %}
       </tr>
       <tr>
@@ -188,7 +197,7 @@
           <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;"></span>Receitas</span>
         </td>
         {% for col in tabela_mensal %}
-        <td style="text-align:right;color:#22c55e;">{% if col.entradas %}R$ {{ col.entradas|floatformat:2 }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+        <td style="text-align:right;color:#22c55e;">{% if col.entradas %}R$ {{ col.entradas|brl }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
         {% endfor %}
       </tr>
       <tr>
@@ -196,7 +205,7 @@
           <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;"></span>Gastos</span>
         </td>
         {% for col in tabela_mensal %}
-        <td style="text-align:right;color:#ef4444;">{% if col.gastos %}R$ {{ col.gastos|floatformat:2 }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+        <td style="text-align:right;color:#ef4444;">{% if col.gastos %}R$ {{ col.gastos|brl }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
         {% endfor %}
       </tr>
       <tr style="border-top:2px solid var(--border);">
@@ -204,7 +213,7 @@
           <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;"></span>Saldo Atual</span>
         </td>
         {% for col in tabela_mensal %}
-        <td style="text-align:right;font-weight:700;color:{% if col.saldo_atual < 0 %}#ef4444{% else %}#22c55e{% endif %};">R$ {{ col.saldo_atual|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:700;color:{% if col.saldo_atual < 0 %}#ef4444{% else %}#22c55e{% endif %};">R$ {{ col.saldo_atual|brl }}</td>
         {% endfor %}
       </tr>
     </tbody>
@@ -232,7 +241,7 @@
         <td style="font-weight:600;font-size:13px;position:sticky;left:0;background:var(--bg-card);">{{ row.nome }}</td>
         {% for v in row.valores %}
         <td style="text-align:right;">
-          {% if v is not None %}<span style="color:#ef4444;font-weight:500;">R$ {{ v|floatformat:2 }}</span>
+          {% if v is not None %}<span style="color:#ef4444;font-weight:500;">R$ {{ v|brl }}</span>
           {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         {% endfor %}
@@ -257,7 +266,7 @@
         {% for r in tabela_por_responsavel %}
         <tr>
           <td><a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ r.responsavel__id }}" style="color:var(--text-primary);text-decoration:none;">{{ r.responsavel__nome }}</a></td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ r.total|floatformat:2 }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ r.total|brl }}</td>
         </tr>
         {% empty %}
         <tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
@@ -280,7 +289,7 @@
               <a href="{% url 'cartao-detail' c.cartao__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="color:var(--text-primary);text-decoration:none;">{{ c.cartao__nome }}</a>
             </div>
           </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ c.total|floatformat:2 }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ c.total|brl }}</td>
           <td style="text-align:center;">
             <form method="post" action="{% url 'fatura-toggle-pago' c.cartao__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
               {% csrf_token %}
@@ -317,7 +326,7 @@
               <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ p.responsavel__id }}&amp;tipo=pix" style="color:var(--text-primary);text-decoration:none;">{{ p.responsavel__nome }}</a>
             </div>
           </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ p.total|floatformat:2 }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ p.total|brl }}</td>
           <td style="text-align:center;">
             <form method="post" action="{% url 'pagamento-toggle' 'pix' p.responsavel__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
               {% csrf_token %}
@@ -354,7 +363,7 @@
               <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ e.responsavel__id }}&amp;tipo=emprestimo" style="color:var(--text-primary);text-decoration:none;">{{ e.responsavel__nome }}</a>
             </div>
           </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ e.total|floatformat:2 }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ e.total|brl }}</td>
           <td style="text-align:center;">
             <form method="post" action="{% url 'pagamento-toggle' 'emprestimo' e.responsavel__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
               {% csrf_token %}
@@ -409,7 +418,7 @@
         <td>
           {% if t.categoria %}
             <span style="display:inline-flex;align-items:center;gap:5px;">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:{{ t.categoria.cor }}22;">
+              <span class="icon-badge icon-badge-xs" style="background:{{ t.categoria.cor }}22;">
                 <i data-lucide="{{ t.categoria.icone }}" style="width:10px;height:10px;stroke:{{ t.categoria.cor }};"></i>
               </span>{{ t.categoria.nome }}
             </span>
@@ -423,7 +432,7 @@
           {% elif t.tipo_pag == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
           {% else %}<span class="badge">{{ t.tipo_label }}</span>{% endif %}
         </td>
-        <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ t.valor|floatformat:2 }}</td>
+        <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ t.valor|brl }}</td>
         <td style="white-space:nowrap;">
           {% if t.atribuido %}
             <span style="font-size:10px;color:var(--text-muted);">Visível</span>
@@ -509,7 +518,7 @@
         </td>
         <td>{{ t.responsavel|default:"—" }}</td>
         <td style="text-align:right;font-weight:600;color:{% if t.tipo == 'gasto' %}#ef4444{% elif t.valor < 0 %}#ef4444{% else %}#22c55e{% endif %};">
-          {% if t.tipo == "gasto" %}-{% endif %}R$ {{ t.valor|floatformat:2 }}
+          {% if t.tipo == "gasto" %}-{% endif %}R$ {{ t.valor|brl }}
         </td>
         <td style="white-space:nowrap;">
           {% if t.atribuido %}

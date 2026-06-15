@@ -1,50 +1,34 @@
-{% extends "base.html" %}
-{% block title %}{{ titulo }} — MyFinances{% endblock %}
-{% block page_title %}{{ titulo }}{% endblock %}
+{% extends "includes/base_form.html" %}
 
-{% block content %}
-<div class="form-card" style="max-width:480px;">
-  {% if form.errors %}
-  <div class="form-errors">
-    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+{% block cancel_url %}{% url 'entrada-list' %}{% endblock %}
+
+{% block form_fields %}
+<div class="form-group">
+  <label class="form-label">Tipo *</label>
+  {{ form.tipo }}
+  {% if form.tipo.errors %}<div class="field-error">{{ form.tipo.errors.0 }}</div>{% endif %}
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+  <div class="form-group">
+    <label class="form-label">Valor (R$) *</label>
+    {{ form.valor }}
+    {% if form.valor.errors %}<div class="field-error">{{ form.valor.errors.0 }}</div>{% endif %}
   </div>
-  {% endif %}
-  <form method="post" novalidate>
-    {% csrf_token %}
+  <div class="form-group">
+    <label class="form-label">Data *</label>
+    {{ form.data }}
+    {% if form.data.errors %}<div class="field-error">{{ form.data.errors.0 }}</div>{% endif %}
+  </div>
+</div>
 
-    <div class="form-group">
-      <label class="form-label">Tipo *</label>
-      {{ form.tipo }}
-      {% if form.tipo.errors %}<div class="field-error">{{ form.tipo.errors.0 }}</div>{% endif %}
-    </div>
+<div class="form-group">
+  <label class="form-label">Conta</label>
+  {{ form.conta }}
+</div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div class="form-group">
-        <label class="form-label">Valor (R$) *</label>
-        {{ form.valor }}
-        {% if form.valor.errors %}<div class="field-error">{{ form.valor.errors.0 }}</div>{% endif %}
-      </div>
-      <div class="form-group">
-        <label class="form-label">Data *</label>
-        {{ form.data }}
-        {% if form.data.errors %}<div class="field-error">{{ form.data.errors.0 }}</div>{% endif %}
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Conta</label>
-      {{ form.conta }}
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Descrição</label>
-      {{ form.descricao }}
-    </div>
-
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
-      <a href="{% url 'entrada-list' %}" class="btn btn-danger">Cancelar</a>
-    </div>
-  </form>
+<div class="form-group">
+  <label class="form-label">Descrição</label>
+  {{ form.descricao }}
 </div>
 {% endblock %}

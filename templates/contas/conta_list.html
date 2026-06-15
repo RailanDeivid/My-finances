@@ -1,6 +1,118 @@
 {% extends "base.html" %}
+{% load static %}
+{% load gastos_tags %}
 {% block title %}Contas — MyFinances{% endblock %}
 {% block page_title %}Contas{% endblock %}
+
+{% block extra_head %}
+<style>
+.contas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Card de conta — estilo banco digital */
+.conta-card-premium {
+  border-radius: 18px;
+  padding: 24px 24px 20px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  text-decoration: none;
+  color: #fff;
+  transition: transform .2s, box-shadow .2s;
+}
+.conta-card-premium:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
+}
+
+/* Círculos decorativos */
+.conta-deco-1 {
+  position: absolute;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: rgba(255,255,255,.1);
+  top: -60px; right: -50px;
+}
+.conta-deco-2 {
+  position: absolute;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  bottom: -30px; left: -20px;
+}
+
+.conta-card-content { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
+
+/* Topo: logo + nome/tipo */
+.conta-card-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+.conta-bank-logo {
+  width: 48px; height: 48px; border-radius: 12px;
+  object-fit: contain;
+  background: rgba(255,255,255,.15);
+  flex-shrink: 0;
+  padding: 4px;
+}
+.conta-bank-placeholder {
+  width: 48px; height: 48px; border-radius: 12px;
+  background: rgba(255,255,255,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 900; color: #fff;
+  flex-shrink: 0;
+}
+.conta-card-nome {
+  font-size: 16px; font-weight: 800;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+.conta-card-tipo {
+  margin-top: 4px;
+  display: inline-block;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 700; letter-spacing: .4px;
+}
+
+/* Saldo */
+.conta-card-saldo-wrap {
+  border-top: 1px solid rgba(255,255,255,.2);
+  padding-top: 14px; margin-top: 16px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+}
+.conta-card-saldo-label {
+  font-size: 9px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase;
+  opacity: .7; margin-bottom: 3px;
+}
+.conta-card-saldo-valor {
+  font-size: 22px; font-weight: 900; letter-spacing: -.3px;
+  color: #4ade80;
+  text-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+.conta-card-acoes {
+  display: flex; gap: 6px; opacity: .75;
+}
+.conta-card-acoes a {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 7px;
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.2);
+  color: #fff; text-decoration: none;
+  transition: background .15s;
+}
+.conta-card-acoes a:hover { background: rgba(255,255,255,.3); }
+.conta-card-acoes a svg { width: 13px; height: 13px; stroke: #fff; }
+</style>
+{% endblock %}
 
 {% block content %}
 
@@ -12,25 +124,38 @@
 </div>
 
 {% if contas %}
-<div class="cartoes-grid">
+<div class="contas-grid">
   {% for conta in contas %}
-  <div class="cartao-card" style="display:block;">
-    <div class="cartao-card-stripe" style="background:{{ conta.cor }};"></div>
-    <div style="margin-top:8px;">
-      <div class="cartao-card-nome">{{ conta.nome }}</div>
-      <div class="cartao-card-info">
-        {% if conta.banco %}{{ conta.banco }} · {% endif %}
-        <span class="bandeira-badge">{{ conta.get_tipo_display }}</span>
+  <div class="conta-card-premium" style="background: linear-gradient(135deg, {{ conta.banco_cor }} 0%, color-mix(in srgb, {{ conta.banco_cor }} 55%, #000) 100%); box-shadow: 0 8px 24px rgba(0,0,0,.3);">
+    <div class="conta-deco-1"></div>
+    <div class="conta-deco-2"></div>
+
+    <div class="conta-card-content">
+      <!-- Topo: logo + nome -->
+      <div class="conta-card-top">
+        {% if conta.banco_logo_path %}
+          <img src="{% static conta.banco_logo_path %}" alt="{{ conta.get_banco_display }}" class="conta-bank-logo">
+        {% else %}
+          <div class="conta-bank-placeholder">{{ conta.nome|first|upper }}</div>
+        {% endif %}
+        <div style="flex:1;min-width:0;">
+          <div class="conta-card-nome">{{ conta.nome }}</div>
+          <span class="conta-card-tipo">{{ conta.get_tipo_display }}</span>
+        </div>
       </div>
-    </div>
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
-      <div class="cartao-card-label">Saldo atual</div>
-      <div class="cartao-card-fatura" style="color:{{ conta.cor }};">R$ {{ conta.saldo_atual|floatformat:2 }}</div>
-    </div>
-    <div style="margin-top:10px;display:flex;justify-content:flex-end;gap:6px;">
-      <a href="{% url 'conta-update' conta.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
-      <a href="{% url 'conta-delete' conta.pk %}" class="btn btn-sm btn-danger"
-         data-confirm="Excluir conta '{{ conta.nome }}'?"><i data-lucide="trash-2"></i></a>
+
+      <!-- Saldo + ações -->
+      <div class="conta-card-saldo-wrap">
+        <div>
+          <div class="conta-card-saldo-label">Saldo atual</div>
+          <div class="conta-card-saldo-valor">R$ {{ conta.saldo_atual|brl }}</div>
+        </div>
+        <div class="conta-card-acoes">
+          <a href="{% url 'conta-detail' conta.pk %}" title="Detalhes"><i data-lucide="eye"></i></a>
+          <a href="{% url 'conta-update' conta.pk %}" title="Editar"><i data-lucide="pencil"></i></a>
+          <a href="{% url 'conta-delete' conta.pk %}" title="Excluir"><i data-lucide="trash-2"></i></a>
+        </div>
+      </div>
     </div>
   </div>
   {% endfor %}

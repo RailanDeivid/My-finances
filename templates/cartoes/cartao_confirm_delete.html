@@ -1,28 +1,24 @@
-{% extends "base.html" %}
+{% extends "base_dialog.html" %}
 {% block title %}Excluir Cartão — MyFinances{% endblock %}
-{% block page_title %}Excluir Cartão{% endblock %}
 
-{% block content %}
-<div class="delete-card">
-  <h2><i data-lucide="trash-2"></i> Excluir Cartão</h2>
-  <p>Tem certeza que deseja excluir o cartão <strong>"{{ object.nome }}"</strong>?</p>
-
-  {% if qtd_gastos %}
-  <div class="alert alert-danger" style="margin-bottom:16px;">
-    <strong>Atenção:</strong> este cartão possui <strong>{{ qtd_gastos }} gasto{{ qtd_gastos|pluralize:",s" }}</strong> vinculado{{ qtd_gastos|pluralize:",s" }}.
-    Ao confirmar, <strong>todos os gastos vinculados também serão excluídos</strong>.
-    <div style="margin-top:8px;">
-      <a href="{% url 'gasto-list' %}?cartao={{ object.pk }}" class="btn btn-sm">Ver gastos vinculados</a>
-    </div>
-  </div>
-  {% endif %}
-
-  <form method="post">
-    {% csrf_token %}
-    <div class="form-actions">
-      <button type="submit" class="btn btn-danger"><i data-lucide="trash-2"></i> Confirmar exclusão</button>
-      <a href="{% url 'cartao-list' %}" class="btn btn-danger">Cancelar</a>
-    </div>
-  </form>
+{% block dialog_content %}
+<div class="dialog-icon"><i data-lucide="trash-2"></i></div>
+<div class="dialog-title">Excluir Cartão</div>
+<div class="dialog-body">
+  Tem certeza que deseja excluir o cartão <strong>"{{ object.nome }}"</strong>?
 </div>
+{% if qtd_gastos %}
+<div class="dialog-warn">
+  <i data-lucide="triangle-alert" style="width:14px;height:14px;vertical-align:-2px;"></i>
+  Este cartão possui <strong>{{ qtd_gastos }} gasto{{ qtd_gastos|pluralize:",s" }}</strong> vinculado{{ qtd_gastos|pluralize:",s" }}.
+  Todos serão excluídos junto.
+</div>
+{% endif %}
+<form method="post">
+  {% csrf_token %}
+  <div class="dialog-actions">
+    <a href="{% url 'cartao-list' %}" class="btn btn-danger">Cancelar</a>
+    <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+  </div>
+</form>
 {% endblock %}

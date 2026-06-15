@@ -9,7 +9,7 @@
   grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
   gap: 6px;
   margin-top: 8px;
-  max-height: 260px;
+  max-height: 280px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -33,14 +33,28 @@
 .icone-btn.selecionado svg { stroke: var(--accent); }
 .icone-btn .label { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.2; }
 
-.cor-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.cor-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
 .cor-swatch {
   width: 36px; height: 36px; border-radius: 8px;
   border: 3px solid transparent; cursor: pointer;
   transition: border-color .15s, transform .1s;
+  flex-shrink: 0;
 }
 .cor-swatch:hover { transform: scale(1.12); }
 .cor-swatch.selecionada { border-color: var(--text-primary); transform: scale(1.12); }
+.cor-picker-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 2px dashed var(--border); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-card); transition: border-color .15s;
+  position: relative; overflow: hidden; flex-shrink: 0;
+}
+.cor-picker-btn:hover { border-color: var(--accent); }
+.cor-picker-btn svg { width: 16px; height: 16px; stroke: var(--text-muted); pointer-events: none; }
+.cor-picker-btn input[type="color"] {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; border: none;
+}
 
 .preview-cat {
   display: flex; align-items: center; gap: 12px;
@@ -54,6 +68,12 @@
   flex-shrink: 0;
 }
 .preview-icon-wrap svg { width: 22px; height: 22px; stroke: #fff; }
+
+.preset-divider {
+  font-size: 11px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .5px;
+  margin: 12px 0 6px; font-weight: 600;
+}
 </style>
 {% endblock %}
 
@@ -62,6 +82,7 @@
   {% if form.errors %}
   <div class="form-errors">
     {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+    {% for e in form.non_field_errors %}<div>• {{ e }}</div>{% endfor %}
   </div>
   {% endif %}
 
@@ -69,12 +90,6 @@
     {% csrf_token %}
     {{ form.icone }}
     {{ form.cor }}
-
-    <div class="form-group">
-      <label class="form-label">Nome *</label>
-      {{ form.nome }}
-      {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
-    </div>
 
     <!-- Preview ao vivo -->
     <div class="preview-cat" id="preview-cat">
@@ -86,6 +101,25 @@
         <div style="font-weight:600;font-size:14px;" id="preview-nome">{{ form.instance.nome|default:"Nome da categoria" }}</div>
         <div style="font-size:11px;color:var(--text-muted);">Prévia da categoria</div>
       </div>
+    </div>
+
+    <!-- Seletor de preset -->
+    <div class="form-group">
+      <label class="form-label">Escolher preset</label>
+      <select id="preset-sel" class="form-control">
+        <option value="">— Selecione um preset ou digite abaixo —</option>
+        {% for nome, icone, cor in icones_presets %}
+        <option value="{{ nome }}" data-icone="{{ icone }}" data-cor="{{ cor }}">{{ nome }}</option>
+        {% endfor %}
+        <option value="__outro__">✏️ Outro (digitar nome)</option>
+      </select>
+    </div>
+
+    <!-- Campo de nome -->
+    <div class="form-group">
+      <label class="form-label">Nome da categoria *</label>
+      {{ form.nome }}
+      {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
     </div>
 
     <!-- Seletor de ícone -->
@@ -111,6 +145,11 @@
              style="background:{{ hex }};" title="{{ nome }}" data-hex="{{ hex }}"
              onclick="selecionarCor(this)"></div>
         {% endfor %}
+        <!-- Botão de cor personalizada -->
+        <div class="cor-picker-btn" title="Cor personalizada" id="cor-picker-btn">
+          <i data-lucide="pipette"></i>
+          <input type="color" id="cor-picker-input" value="{{ form.instance.cor|default:'#888888' }}">
+        </div>
       </div>
     </div>
 
@@ -141,8 +180,6 @@ function selecionarIcone(btn) {
   btn.classList.add('selecionado');
   var valor = btn.dataset.valor;
   document.getElementById('id_icone').value = valor;
-
-  // Atualiza preview
   var wrap = document.getElementById('preview-wrap');
   wrap.innerHTML = '<i data-lucide="' + valor + '"></i>';
   if (window.lucide) lucide.createIcons({ nodes: [wrap] });
@@ -150,30 +187,74 @@ function selecionarIcone(btn) {
 
 function selecionarCor(el) {
   document.querySelectorAll('.cor-swatch').forEach(s => s.classList.remove('selecionada'));
+  document.getElementById('cor-picker-btn').style.borderStyle = 'dashed';
   el.classList.add('selecionada');
   var hex = el.dataset.hex;
   document.getElementById('id_cor').value = hex;
   document.getElementById('preview-wrap').style.background = hex;
+  document.getElementById('cor-picker-input').value = hex;
 }
 
 (function() {
   var corAtual = document.getElementById('id_cor').value;
-  if (!corAtual) document.getElementById('id_cor').value = '#888888';
+  if (!corAtual) {
+    document.getElementById('id_cor').value = '#888888';
+    document.getElementById('cor-picker-input').value = '#888888';
+  }
 
-  var nomeSelect = document.getElementById('id_nome');
-  if (nomeSelect) {
-    nomeSelect.addEventListener('change', function() {
-      var nome = this.options[this.selectedIndex].text.replace(/^[^\s]+\s/, '').trim();
-      var nomeVal = this.value;
-      document.getElementById('preview-nome').textContent = nomeVal || 'Nome da categoria';
-      var p = PRESETS[nomeVal];
-      if (p) {
-        var btnIcone = document.querySelector('.icone-btn[data-valor="' + p.icone + '"]');
-        if (btnIcone) selecionarIcone(btnIcone);
-        var swatchCor = document.querySelector('.cor-swatch[data-hex="' + p.cor + '"]');
-        if (swatchCor) selecionarCor(swatchCor);
+  // Color picker personalizado
+  var pickerInput = document.getElementById('cor-picker-input');
+  var pickerBtn = document.getElementById('cor-picker-btn');
+  pickerInput.addEventListener('input', function() {
+    var hex = this.value;
+    document.getElementById('id_cor').value = hex;
+    document.getElementById('preview-wrap').style.background = hex;
+    document.querySelectorAll('.cor-swatch').forEach(s => s.classList.remove('selecionada'));
+    pickerBtn.style.borderColor = hex;
+    pickerBtn.style.borderStyle = 'solid';
+  });
+
+  // Preset selector
+  var presetSel = document.getElementById('preset-sel');
+  var nomeInput = document.getElementById('id_nome');
+
+  presetSel.addEventListener('change', function() {
+    var val = this.value;
+    if (!val || val === '__outro__') {
+      nomeInput.value = '';
+      nomeInput.focus();
+      document.getElementById('preview-nome').textContent = 'Nome da categoria';
+      return;
+    }
+    nomeInput.value = val;
+    document.getElementById('preview-nome').textContent = val;
+    var p = PRESETS[val];
+    if (p) {
+      var btnIcone = document.querySelector('.icone-btn[data-valor="' + p.icone + '"]');
+      if (btnIcone) selecionarIcone(btnIcone);
+      var swatchCor = document.querySelector('.cor-swatch[data-hex="' + p.cor + '"]');
+      if (swatchCor) {
+        selecionarCor(swatchCor);
+      } else {
+        document.getElementById('id_cor').value = p.cor;
+        document.getElementById('preview-wrap').style.background = p.cor;
+        document.getElementById('cor-picker-input').value = p.cor;
+        pickerBtn.style.borderColor = p.cor;
+        pickerBtn.style.borderStyle = 'solid';
       }
-    });
+    }
+  });
+
+  // Atualiza preview ao digitar no nome
+  nomeInput.addEventListener('input', function() {
+    document.getElementById('preview-nome').textContent = this.value || 'Nome da categoria';
+    presetSel.value = '';
+  });
+
+  // Ao editar um item existente, marca preset se nome bater
+  var nomeVal = nomeInput.value;
+  if (nomeVal && PRESETS[nomeVal]) {
+    presetSel.value = nomeVal;
   }
 })();
 </script>

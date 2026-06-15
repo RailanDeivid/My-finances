@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% load static %}
+{% load gastos_tags %}
+{% block title %}{{ conta.nome }} — MyFinances{% endblock %}
+{% block page_title %}{{ conta.nome }}{% endblock %}
+
+{% block content %}
+
+<!-- Voltar + Ações -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <a href="{% url 'conta-list' %}" class="btn">
+    <i data-lucide="arrow-left"></i> Voltar para Contas
+  </a>
+  <div style="display:flex;gap:8px;">
+    <a href="{% url 'conta-update' conta.pk %}" class="btn">
+      <i data-lucide="pencil"></i> Editar Conta
+    </a>
+    <a href="{% url 'conta-delete' conta.pk %}" class="btn btn-danger">
+      <i data-lucide="trash-2"></i> Excluir
+    </a>
+  </div>
+</div>
+
+<!-- Card premium da conta -->
+<div style="margin-bottom:28px;">
+  <div style="
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 190px;
+    max-width: 520px;
+    background: linear-gradient(135deg, {{ conta.banco_cor }} 0%, color-mix(in srgb, {{ conta.banco_cor }} 55%, #000) 100%);
+    box-shadow: 0 8px 32px rgba(0,0,0,.35);
+    color: #fff;
+  ">
+    <!-- Círculos decorativos -->
+    <div style="position:absolute;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.1);top:-70px;right:-55px;"></div>
+    <div style="position:absolute;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.07);bottom:-40px;left:-20px;"></div>
+
+    <!-- Topo: logo + nome/banco/tipo -->
+    <div style="display:flex;align-items:center;gap:16px;flex:1;position:relative;z-index:1;margin-bottom:16px;">
+      {% if conta.banco_logo_path %}
+        <img src="{% static conta.banco_logo_path %}" alt="{{ conta.get_banco_display }}"
+             style="width:52px;height:52px;border-radius:14px;object-fit:contain;background:rgba(255,255,255,.15);padding:5px;flex-shrink:0;">
+      {% else %}
+        <div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;">
+          {{ conta.nome|first|upper }}
+        </div>
+      {% endif %}
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:20px;font-weight:900;letter-spacing:.2px;text-shadow:0 1px 4px rgba(0,0,0,.2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ conta.nome }}</div>
+        <div style="margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          {% if conta.get_banco_display %}<span style="font-size:11px;opacity:.8;">{{ conta.get_banco_display }}</span>{% endif %}
+          <span style="display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);border-radius:5px;padding:2px 8px;font-size:10px;font-weight:700;letter-spacing:.4px;">{{ conta.get_tipo_display }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Saldo -->
+    <div style="border-top:1px solid rgba(255,255,255,.2);padding-top:14px;display:flex;align-items:flex-end;justify-content:space-between;position:relative;z-index:1;">
+      <div>
+        <div style="font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;opacity:.7;margin-bottom:3px;">Saldo atual</div>
+        <div style="font-size:26px;font-weight:900;letter-spacing:-.5px;color:#4ade80;text-shadow:0 2px 6px rgba(0,0,0,.2);">R$ {{ conta.saldo_atual|brl }}</div>
+      </div>
+      <div style="text-align:right;font-size:11px;opacity:.75;line-height:1.8;">
+        <div>{{ qtd_entradas }} entrada{{ qtd_entradas|pluralize:"s" }} registrada{{ qtd_entradas|pluralize:"s" }}</div>
+        <div>Total recebido: R$ {{ total_entradas|brl }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Entradas vinculadas -->
+<div class="page-header">
+  <h1>Entradas nesta Conta</h1>
+  <a href="{% url 'entrada-create' %}" class="btn btn-primary btn-sm">
+    <i data-lucide="plus"></i> Nova Entrada
+  </a>
+</div>
+
+{% if entradas %}
+<div class="tabela-wrapper">
+  <table class="tabela-dados">
+    <thead>
+      <tr>
+        <th>Data</th>
+        <th>Tipo</th>
+        <th>Descrição</th>
+        <th>Responsável</th>
+        <th style="text-align:right;">Valor</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entrada in entradas %}
+      <tr>
+        <td style="white-space:nowrap;color:var(--text-muted);">{{ entrada.data|date:"d/m/Y" }}</td>
+        <td>
+          <span class="badge {% if entrada.tipo == 'salario' %}badge-salario{% elif entrada.tipo == 'bonus' %}badge-bonus{% elif entrada.tipo == 'saldo_anterior' %}badge-saldo-ant{% else %}badge-outro{% endif %}">
+            {{ entrada.get_tipo_display }}
+          </span>
+        </td>
+        <td>{{ entrada.descricao|default:"—" }}</td>
+        <td style="color:var(--text-muted);">{{ entrada.responsavel.nome|default:"—" }}</td>
+        <td style="text-align:right;font-weight:700;color:#22c55e;">R$ {{ entrada.valor|brl }}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          <a href="{% url 'entrada-update' entrada.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
+          <a href="{% url 'entrada-delete' entrada.pk %}" class="btn btn-sm btn-danger"><i data-lucide="trash-2"></i></a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr style="border-top:2px solid var(--border);">
+        <td colspan="4" style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</td>
+        <td style="text-align:right;font-weight:700;color:#22c55e;">R$ {{ total_entradas|brl }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% else %}
+<div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+  <i data-lucide="inbox" style="width:40px;height:40px;stroke:var(--text-muted);margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;"></i>
+  <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Nenhuma entrada vinculada</div>
+  <div style="font-size:13px;margin-bottom:16px;">Ao adicionar uma entrada, selecione esta conta para vinculá-la aqui.</div>
+  <a href="{% url 'entrada-create' %}" class="btn btn-primary"><i data-lucide="plus"></i> Adicionar Entrada</a>
+</div>
+{% endif %}
+
+{% endblock %}

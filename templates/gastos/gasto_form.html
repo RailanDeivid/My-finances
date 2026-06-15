@@ -8,7 +8,6 @@
 
   {% if form.errors %}
   <div class="form-errors">
-    <strong>Corrija os erros abaixo:</strong>
     {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
     {% for e in form.non_field_errors %}<div>• {{ e }}</div>{% endfor %}
   </div>

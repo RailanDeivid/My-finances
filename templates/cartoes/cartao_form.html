@@ -1,70 +1,52 @@
-{% extends "base.html" %}
-{% block title %}{{ titulo }} — MyFinances{% endblock %}
-{% block page_title %}{{ titulo }}{% endblock %}
+{% extends "includes/base_form.html" %}
 
-{% block content %}
-<div class="form-card">
+{% block form_card_attrs %}{% endblock %}
+{% block cancel_url %}{% url 'cartao-list' %}{% endblock %}
 
-  {% if form.errors %}
-  <div class="form-errors">
-    <strong>Corrija os erros abaixo:</strong>
-    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+{% block form_fields %}
+<div class="form-section-title">Identificação</div>
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
+  <div class="form-group">
+    <label class="form-label">Nome do Cartão *</label>
+    {{ form.nome }}
+    {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
   </div>
-  {% endif %}
+  <div class="form-group">
+    <label class="form-label">Cor</label>
+    {{ form.cor }}
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+  <div class="form-group">
+    <label class="form-label">Bandeira</label>
+    {{ form.bandeira }}
+  </div>
+  <div class="form-group">
+    <label class="form-label">Tipo</label>
+    {{ form.tipo }}
+  </div>
+</div>
 
-  <form method="post" novalidate>
-    {% csrf_token %}
+<div class="form-section-title">Limite e Vencimento</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+  <div class="form-group">
+    <label class="form-label">Limite (R$)</label>
+    {{ form.limite }}
+  </div>
+  <div class="form-group" id="fechamento-row">
+    <label class="form-label">Dia de Fechamento</label>
+    {{ form.dia_fechamento }}
+  </div>
+  <div class="form-group">
+    <label class="form-label">Dia de Vencimento</label>
+    {{ form.dia_vencimento }}
+  </div>
+</div>
 
-    <div class="form-section-title">Identificação</div>
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;">
-      <div class="form-group">
-        <label class="form-label">Nome do Cartão *</label>
-        {{ form.nome }}
-        {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cor</label>
-        {{ form.cor }}
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div class="form-group">
-        <label class="form-label">Bandeira</label>
-        {{ form.bandeira }}
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tipo</label>
-        {{ form.tipo }}
-      </div>
-    </div>
-
-    <div class="form-section-title">Limite e Vencimento</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
-      <div class="form-group">
-        <label class="form-label">Limite (R$)</label>
-        {{ form.limite }}
-      </div>
-      <div class="form-group" id="fechamento-row">
-        <label class="form-label">Dia de Fechamento</label>
-        {{ form.dia_fechamento }}
-      </div>
-      <div class="form-group">
-        <label class="form-label">Dia de Vencimento</label>
-        {{ form.dia_vencimento }}
-      </div>
-    </div>
-
-    <div class="form-group">
-      <div class="form-check">
-        {{ form.ativo }}
-        <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Cartão ativo</label>
-      </div>
-    </div>
-
-    <div class="form-actions">
-      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
-      <a href="{% url 'cartao-list' %}" class="btn btn-danger">Cancelar</a>
-    </div>
-  </form>
+<div class="form-group">
+  <div class="form-check">
+    {{ form.ativo }}
+    <label class="form-check-label" for="{{ form.ativo.id_for_label }}">Cartão ativo</label>
+  </div>
 </div>
 {% endblock %}

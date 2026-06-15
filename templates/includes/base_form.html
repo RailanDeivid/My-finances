@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} — MyFinances{% endblock %}
+{% block page_title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="form-card" {% block form_card_attrs %}style="max-width:480px;"{% endblock %}>
+  {% if form.errors %}
+  <div class="form-errors">
+    {% for field in form %}{% for e in field.errors %}<div>• {{ field.label }}: {{ e }}</div>{% endfor %}{% endfor %}
+    {% for e in form.non_field_errors %}<div>• {{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% block form_fields %}{% endblock %}
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
+      <a href="{% block cancel_url %}{% endblock %}" class="btn btn-danger">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

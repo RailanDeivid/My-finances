@@ -3,6 +3,7 @@
 {% block page_title %}Categorias{% endblock %}
 
 {% block content %}
+{% load gastos_tags %}
 
 {% include "includes/mes_ano_filtro.html" %}
 
@@ -36,7 +37,7 @@
         </td>
         <td style="text-align:center;">
           {% if cat.icone %}
-          <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:{{ cat.cor }}22;">
+          <span class="icon-badge icon-badge-md" style="background:{{ cat.cor }}22;">
             <i data-lucide="{{ cat.icone }}" style="width:14px;height:14px;stroke:{{ cat.cor }};"></i>
           </span>
           {% else %}<span style="color:var(--text-muted);font-size:12px;">—</span>{% endif %}
@@ -49,7 +50,7 @@
         </td>
         <td style="text-align:right;font-weight:600;">
           {% if cat.total_gastos_mes > 0 %}
-            <span style="color:var(--accent);">R$ {{ cat.total_gastos_mes|floatformat:2 }}</span>
+            <span style="color:var(--accent);">R$ {{ cat.total_gastos_mes|brl }}</span>
           {% else %}
             <span style="color:var(--text-muted);">—</span>
           {% endif %}

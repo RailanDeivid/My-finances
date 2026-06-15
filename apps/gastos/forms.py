@@ -15,14 +15,25 @@ _ANO_ATUAL = _dt.date.today().year
 _ANOS = [(y, y) for y in range(_ANO_ATUAL, _ANO_ATUAL + 7)]
 
 
-class GastoForm(forms.ModelForm):
+class FormControlMixin:
+    """Aplica automaticamente form-control em todos os campos que não sejam hidden ou checkbox."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, (forms.HiddenInput, forms.CheckboxInput)):
+                continue
+            widget.attrs.setdefault("class", "form-control")
+
+
+class GastoForm(FormControlMixin, forms.ModelForm):
     mes_inicio = forms.ChoiceField(
         choices=_MESES, required=False, label="Mês da 1ª Parcela",
-        widget=forms.Select(attrs={"class": "form-control", "id": "id_mes_inicio"}),
+        widget=forms.Select(attrs={"id": "id_mes_inicio"}),
     )
     ano_inicio = forms.ChoiceField(
         choices=_ANOS, required=False, label="Ano",
-        widget=forms.Select(attrs={"class": "form-control", "id": "id_ano_inicio"}),
+        widget=forms.Select(attrs={"id": "id_ano_inicio"}),
     )
 
     class Meta:
@@ -32,15 +43,15 @@ class GastoForm(forms.ModelForm):
             "total_parcelas", "cartao", "responsavel", "categoria", "observacao",
         ]
         widgets = {
-            "descricao": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Mercado, Farmácia..."}),
-            "valor_total": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "placeholder": "0,00"}),
-            "data_compra": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
-            "tipo_pagamento": forms.Select(attrs={"class": "form-control", "id": "id_tipo_pagamento"}),
-            "total_parcelas": forms.NumberInput(attrs={"class": "form-control", "min": "2", "max": "60"}),
-            "cartao": forms.Select(attrs={"class": "form-control", "id": "id_cartao"}),
-            "responsavel": forms.Select(attrs={"class": "form-control", "id": "id_responsavel"}),
-            "categoria": forms.Select(attrs={"class": "form-control"}),
-            "observacao": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "descricao":      forms.TextInput(attrs={"placeholder": "Ex: Mercado, Farmácia..."}),
+            "valor_total":    forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
+            "data_compra":    forms.DateInput(attrs={"type": "date"}),
+            "tipo_pagamento": forms.Select(attrs={"id": "id_tipo_pagamento"}),
+            "total_parcelas": forms.NumberInput(attrs={"min": "2", "max": "60"}),
+            "cartao":         forms.Select(attrs={"id": "id_cartao"}),
+            "responsavel":    forms.Select(attrs={"id": "id_responsavel"}),
+            "categoria":      forms.Select(),
+            "observacao":     forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -80,18 +91,18 @@ class GastoForm(forms.ModelForm):
         return cleaned
 
 
-class CartaoForm(forms.ModelForm):
+class CartaoForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = Cartao
         fields = ["nome", "bandeira", "limite", "dia_fechamento", "dia_vencimento", "cor", "ativo"]
         widgets = {
-            "nome": forms.TextInput(attrs={"class": "form-control"}),
-            "bandeira": forms.Select(attrs={"class": "form-control"}),
-            "limite": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "dia_fechamento": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "31"}),
-            "dia_vencimento": forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "31"}),
-            "cor": forms.TextInput(attrs={"class": "form-control form-control-color", "type": "color"}),
-            "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "nome":           forms.TextInput(),
+            "bandeira":       forms.Select(),
+            "limite":         forms.NumberInput(attrs={"step": "0.01"}),
+            "dia_fechamento": forms.NumberInput(attrs={"min": "1", "max": "31"}),
+            "dia_vencimento": forms.NumberInput(attrs={"min": "1", "max": "31"}),
+            "cor":            forms.TextInput(attrs={"class": "form-control form-control-color", "type": "color"}),
+            "ativo":          forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -101,14 +112,14 @@ class CartaoForm(forms.ModelForm):
         self.fields["dia_vencimento"].required = False
 
 
-class ResponsavelForm(forms.ModelForm):
+class ResponsavelForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = Responsavel
         fields = ["nome", "ativo", "usuario_vinculado"]
         widgets = {
-            "nome": forms.TextInput(attrs={"class": "form-control"}),
-            "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "usuario_vinculado": forms.Select(attrs={"class": "form-control"}),
+            "nome":              forms.TextInput(),
+            "ativo":             forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "usuario_vinculado": forms.Select(),
         }
         labels = {
             "usuario_vinculado": "Vinculado ao login",
@@ -120,36 +131,28 @@ class ResponsavelForm(forms.ModelForm):
         self.fields["usuario_vinculado"].empty_label = "— Não vinculado —"
 
 
-class CategoriaForm(forms.ModelForm):
-    NOME_CHOICES = [("", "— Selecione uma categoria —")] + [
-        (nome, f"{icone} {nome}") for nome, icone, cor in Categoria.PRESETS
-    ]
-
+class CategoriaForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = Categoria
         fields = ["nome", "icone", "cor", "ativo"]
         widgets = {
-            "nome": forms.Select(attrs={"class": "form-control", "id": "id_nome"}),
+            "nome":  forms.TextInput(attrs={"id": "id_nome", "placeholder": "Nome da categoria..."}),
             "icone": forms.HiddenInput(),
-            "cor": forms.HiddenInput(),
+            "cor":   forms.HiddenInput(),
             "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["nome"].widget.choices = self.NOME_CHOICES
 
-
-class EntradaForm(forms.ModelForm):
+class EntradaForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = Entrada
         fields = ["tipo", "descricao", "valor", "data", "conta"]
         widgets = {
-            "tipo": forms.Select(attrs={"class": "form-control"}),
-            "descricao": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Salário junho..."}),
-            "valor": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "placeholder": "0,00"}),
-            "data": forms.DateInput(attrs={"class": "form-control", "type": "date"}),
-            "conta": forms.Select(attrs={"class": "form-control"}),
+            "tipo":     forms.Select(),
+            "descricao": forms.TextInput(attrs={"placeholder": "Ex: Salário junho..."}),
+            "valor":    forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
+            "data":     forms.DateInput(attrs={"type": "date"}),
+            "conta":    forms.Select(),
         }
 
     def __init__(self, *args, **kwargs):
@@ -165,50 +168,50 @@ class EntradaForm(forms.ModelForm):
             self.fields["conta"].queryset = Conta.objects.filter(ativo=True)
 
 
-class ContaForm(forms.ModelForm):
+class ContaForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = Conta
         fields = ["nome", "banco", "tipo", "saldo_atual", "cor", "ativo"]
         widgets = {
-            "nome": forms.TextInput(attrs={"class": "form-control"}),
-            "banco": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ex: Nubank, Itaú..."}),
-            "tipo": forms.Select(attrs={"class": "form-control"}),
-            "saldo_atual": forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "placeholder": "0,00"}),
-            "cor": forms.TextInput(attrs={"class": "form-control form-control-color", "type": "color"}),
-            "ativo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "nome":       forms.TextInput(),
+            "banco":      forms.Select(),
+            "tipo":       forms.Select(),
+            "saldo_atual": forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
+            "cor":        forms.TextInput(attrs={"class": "form-control form-control-color", "type": "color"}),
+            "ativo":      forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
 
-class PerfilForm(forms.ModelForm):
+class PerfilForm(FormControlMixin, forms.ModelForm):
     class Meta:
         model = User
         fields = ["username", "first_name", "last_name", "email"]
         widgets = {
-            "username": forms.TextInput(attrs={"class": "form-control", "id": "pf_username"}),
-            "first_name": forms.TextInput(attrs={"class": "form-control", "id": "pf_nome"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control", "id": "pf_sobrenome"}),
-            "email": forms.EmailInput(attrs={"class": "form-control", "id": "pf_email"}),
+            "username":   forms.TextInput(attrs={"id": "pf_username"}),
+            "first_name": forms.TextInput(attrs={"id": "pf_nome"}),
+            "last_name":  forms.TextInput(attrs={"id": "pf_sobrenome"}),
+            "email":      forms.EmailInput(attrs={"id": "pf_email"}),
         }
         labels = {
-            "username": "Usuário",
+            "username":   "Usuário",
             "first_name": "Nome",
-            "last_name": "Sobrenome",
-            "email": "E-mail",
+            "last_name":  "Sobrenome",
+            "email":      "E-mail",
         }
 
 
-class SenhaForm(forms.Form):
+class SenhaForm(FormControlMixin, forms.Form):
     senha_atual = forms.CharField(
         label="Senha atual",
-        widget=forms.PasswordInput(attrs={"class": "form-control", "id": "pf_senha_atual", "placeholder": "••••••••"}),
+        widget=forms.PasswordInput(attrs={"id": "pf_senha_atual", "placeholder": "••••••••"}),
     )
     nova_senha = forms.CharField(
         label="Nova senha",
-        widget=forms.PasswordInput(attrs={"class": "form-control", "id": "pf_nova_senha", "placeholder": "••••••••"}),
+        widget=forms.PasswordInput(attrs={"id": "pf_nova_senha", "placeholder": "••••••••"}),
     )
     confirmar_senha = forms.CharField(
         label="Confirmar nova senha",
-        widget=forms.PasswordInput(attrs={"class": "form-control", "id": "pf_confirmar_senha", "placeholder": "••••••••"}),
+        widget=forms.PasswordInput(attrs={"id": "pf_confirmar_senha", "placeholder": "••••••••"}),
     )
 
     def __init__(self, user, *args, **kwargs):

@@ -2,7 +2,178 @@
 {% block title %}Cartões — MyFinances{% endblock %}
 {% block page_title %}Cartões{% endblock %}
 
+{% block extra_head %}
+<style>
+/* Grid de cartões — cards mais largos */
+.cartoes-grid-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Card principal — visual de cartão de crédito */
+.cc-card {
+  border-radius: 18px;
+  padding: 24px 24px 20px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+  text-decoration: none;
+  color: #fff;
+  transition: transform .2s, box-shadow .2s;
+  cursor: pointer;
+}
+.cc-card:hover {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 16px 40px rgba(0,0,0,.45);
+}
+
+/* Gradiente de fundo usando a cor do cartão */
+.cc-card-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Círculos decorativos no fundo */
+.cc-deco-circle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: .18;
+  background: #fff;
+}
+.cc-deco-circle-1 {
+  width: 200px; height: 200px;
+  top: -60px; right: -50px;
+}
+.cc-deco-circle-2 {
+  width: 140px; height: 140px;
+  bottom: -40px; right: 30px;
+}
+.cc-deco-circle-3 {
+  width: 80px; height: 80px;
+  top: 30px; right: 60px;
+  opacity: .1;
+}
+
+/* Conteúdo acima do background */
+.cc-content { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
+
+/* Linha do topo: chip + bandeira */
+.cc-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+/* Chip EMV simulado */
+.cc-chip {
+  width: 34px; height: 26px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #f0d060 0%, #c8a020 40%, #f0d060 70%, #a87010 100%);
+  position: relative;
+  flex-shrink: 0;
+}
+.cc-chip::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px; height: 16px;
+  border: 1.5px solid rgba(0,0,0,.25);
+  border-radius: 3px;
+}
+.cc-chip::after {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 1.5px; height: 16px;
+  background: rgba(0,0,0,.2);
+}
+
+/* Bandeira (Visa/Master etc.) */
+.cc-bandeira {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  opacity: .85;
+  text-align: right;
+  line-height: 1.3;
+}
+.cc-bandeira-badge {
+  display: inline-block;
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .4px;
+}
+
+/* Nome do cartão */
+.cc-nome {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: .3px;
+  flex: 1;
+  text-shadow: 0 1px 4px rgba(0,0,0,.2);
+}
+
+/* Linha inferior: fatura + limite/datas */
+.cc-bottom {
+  border-top: 1px solid rgba(255,255,255,.2);
+  padding-top: 14px;
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.cc-fatura-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  opacity: .7;
+  margin-bottom: 3px;
+}
+.cc-fatura-valor {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -.3px;
+  text-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+.cc-meta {
+  text-align: right;
+  font-size: 10px;
+  opacity: .75;
+  line-height: 1.6;
+}
+
+/* Ponto de número de cartão decorativo */
+.cc-dots {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+.cc-dot-group {
+  display: flex;
+  gap: 3px;
+}
+.cc-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.5);
+}
+</style>
+{% endblock %}
+
 {% block content %}
+{% load gastos_tags %}
 
 {% with filtro_label="Mês/Ano da Fatura:" %}
   {% include "includes/mes_ano_filtro.html" %}
@@ -22,38 +193,70 @@
 </div>
 
 {% if cartoes %}
-<div class="cartoes-grid">
+<div class="cartoes-grid-v2">
   {% for cartao in cartoes %}
-  <a href="{% url 'cartao-detail' cartao.pk %}?mes={{ mes }}&amp;ano={{ ano }}" class="cartao-card" style="text-decoration:none;display:block;">
-    <div class="cartao-card-stripe" style="background:{{ cartao.cor }};"></div>
-    <div style="margin-top:8px;">
-      <div class="cartao-card-nome">{{ cartao.nome }}</div>
-      <div class="cartao-card-info">
-        {{ cartao.get_bandeira_display }}
-        <span class="bandeira-badge">{{ cartao.get_tipo_display }}</span>
+  <a href="{% url 'cartao-detail' cartao.pk %}?mes={{ mes }}&amp;ano={{ ano }}" class="cc-card">
+
+    <!-- Fundo com gradiente na cor do cartão -->
+    <div class="cc-card-bg" style="background: linear-gradient(135deg, {{ cartao.cor }} 0%, color-mix(in srgb, {{ cartao.cor }} 60%, #000) 100%);"></div>
+
+    <!-- Círculos decorativos -->
+    <div class="cc-deco-circle cc-deco-circle-1"></div>
+    <div class="cc-deco-circle cc-deco-circle-2"></div>
+    <div class="cc-deco-circle cc-deco-circle-3"></div>
+
+    <div class="cc-content">
+      <!-- Topo: chip + bandeira -->
+      <div class="cc-top">
+        <div class="cc-chip"></div>
+        <div class="cc-bandeira">
+          {% if cartao.get_bandeira_display %}<div>{{ cartao.get_bandeira_display }}</div>{% endif %}
+          <span class="cc-bandeira-badge">{{ cartao.get_tipo_display }}</span>
+        </div>
       </div>
-    </div>
-    {% if cartao.tipo == "credito" %}
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
-      <div class="cartao-card-label">Fatura {{ mes }}/{{ ano }}</div>
-      <div class="cartao-card-fatura" style="color:{{ cartao.cor }};">R$ {{ cartao.fatura_mes|floatformat:2 }}</div>
-      {% if cartao.limite %}
-      <div class="cartao-card-label" style="margin-top:4px;">Limite: R$ {{ cartao.limite|floatformat:2 }}</div>
-      {% endif %}
-      {% if cartao.dia_fechamento %}
-      <div class="cartao-card-label">Fecha dia {{ cartao.dia_fechamento }}{% if cartao.dia_vencimento %} · Vence dia {{ cartao.dia_vencimento }}{% endif %}</div>
-      {% endif %}
-    </div>
-    {% endif %}
-    <div style="margin-top:10px;text-align:right;">
-      <span style="font-size:11px;color:var(--text-muted);">Clique para ver detalhes →</span>
+
+      <!-- Dots decorativos (número de cartão simulado) -->
+      <div class="cc-dots">
+        <div class="cc-dot-group">
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+        </div>
+        <div class="cc-dot-group">
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+        </div>
+        <div class="cc-dot-group">
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+          <span class="cc-dot"></span><span class="cc-dot"></span>
+        </div>
+      </div>
+
+      <!-- Nome do cartão -->
+      <div class="cc-nome">{{ cartao.nome }}</div>
+
+      <!-- Rodapé: fatura + meta -->
+      <div class="cc-bottom">
+        <div>
+          <div class="cc-fatura-label">Fatura {{ mes }}/{{ ano }}</div>
+          <div class="cc-fatura-valor">R$ {{ cartao.fatura_mes|brl }}</div>
+        </div>
+        <div class="cc-meta">
+          {% if cartao.limite %}
+          <div style="color:#4ade80;font-weight:700;">Limite R$ {{ cartao.limite|brl:0 }}</div>
+          {% endif %}
+          {% if cartao.dia_fechamento %}
+          <div>Fecha dia {{ cartao.dia_fechamento }}{% if cartao.dia_vencimento %} · Vence {{ cartao.dia_vencimento }}{% endif %}</div>
+          {% endif %}
+          <div style="opacity:.6;margin-top:2px;">Ver detalhes →</div>
+        </div>
+      </div>
     </div>
   </a>
   {% endfor %}
 </div>
 {% else %}
 {% url 'cartao-create' as create_url %}
-{% with es_icon="credit-card" es_title="Nenhum cartão cadastrado" es_description="Adicione seus cartões de crédito e débito para acompanhar faturas e gastos por cartão." es_url=create_url es_button="Adicionar primeiro cartão" %}
+{% with es_icon="credit-card" es_title="Nenhum cartão cadastrado" es_description="Adicione seus cartões de crédito para acompanhar faturas e gastos." es_url=create_url es_button="Adicionar primeiro cartão" %}
   {% include "includes/empty_state.html" %}
 {% endwith %}
 {% endif %}
