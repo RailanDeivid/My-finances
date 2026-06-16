@@ -327,6 +327,14 @@ class Gasto(models.Model):
         null=True, blank=True,
         help_text="Número total de parcelas. Preencher apenas se parcelado."
     )
+    grupo_divisao = models.UUIDField(
+        null=True, blank=True, default=None, db_index=True,
+        help_text="UUID compartilhado entre os dois lados de um gasto dividido.",
+    )
+    pct_divisao = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Percentual desta parte no gasto dividido (ex: 60 = 60%).",
+    )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, related_name="gastos_proprios",
     )
@@ -458,6 +466,75 @@ class Conta(models.Model):
     @property
     def banco_cor(self):
         return self.BANCO_COR.get(self.banco, self.cor)
+
+
+class Investimento(models.Model):
+    TIPO_INV_CHOICES = [
+        ("renda_fixa",        "Renda Fixa"),
+        ("renda_variavel",    "Renda Variável"),
+        ("fundo_imobiliario", "Fundo Imobiliário"),
+    ]
+    conta = models.ForeignKey(
+        Conta, on_delete=models.CASCADE, related_name="investimentos"
+    )
+    descricao = models.CharField(max_length=200)
+    tipo_investimento = models.CharField(
+        max_length=20, choices=TIPO_INV_CHOICES, default="renda_fixa",
+        verbose_name="Tipo de Investimento",
+    )
+    saldo_inicial = models.DecimalField(max_digits=14, decimal_places=2)
+    saldo_atual = models.DecimalField(max_digits=14, decimal_places=2)
+    liquidado = models.BooleanField(default=False)
+    data_liquidacao = models.DateTimeField(null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="investimentos")
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Investimento"
+        verbose_name_plural = "Investimentos"
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return self.descricao
+
+    @property
+    def rentabilidade(self):
+        return self.saldo_atual - self.saldo_inicial
+
+    @property
+    def rentabilidade_pct(self):
+        if not self.saldo_inicial:
+            return Decimal("0")
+        return (self.rentabilidade / self.saldo_inicial * 100).quantize(Decimal("0.01"))
+
+
+class InvestimentoHistorico(models.Model):
+    TIPO_CHOICES = [
+        ("inicial",       "Aporte Inicial"),
+        ("aporte",        "Aporte"),
+        ("saque",         "Saque"),
+        ("rendimento",    "Rendimento"),
+        ("ajuste_saldo",  "Ajuste de Saldo"),
+        ("liquidacao",    "Liquidação"),
+    ]
+    investimento = models.ForeignKey(
+        Investimento, on_delete=models.CASCADE, related_name="historico"
+    )
+    valor_anterior = models.DecimalField(max_digits=14, decimal_places=2)
+    valor_novo = models.DecimalField(max_digits=14, decimal_places=2)
+    diferenca = models.DecimalField(max_digits=14, decimal_places=2)
+    tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, default="rendimento")
+    motivo = models.CharField(max_length=300, blank=True)
+    data_movimentacao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Histórico de Investimento"
+        verbose_name_plural = "Histórico de Investimentos"
+        ordering = ["-data_movimentacao"]
+
+    def __str__(self):
+        return f"{self.investimento} — {self.data_movimentacao:%d/%m/%Y %H:%M}"
 
 
 class PagamentoFeito(models.Model):

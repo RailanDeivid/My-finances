@@ -117,7 +117,10 @@
       {% for g in gastos %}
       <tr>
         <td style="white-space:nowrap;">{{ g.data_compra|date:"d/m/Y" }}</td>
-        <td style="font-weight:500;">{{ g.descricao }}</td>
+        <td style="font-weight:500;">
+          {{ g.descricao }}
+          {% if g.grupo_divisao %}<span class="badge" style="font-size:10px;background:rgba(99,102,241,.15);color:#818cf8;margin-left:4px;vertical-align:middle;">÷ dividido</span>{% endif %}
+        </td>
         <td>
           {% if g.categoria %}
             <span style="display:inline-flex;align-items:center;gap:6px;">
@@ -144,10 +147,10 @@
           <a href="{% url 'gasto-update' g.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
-          <a href="{% url 'gasto-delete' g.pk %}" class="btn btn-sm btn-danger" title="Excluir"
-             data-confirm="Confirma a exclusão de '{{ g.descricao }}'?">
+          <button type="button" class="btn btn-sm btn-danger" title="Excluir"
+                  onclick="openDeleteModal('{% url 'gasto-delete' g.pk %}', 'Excluir \'{{ g.descricao|escapejs }}\'? Esta ação não pode ser desfeita.')">
             <i data-lucide="trash-2"></i>
-          </a>
+          </button>
         </td>
       </tr>
       {% empty %}

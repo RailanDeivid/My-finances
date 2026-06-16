@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "apps.gastos",
+    "apps.whatsapp",
 ]
 
 MIDDLEWARE = [
@@ -96,6 +97,17 @@ LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
 
 FIXTURE_DIRS = [BASE_DIR / "fixtures"]
+
+# ── WhatsApp / OpenAI / Redis ────────────────────────────────────────────────
+OPENAI_KEY         = os.environ.get("OPENAI_KEY", "")
+OPENAI_MODEL       = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_TEMPERATURE = os.environ.get("OPENAI_TEMPERATURE", "0.2")
+
+EVOLUTION_API_URL       = os.environ.get("EVOLUTION_API_URL", "http://evolution-api:8080")
+EVOLUTION_INSTANCE_NAME = os.environ.get("EVOLUTION_INSTANCE_NAME", "myfinances")
+EVOLUTION_API_KEY       = os.environ.get("EVOLUTION_API_KEY", "")
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
 LOGGING = {
     "version": 1,

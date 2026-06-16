@@ -1,4 +1,6 @@
 import json
+import re
+import uuid
 from datetime import date
 from decimal import Decimal
 
@@ -15,8 +17,8 @@ from django.views.generic import (
 from django.contrib import messages
 
 from django.shortcuts import get_object_or_404
-from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, FaturaPaga, Conta, PagamentoFeito
-from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, EntradaForm, ContaForm, PerfilForm, SenhaForm
+from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, FaturaPaga, Conta, PagamentoFeito, Investimento, InvestimentoHistorico
+from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, EntradaForm, ContaForm, PerfilForm, SenhaForm, InvestimentoForm, InvestimentoAtualizarSaldoForm
 
 
 def _mes_ano_from_request(request):
@@ -165,7 +167,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         total_entradas = entradas_mes.aggregate(t=Sum("valor"))["t"] or Decimal("0")
         total_gasto = gastos_mes_proprios.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        saldo = total_entradas - total_gasto
+
+        contas = Conta.objects.filter(user=user, ativo=True)
+        total_contas = contas.aggregate(t=Sum("saldo_atual"))["t"] or Decimal("0")
+        saldo = total_contas - total_gasto
 
         ctx["total_entradas"] = total_entradas
         ctx["total_gasto"] = total_gasto
@@ -210,10 +215,72 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .values_list("responsavel_id", flat=True)
         )
 
-        contas = Conta.objects.filter(user=user, ativo=True)
-        total_contas = contas.aggregate(t=Sum("saldo_atual"))["t"] or Decimal("0")
         ctx["contas"] = contas
         ctx["total_contas"] = total_contas
+
+        # Investimentos (independente de filtro de período)
+        investimentos_dash = list(Investimento.objects.filter(user=user, liquidado=False).select_related("conta"))
+        ctx["investimentos_dash"] = investimentos_dash
+        ctx["inv_total_atual"] = sum(i.saldo_atual for i in investimentos_dash)
+
+        # Gráfico de evolução mensal dos investimentos no dashboard (carry-forward + barras)
+        from collections import OrderedDict
+        MESES_PT_D = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+        todos_inv    = list(Investimento.objects.filter(user=user))
+        inv_ids_dash = [i.pk for i in todos_inv]
+        hist_dash = InvestimentoHistorico.objects.filter(
+            investimento_id__in=inv_ids_dash
+        ).order_by("data_movimentacao").values("investimento_id", "valor_novo", "diferenca", "tipo", "data_movimentacao")
+
+        meses_saldo  = OrderedDict()
+        aportes_d    = {}   # {chave: total}
+        saques_d     = {}   # {chave: total}
+        for r in hist_dash:
+            chave = (r["data_movimentacao"].year, r["data_movimentacao"].month)
+            if chave not in meses_saldo:
+                meses_saldo[chave] = {}
+            meses_saldo[chave][r["investimento_id"]] = float(r["valor_novo"])
+            tipo = r.get("tipo") or "rendimento"
+            dif  = float(r["diferenca"])
+            if tipo in ("aporte", "inicial"):
+                aportes_d[chave] = aportes_d.get(chave, 0) + max(0, dif)
+            elif tipo == "saque":
+                saques_d[chave] = saques_d.get(chave, 0) + abs(min(0, dif))
+
+        dash_labels, dash_dados, dash_aportes_bar, dash_saques_bar = [], [], [], []
+        if meses_saldo:
+            saldo_acum_d = {}
+            primeiro_d   = min(meses_saldo.keys())
+            ultimo_d     = (date.today().year, date.today().month)
+            cur = date(primeiro_d[0], primeiro_d[1], 1)
+            end = date(ultimo_d[0], ultimo_d[1], 1)
+            while cur <= end:
+                chave = (cur.year, cur.month)
+                if chave in meses_saldo:
+                    saldo_acum_d.update(meses_saldo[chave])
+                dash_labels.append(f"{MESES_PT_D[cur.month-1]}/{cur.year}")
+                dash_dados.append(round(sum(saldo_acum_d.values()), 2))
+                dash_aportes_bar.append(round(aportes_d.get(chave, 0), 2))
+                dash_saques_bar.append(round(saques_d.get(chave, 0), 2))
+                cur += relativedelta(months=1)
+
+        ctx["dash_inv_labels"]      = json.dumps(dash_labels)
+        ctx["dash_inv_dados"]       = json.dumps(dash_dados)
+        ctx["dash_inv_aportes_bar"] = json.dumps(dash_aportes_bar)
+        ctx["dash_inv_saques_bar"]  = json.dumps(dash_saques_bar)
+
+        # Rosca — distribuição por tipo (investimentos ativos no dash)
+        from collections import defaultdict
+        LABEL_MAP_D = {
+            "renda_fixa":        "Renda Fixa",
+            "renda_variavel":    "Renda Variável",
+            "fundo_imobiliario": "Fundo Imobiliário",
+        }
+        tipo_dash = defaultdict(float)
+        for inv in investimentos_dash:
+            tipo_dash[LABEL_MAP_D.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
+        ctx["dash_rosca_labels"] = json.dumps(list(tipo_dash.keys()))
+        ctx["dash_rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_dash.values()])
 
         # Por categoria (gráfico pizza) — inclui atribuídos, respeita filtros ativos
         gastos_cat_qs = Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
@@ -434,6 +501,136 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ]
         ctx["tabela_resp_meses"] = tabela_resp_meses
 
+        # Tabela Parcelados × Meses
+        _parcela_re = re.compile(r'\s*\((\d+)/(\d+)\)$')
+        parcelados_ano_qs = (
+            Gasto.objects.filter(
+                user=user,
+                data_compra__year=ano,
+                tipo_pagamento="credito_parcelado",
+            )
+            .select_related("responsavel", "cartao")
+            .order_by("data_compra")
+        )
+
+        series_map = {}
+        series_order = []
+        for g in parcelados_ano_qs:
+            m = _parcela_re.search(g.descricao)
+            if m:
+                parcela_num = int(m.group(1))
+                total = int(m.group(2))
+                desc_base = g.descricao[:m.start()]
+            else:
+                parcela_num = 1
+                total = g.total_parcelas or 1
+                desc_base = g.descricao
+
+            serie_key = (desc_base, g.responsavel_id, g.cartao_id, total)
+            if serie_key not in series_map:
+                series_map[serie_key] = {
+                    "descricao": desc_base,
+                    "responsavel": g.responsavel,
+                    "cartao": g.cartao,
+                    "total_parcelas": total,
+                    "meses": {},
+                }
+                series_order.append(serie_key)
+            series_map[serie_key]["meses"][g.data_compra.month] = {
+                "parcela_num": parcela_num,
+                "valor": float(g.valor_total),
+            }
+
+        tabela_parcelados = []
+        for key in series_order:
+            data = series_map[key]
+            tabela_parcelados.append({
+                "descricao": data["descricao"],
+                "responsavel": data["responsavel"],
+                "cartao": data["cartao"],
+                "total_parcelas": data["total_parcelas"],
+                "meses": [data["meses"].get(mes_num) for _, mes_num in todos_meses],
+            })
+        ctx["tabela_parcelados"] = tabela_parcelados
+
+        # Tabela Gastos Divididos × Meses
+        from collections import defaultdict
+        split_qs = (
+            Gasto.objects.filter(
+                user=user,
+                grupo_divisao__isnull=False,
+                data_compra__year=ano,
+            )
+            .select_related("responsavel", "cartao")
+            .order_by("data_compra")
+        )
+
+        # agrupa por UUID de divisão para descobrir "dividido com"
+        grupos_div = defaultdict(list)
+        for g in split_qs:
+            grupos_div[str(g.grupo_divisao)].append(g)
+
+        div_series_map = {}
+        div_series_order = []
+        for grupo_uuid, gastos_grupo in grupos_div.items():
+            # mapa responsavel_id → responsavel para este grupo
+            resp_no_grupo = {g.responsavel_id: g.responsavel for g in gastos_grupo}
+
+            # Exibe apenas o lado "principal" do split (menor pk = criado primeiro)
+            main_resp_id = min(gastos_grupo, key=lambda x: x.pk).responsavel_id
+
+            for g in gastos_grupo:
+                if g.responsavel_id != main_resp_id:
+                    continue  # ignora o outro lado do split
+
+                match = _parcela_re.search(g.descricao)
+                if match:
+                    parcela_num = int(match.group(1))
+                    total = int(match.group(2))
+                    desc_base = g.descricao[:match.start()]
+                else:
+                    parcela_num = 1
+                    total = g.total_parcelas or 1
+                    desc_base = g.descricao
+
+                if grupo_uuid not in div_series_map:
+                    outros = [r for rid, r in resp_no_grupo.items() if rid != g.responsavel_id]
+                    div_series_map[grupo_uuid] = {
+                        "descricao": desc_base,
+                        "responsavel": g.responsavel,
+                        "dividido_com": outros[0] if outros else None,
+                        "cartao": g.cartao,
+                        "tipo_pagamento": g.tipo_pagamento,
+                        "total_parcelas": total if g.tipo_pagamento == "credito_parcelado" else None,
+                        "pct_meu": g.pct_divisao,
+                        "meses": {},
+                    }
+                    div_series_order.append(grupo_uuid)
+
+                div_series_map[grupo_uuid]["meses"][g.data_compra.month] = {
+                    "parcela_num": parcela_num,
+                    "valor": float(g.valor_total),
+                    "is_parcelado": g.tipo_pagamento == "credito_parcelado",
+                }
+
+        tabela_divididos = []
+        for grupo_uuid in div_series_order:
+            d = div_series_map[grupo_uuid]
+            pct_meu   = d["pct_meu"] or 50
+            pct_outro = 100 - pct_meu
+            tabela_divididos.append({
+                "descricao":      d["descricao"],
+                "responsavel":    d["responsavel"],
+                "dividido_com":   d["dividido_com"],
+                "cartao":         d["cartao"],
+                "tipo_pagamento": d["tipo_pagamento"],
+                "total_parcelas": d["total_parcelas"],
+                "pct_meu":        pct_meu,
+                "pct_outro":      pct_outro,
+                "meses": [d["meses"].get(mes_num) for _, mes_num in todos_meses],
+            })
+        ctx["tabela_divididos"] = tabela_divididos
+
         return ctx
 
 
@@ -459,6 +656,9 @@ class GastoListView(UserOwnedMixin, ListView):
                 qs = qs.filter(data_compra__month=int(mes), data_compra__year=int(ano))
             except ValueError:
                 pass
+        else:
+            # Sem filtro de mês: oculta parcelas 2, 3, ..., N — mostra só a 1ª de cada grupo
+            qs = qs.exclude(descricao__iregex=r'\(([2-9]|\d{2,})/\d+\)\s*$')
         if responsavel:
             qs = qs.filter(responsavel_id=responsavel)
         if cartao:
@@ -513,32 +713,83 @@ class GastoCreateView(UserOwnedMixin, CreateView):
                 except (ValueError, TypeError):
                     pass
 
+        dividir = form.cleaned_data.get("dividir_gasto")
+        dividir_com = form.cleaned_data.get("dividir_com")
+        grupo_id = uuid.uuid4() if (dividir and dividir_com) else None
+
+        valor_original = gasto.valor_total
+        pct_meu = int(form.cleaned_data.get("pct_responsavel") or 50)
+        pct_outro = 100 - pct_meu
+
+        if grupo_id:
+            valor_meu   = (valor_original * Decimal(pct_meu)   / 100).quantize(Decimal("0.01"))
+            valor_outro = (valor_original * Decimal(pct_outro) / 100).quantize(Decimal("0.01"))
+            # ajusta arredondamento: garante que a soma bate
+            if valor_meu + valor_outro != valor_original:
+                valor_outro = valor_original - valor_meu
+
+        def _criar_gastos(responsavel, valor, pct, grupo):
+            kwargs_base = dict(
+                valor_total=valor,
+                tipo_pagamento=gasto.tipo_pagamento,
+                cartao=gasto.cartao,
+                responsavel=responsavel,
+                categoria=gasto.categoria,
+                observacao=gasto.observacao,
+                total_parcelas=n,
+                user=self.request.user,
+                grupo_divisao=grupo,
+                pct_divisao=pct,
+            )
+            desc = gasto.descricao
+            if n:
+                Gasto.objects.create(descricao=f"{desc} (1/{n})", data_compra=data_inicio, **kwargs_base)
+                for i in range(2, n + 1):
+                    Gasto.objects.create(
+                        descricao=f"{desc} ({i}/{n})",
+                        data_compra=data_inicio + relativedelta(months=i - 1),
+                        **kwargs_base,
+                    )
+            else:
+                Gasto.objects.create(descricao=desc, data_compra=data_inicio, **kwargs_base)
+
         if n:
-            descricao_base = gasto.descricao
-            gasto.descricao = f"{descricao_base} (1/{n})"
-            gasto.data_compra = data_inicio
-            gasto.save()
-            for i in range(2, n + 1):
-                Gasto.objects.create(
-                    descricao=f"{descricao_base} ({i}/{n})",
-                    valor_total=gasto.valor_total,
-                    tipo_pagamento=gasto.tipo_pagamento,
-                    cartao=gasto.cartao,
-                    responsavel=gasto.responsavel,
-                    categoria=gasto.categoria,
-                    data_compra=data_inicio + relativedelta(months=i - 1),
-                    observacao=gasto.observacao,
-                    total_parcelas=n,
-                    user=self.request.user,
-                )
+            if grupo_id:
+                _criar_gastos(gasto.responsavel, valor_meu,   pct_meu,   grupo_id)
+                _criar_gastos(dividir_com,       valor_outro, pct_outro, grupo_id)
+            else:
+                descricao_base = gasto.descricao
+                gasto.descricao = f"{descricao_base} (1/{n})"
+                gasto.data_compra = data_inicio
+                gasto.save()
+                for i in range(2, n + 1):
+                    Gasto.objects.create(
+                        descricao=f"{descricao_base} ({i}/{n})",
+                        valor_total=gasto.valor_total,
+                        tipo_pagamento=gasto.tipo_pagamento,
+                        cartao=gasto.cartao,
+                        responsavel=gasto.responsavel,
+                        categoria=gasto.categoria,
+                        data_compra=data_inicio + relativedelta(months=i - 1),
+                        observacao=gasto.observacao,
+                        total_parcelas=n,
+                        user=self.request.user,
+                    )
         else:
-            gasto.save()
+            if grupo_id:
+                _criar_gastos(gasto.responsavel, valor_meu,   pct_meu,   grupo_id)
+                _criar_gastos(dividir_com,       valor_outro, pct_outro, grupo_id)
+            else:
+                gasto.save()
 
         _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, self.request.user)
         usuario_atribuido = gasto.responsavel.usuario_vinculado
         if usuario_atribuido and usuario_atribuido != self.request.user:
             _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, usuario_atribuido)
-        messages.success(self.request, "Gasto registrado com sucesso.")
+        if grupo_id:
+            messages.success(self.request, "Gasto dividido e registrado para os dois responsáveis.")
+        else:
+            messages.success(self.request, "Gasto registrado com sucesso.")
         next_url = self.request.POST.get("next") or self.success_url
         return HttpResponseRedirect(next_url)
 
@@ -546,6 +797,26 @@ class GastoCreateView(UserOwnedMixin, CreateView):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo"] = "Novo Gasto"
         return ctx
+
+
+_PARCELA_GROUP_RE = re.compile(r'^(.*?)\s*\((\d+)/(\d+)\)$')
+
+
+def _encontrar_grupo_parcelado(gasto, user):
+    """Retorna todas as parcelas do mesmo grupo, ordenadas pela data."""
+    m = _PARCELA_GROUP_RE.match(gasto.descricao)
+    if not m:
+        return []
+    base, total = m.group(1), int(m.group(3))
+    padroes = [f"{base} ({i}/{total})" for i in range(1, total + 1)]
+    return list(
+        Gasto.objects.filter(
+            user=user,
+            descricao__in=padroes,
+            responsavel=gasto.responsavel,
+            tipo_pagamento="credito_parcelado",
+        ).order_by("data_compra")
+    )
 
 
 class GastoUpdateView(UserOwnedMixin, UpdateView):
@@ -563,6 +834,37 @@ class GastoUpdateView(UserOwnedMixin, UpdateView):
         data_antiga = self.get_object().data_compra
         gasto = form.save()
         usuario_atribuido = gasto.responsavel.usuario_vinculado
+
+        # Sincroniza com o outro lado do split (se existir)
+        if gasto.grupo_divisao:
+            parceiro = (
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=gasto.grupo_divisao,
+                    data_compra__month=data_antiga.month,
+                    data_compra__year=data_antiga.year,
+                )
+                .exclude(pk=gasto.pk)
+                .first()
+            )
+            if parceiro:
+                pct_meu   = Decimal(gasto.pct_divisao or 50)
+                pct_outro = Decimal(100) - pct_meu
+                # Recalcula o valor do parceiro proporcionalmente
+                total_compra   = (gasto.valor_total * Decimal("100") / pct_meu)
+                novo_valor_parceiro = (total_compra * pct_outro / Decimal("100")).quantize(Decimal("0.01"))
+                parceiro.descricao      = gasto.descricao
+                parceiro.data_compra    = gasto.data_compra
+                parceiro.tipo_pagamento = gasto.tipo_pagamento
+                parceiro.total_parcelas = gasto.total_parcelas
+                parceiro.categoria      = gasto.categoria
+                parceiro.valor_total    = novo_valor_parceiro
+                parceiro.pct_divisao    = int(pct_outro)
+                parceiro.save(update_fields=[
+                    "descricao", "data_compra", "tipo_pagamento",
+                    "total_parcelas", "categoria", "valor_total", "pct_divisao",
+                ])
+
         _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
         if gasto.data_compra != data_antiga:
             _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, self.request.user)
@@ -576,7 +878,129 @@ class GastoUpdateView(UserOwnedMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo"] = "Editar Gasto"
+        gasto = self.object
+        if gasto.tipo_pagamento == "credito_parcelado":
+            grupo = _encontrar_grupo_parcelado(gasto, self.request.user)
+            if len(grupo) > 1:
+                ctx["parcelas_grupo"] = grupo
+            ctx["parcelado_edit"] = True
+        else:
+            ctx["parcelado_edit"] = False
         return ctx
+
+
+@login_required
+def gasto_parcela_valor(request, pk):
+    """Atualiza apenas o valor_total de uma parcela específica, sincronizando o split."""
+    if request.method != "POST":
+        return HttpResponseRedirect(reverse_lazy("gasto-update", kwargs={"pk": pk}))
+
+    gasto = get_object_or_404(Gasto, pk=pk, user=request.user)
+    next_url = request.POST.get("next") or reverse_lazy("gasto-update", kwargs={"pk": pk})
+
+    try:
+        novo_valor = Decimal(request.POST["valor_total"].replace(",", "."))
+        if novo_valor <= 0:
+            raise ValueError
+    except Exception:
+        messages.error(request, "Valor inválido.")
+        return HttpResponseRedirect(next_url)
+
+    gasto.valor_total = novo_valor
+    gasto.save(update_fields=["valor_total"])
+
+    if gasto.grupo_divisao and gasto.pct_divisao:
+        mes, ano = gasto.data_compra.month, gasto.data_compra.year
+        parceiro = (
+            Gasto.objects.filter(
+                user=request.user,
+                grupo_divisao=gasto.grupo_divisao,
+                data_compra__month=mes,
+                data_compra__year=ano,
+            )
+            .exclude(pk=gasto.pk)
+            .first()
+        )
+        if parceiro:
+            pct_meu   = Decimal(gasto.pct_divisao)
+            pct_outro = Decimal(100) - pct_meu
+            total_compra        = novo_valor * Decimal("100") / pct_meu
+            novo_valor_parceiro = (total_compra * pct_outro / Decimal("100")).quantize(Decimal("0.01"))
+            parceiro.valor_total = novo_valor_parceiro
+            parceiro.save(update_fields=["valor_total"])
+
+    _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, request.user)
+    messages.success(request, "Valor da parcela atualizado.")
+    return HttpResponseRedirect(next_url)
+
+
+@login_required
+def gasto_parcela_add(request, pk):
+    """Adiciona uma parcela extra ao grupo de um gasto parcelado."""
+    gasto_ref = get_object_or_404(Gasto, pk=pk, user=request.user)
+    grupo = _encontrar_grupo_parcelado(gasto_ref, request.user)
+    if not grupo:
+        messages.error(request, "Grupo de parcelas não encontrado.")
+        return HttpResponseRedirect(reverse_lazy("gasto-update", kwargs={"pk": pk}))
+
+    m = _PARCELA_GROUP_RE.match(gasto_ref.descricao)
+    base = m.group(1)
+    total_atual = len(grupo)
+    novo_total = total_atual + 1
+
+    # renomeia parcelas do lado principal
+    for i, g in enumerate(grupo, 1):
+        g.descricao = f"{base} ({i}/{novo_total})"
+        g.save(update_fields=["descricao"])
+
+    ultima = grupo[-1]
+    nova_data = ultima.data_compra + relativedelta(months=1)
+    Gasto.objects.create(
+        user=request.user,
+        descricao=f"{base} ({novo_total}/{novo_total})",
+        valor_total=ultima.valor_total,
+        data_compra=nova_data,
+        tipo_pagamento="credito_parcelado",
+        total_parcelas=novo_total,
+        cartao=ultima.cartao,
+        responsavel=ultima.responsavel,
+        categoria=ultima.categoria,
+        pct_divisao=ultima.pct_divisao,
+        grupo_divisao=ultima.grupo_divisao,
+    )
+
+    # Se é gasto dividido, repete a operação para o outro lado do split
+    if ultima.grupo_divisao:
+        outro_grupo = list(
+            Gasto.objects.filter(
+                user=request.user,
+                grupo_divisao=ultima.grupo_divisao,
+            )
+            .exclude(responsavel=ultima.responsavel)
+            .order_by("data_compra")
+        )
+        if outro_grupo:
+            for i, g in enumerate(outro_grupo, 1):
+                g.descricao = f"{base} ({i}/{novo_total})"
+                g.save(update_fields=["descricao"])
+            ultima_outro = outro_grupo[-1]
+            Gasto.objects.create(
+                user=request.user,
+                descricao=f"{base} ({novo_total}/{novo_total})",
+                valor_total=ultima_outro.valor_total,
+                data_compra=nova_data,
+                tipo_pagamento="credito_parcelado",
+                total_parcelas=novo_total,
+                cartao=ultima_outro.cartao,
+                responsavel=ultima_outro.responsavel,
+                categoria=ultima_outro.categoria,
+                pct_divisao=ultima_outro.pct_divisao,
+                grupo_divisao=ultima_outro.grupo_divisao,
+            )
+
+    _recalcular_saldos_a_partir(nova_data.month, nova_data.year, request.user)
+    messages.success(request, f"Parcela {novo_total}/{novo_total} adicionada ao grupo.")
+    return HttpResponseRedirect(reverse_lazy("gasto-update", kwargs={"pk": pk}))
 
 
 class GastoDeleteView(UserOwnedMixin, DeleteView):
@@ -585,9 +1009,55 @@ class GastoDeleteView(UserOwnedMixin, DeleteView):
     success_url = reverse_lazy("gasto-list")
 
     def form_valid(self, form):
-        mes, ano = self.object.data_compra.month, self.object.data_compra.year
-        usuario_atribuido = self.object.responsavel.usuario_vinculado
-        response = super().form_valid(form)
+        gasto = self.object
+        mes, ano = gasto.data_compra.month, gasto.data_compra.year
+        usuario_atribuido = gasto.responsavel.usuario_vinculado
+        grupo_divisao = gasto.grupo_divisao
+        responsavel_pk = gasto.responsavel_id
+
+        # Extrai base da descrição para renumerar parcelas restantes
+        m = _PARCELA_GROUP_RE.match(gasto.descricao)
+        base_desc = m.group(1) if m else None
+
+        # Encontra o parceiro do split ANTES de deletar
+        parceiro = None
+        parceiro_resp_pk = None
+        if grupo_divisao:
+            parceiro = (
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=grupo_divisao,
+                    data_compra__month=mes,
+                    data_compra__year=ano,
+                )
+                .exclude(responsavel_id=responsavel_pk)
+                .first()
+            )
+            if parceiro:
+                parceiro_resp_pk = parceiro.responsavel_id
+
+        response = super().form_valid(form)  # deleta o gasto principal
+
+        if parceiro:
+            parceiro.delete()
+
+        # Renumera parcelas restantes de ambos os lados
+        if grupo_divisao and base_desc:
+            for resp_pk in filter(None, [responsavel_pk, parceiro_resp_pk]):
+                restantes = list(
+                    Gasto.objects.filter(
+                        user=self.request.user,
+                        grupo_divisao=grupo_divisao,
+                        responsavel_id=resp_pk,
+                    ).order_by("data_compra")
+                )
+                if not restantes:
+                    continue
+                novo_total = len(restantes)
+                for i, g in enumerate(restantes, 1):
+                    g.descricao = f"{base_desc} ({i}/{novo_total})"
+                    g.save(update_fields=["descricao"])
+
         _recalcular_saldos_a_partir(mes, ano, self.request.user)
         if usuario_atribuido and usuario_atribuido != self.request.user:
             _recalcular_saldos_a_partir(mes, ano, usuario_atribuido)
@@ -1118,3 +1588,297 @@ class ContaDetailView(UserOwnedMixin, DetailView):
         ctx["total_entradas"] = entradas.aggregate(t=Sum("valor"))["t"] or 0
         ctx["qtd_entradas"] = entradas.count()
         return ctx
+
+
+# ── Investimentos ────────────────────────────────────────────────────────────
+
+class InvestimentoListView(LoginRequiredMixin, TemplateView):
+    template_name = "investimentos/investimento_list.html"
+
+    def _build_series(self, historico_qs, inv_conta_map, inv_inicial_map):
+        """
+        Reconstrói a evolução patrimonial mensal com carry-forward.
+        inv_conta_map:   {inv_pk: conta_id}
+        inv_inicial_map: {inv_pk: saldo_inicial}
+        Retorna (labels, dados_patrimonio, aportes_bar, saques_bar, conta_series).
+        conta_series[id] = {"labels", "dados", "aportes_bar", "saques_bar"}
+        """
+        from collections import OrderedDict
+        MESES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+        registros = list(
+            historico_qs.order_by("data_movimentacao")
+            .values("investimento_id", "valor_novo", "diferenca", "tipo", "data_movimentacao")
+        )
+        if not registros:
+            return [], [], [], [], {}
+
+        meses_geral   = OrderedDict()   # {chave: {inv_pk: ultimo_valor}}
+        aportes_g     = {}              # {chave: valor_total_aportes}
+        saques_g      = {}              # {chave: valor_total_saques}
+        meses_conta   = {}
+        aportes_conta = {}
+        saques_conta  = {}
+
+        for r in registros:
+            dt       = r["data_movimentacao"]
+            chave    = (dt.year, dt.month)
+            inv_pk   = r["investimento_id"]
+            val      = float(r["valor_novo"])
+            dif      = float(r["diferenca"])
+            tipo     = r.get("tipo") or "rendimento"
+            conta_id = inv_conta_map.get(inv_pk)
+
+            # Linha de patrimônio (último valor por inv por mês)
+            if chave not in meses_geral:
+                meses_geral[chave] = {}
+            meses_geral[chave][inv_pk] = val
+
+            # Barras globais
+            if tipo in ("aporte", "inicial"):
+                aportes_g[chave] = aportes_g.get(chave, 0) + max(0, dif)
+            elif tipo == "saque":
+                saques_g[chave]  = saques_g.get(chave, 0)  + abs(min(0, dif))
+
+            # Séries por conta
+            if conta_id is not None:
+                if conta_id not in meses_conta:
+                    meses_conta[conta_id]   = OrderedDict()
+                    aportes_conta[conta_id] = {}
+                    saques_conta[conta_id]  = {}
+                if chave not in meses_conta[conta_id]:
+                    meses_conta[conta_id][chave] = {}
+                meses_conta[conta_id][chave][inv_pk] = val
+                if tipo in ("aporte", "inicial"):
+                    aportes_conta[conta_id][chave] = aportes_conta[conta_id].get(chave, 0) + max(0, dif)
+                elif tipo == "saque":
+                    saques_conta[conta_id][chave]  = saques_conta[conta_id].get(chave, 0)  + abs(min(0, dif))
+
+        from dateutil.relativedelta import relativedelta as _rd
+        primeiro = min(meses_geral.keys())
+        hoje     = date.today()
+        ultimo   = (hoje.year, hoje.month)
+
+        def _mes_range(inicio, fim):
+            cur = date(inicio[0], inicio[1], 1)
+            end = date(fim[0], fim[1], 1)
+            while cur <= end:
+                yield (cur.year, cur.month)
+                cur += _rd(months=1)
+
+        saldo_acum = {}
+        all_labels, all_dados, all_aportes_bar, all_saques_bar = [], [], [], []
+
+        for chave in _mes_range(primeiro, ultimo):
+            if chave in meses_geral:
+                saldo_acum.update(meses_geral[chave])
+            ano, mes = chave
+            all_labels.append(f"{MESES_PT[mes-1]}/{ano}")
+            all_dados.append(round(sum(saldo_acum.values()), 2))
+            all_aportes_bar.append(round(aportes_g.get(chave, 0), 2))
+            all_saques_bar.append(round(saques_g.get(chave, 0), 2))
+
+        conta_series = {}
+        for conta_id, meses in meses_conta.items():
+            pri_c = min(meses.keys())
+            s_c   = {}
+            lab_c, dat_c, apo_bar_c, saq_bar_c = [], [], [], []
+            for chave in _mes_range(pri_c, ultimo):
+                if chave in meses:
+                    s_c.update(meses[chave])
+                ano, mes = chave
+                lab_c.append(f"{MESES_PT[mes-1]}/{ano}")
+                dat_c.append(round(sum(s_c.values()), 2))
+                apo_bar_c.append(round(aportes_conta[conta_id].get(chave, 0), 2))
+                saq_bar_c.append(round(saques_conta[conta_id].get(chave, 0), 2))
+            conta_series[conta_id] = {
+                "labels": lab_c, "dados": dat_c,
+                "aportes_bar": apo_bar_c, "saques_bar": saq_bar_c,
+            }
+
+        return all_labels, all_dados, all_aportes_bar, all_saques_bar, conta_series
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        user = self.request.user
+        todos = list(Investimento.objects.filter(user=user).select_related("conta"))
+        ativos     = [i for i in todos if not i.liquidado]
+        liquidados = [i for i in todos if i.liquidado]
+        ctx["investimentos"]  = ativos
+        ctx["liquidados"]     = liquidados
+        ctx["contas"] = Conta.objects.filter(user=user, ativo=True)
+        ctx["form"] = InvestimentoForm(user)
+        ctx["total_inicial"] = sum(i.saldo_inicial for i in ativos)
+        ctx["total_atual"]   = sum(i.saldo_atual   for i in ativos)
+        ctx["total_rentab"]  = ctx["total_atual"] - ctx["total_inicial"]
+
+        # Dados para o gráfico — usa todos (ativos + liquidados) para mostrar histórico completo
+        inv_ids          = [i.pk for i in todos]
+        inv_conta_map    = {i.pk: i.conta_id   for i in todos}
+        inv_inicial_map  = {i.pk: float(i.saldo_inicial) for i in todos}
+        historico_qs = InvestimentoHistorico.objects.filter(investimento_id__in=inv_ids)
+
+        all_labels, all_dados, all_aportes_bar, all_saques_bar, conta_series = self._build_series(
+            historico_qs, inv_conta_map, inv_inicial_map
+        )
+
+        ctx["chart_labels"]      = json.dumps(all_labels)
+        ctx["chart_dados"]       = json.dumps(all_dados)
+        ctx["chart_aportes_bar"] = json.dumps(all_aportes_bar)
+        ctx["chart_saques_bar"]  = json.dumps(all_saques_bar)
+        ctx["chart_por_conta"]   = json.dumps(conta_series)
+        ctx["contas_com_inv"]  = [
+            {"id": c.pk, "nome": c.nome}
+            for c in ctx["contas"]
+            if c.pk in {i.conta_id for i in todos}
+        ]
+
+        # Gráfico de rosca — distribuição por tipo (apenas ativos)
+        from collections import defaultdict
+        LABEL_MAP = {
+            "renda_fixa":        "Renda Fixa",
+            "renda_variavel":    "Renda Variável",
+            "fundo_imobiliario": "Fundo Imobiliário",
+        }
+        tipo_totais = defaultdict(float)
+        for inv in ativos:
+            tipo_totais[LABEL_MAP.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
+        ctx["rosca_labels"] = json.dumps(list(tipo_totais.keys()))
+        ctx["rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_totais.values()])
+
+        return ctx
+
+
+class InvestimentoCreateView(LoginRequiredMixin, CreateView):
+    model = Investimento
+    form_class = InvestimentoForm
+    success_url = reverse_lazy("investimento-list")
+
+    def get_form_kwargs(self):
+        kw = super().get_form_kwargs()
+        kw["user"] = self.request.user
+        return kw
+
+    def form_valid(self, form):
+        inv = form.save(commit=False)
+        inv.user = self.request.user
+        inv.saldo_atual = inv.saldo_inicial
+        inv.save()
+        InvestimentoHistorico.objects.create(
+            investimento=inv,
+            valor_anterior=Decimal("0"),
+            valor_novo=inv.saldo_inicial,
+            diferenca=inv.saldo_inicial,
+            tipo="inicial",
+            motivo="Aporte inicial",
+        )
+        messages.success(self.request, "Investimento criado com sucesso.")
+        return HttpResponseRedirect(self.success_url)
+
+    def form_invalid(self, form):
+        messages.error(self.request, "Corrija os erros abaixo.")
+        return HttpResponseRedirect(reverse_lazy("investimento-list"))
+
+
+class InvestimentoDeleteView(LoginRequiredMixin, DeleteView):
+    model = Investimento
+    template_name = "investimentos/investimento_confirm_delete.html"
+    success_url = reverse_lazy("investimento-list")
+
+    def get_queryset(self):
+        return super().get_queryset().filter(user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Investimento excluído.")
+        return super().form_valid(form)
+
+
+class InvestimentoDetailView(LoginRequiredMixin, DetailView):
+    model = Investimento
+    template_name = "investimentos/investimento_detail.html"
+    context_object_name = "inv"
+
+    def get_queryset(self):
+        return super().get_queryset().filter(user=self.request.user).select_related("conta")
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        inv = self.object
+        historico = inv.historico.all()
+        ctx["historico"] = historico
+        ctx["form_saldo"] = InvestimentoAtualizarSaldoForm(
+            initial={"novo_saldo": inv.saldo_atual}
+        )
+
+        conta_id = self.request.GET.get("conta_filtro", "")
+        ctx["conta_filtro"] = conta_id
+        ctx["contas_disponiveis"] = Conta.objects.filter(user=self.request.user, ativo=True)
+
+        chart_qs = historico.order_by("data_movimentacao")
+        labels = [h.data_movimentacao.strftime("%d/%m/%Y %H:%M") for h in chart_qs]
+        dados  = [float(h.valor_novo) for h in chart_qs]
+        ctx["chart_labels"] = json.dumps(labels)
+        ctx["chart_dados"]  = json.dumps(dados)
+        return ctx
+
+
+@login_required
+def investimento_liquidar(request, pk):
+    if request.method != "POST":
+        return HttpResponseRedirect(reverse_lazy("investimento-detail", kwargs={"pk": pk}))
+    inv = get_object_or_404(Investimento, pk=pk, user=request.user)
+    if inv.liquidado:
+        messages.info(request, "Investimento já liquidado.")
+        return HttpResponseRedirect(reverse_lazy("investimento-list"))
+
+    from django.utils import timezone
+    InvestimentoHistorico.objects.create(
+        investimento=inv,
+        valor_anterior=inv.saldo_atual,
+        valor_novo=Decimal("0"),
+        diferenca=-inv.saldo_atual,
+        tipo="liquidacao",
+        motivo="Liquidação / Saque total",
+    )
+    inv.liquidado = True
+    inv.data_liquidacao = timezone.now()
+    inv.saldo_atual = Decimal("0")
+    inv.save(update_fields=["liquidado", "data_liquidacao", "saldo_atual", "atualizado_em"])
+    messages.success(request, f'Investimento "{inv.descricao}" liquidado com sucesso.')
+    return HttpResponseRedirect(reverse_lazy("investimento-list"))
+
+
+@login_required
+def investimento_atualizar_saldo(request, pk):
+    inv = get_object_or_404(Investimento, pk=pk, user=request.user)
+    if request.method != "POST":
+        return HttpResponseRedirect(reverse_lazy("investimento-detail", kwargs={"pk": pk}))
+
+    form = InvestimentoAtualizarSaldoForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Dados inválidos. Verifique o formulário.")
+        return HttpResponseRedirect(reverse_lazy("investimento-detail", kwargs={"pk": pk}))
+
+    valor  = form.cleaned_data["valor"]
+    tipo   = form.cleaned_data["tipo"]
+    motivo = form.cleaned_data.get("motivo", "")
+
+    if tipo == "ajuste_saldo":
+        novo_saldo = valor
+    elif tipo == "saque":
+        novo_saldo = inv.saldo_atual - valor
+    else:  # aporte ou rendimento
+        novo_saldo = inv.saldo_atual + valor
+
+    InvestimentoHistorico.objects.create(
+        investimento=inv,
+        valor_anterior=inv.saldo_atual,
+        valor_novo=novo_saldo,
+        diferenca=novo_saldo - inv.saldo_atual,
+        tipo=tipo,
+        motivo=motivo,
+    )
+    inv.saldo_atual = novo_saldo
+    inv.save(update_fields=["saldo_atual", "atualizado_em"])
+    messages.success(request, "Saldo atualizado com sucesso.")
+    return HttpResponseRedirect(reverse_lazy("investimento-detail", kwargs={"pk": pk}))

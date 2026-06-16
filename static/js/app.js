@@ -108,20 +108,21 @@
       });
     }
 
-    // Modais de formulário — fechar clicando fora ou Escape
-    ["modal-novo-gasto", "modal-nova-entrada", "modal-perfil"].forEach(function (id) {
-      var fm = document.getElementById(id);
-      if (!fm) return;
-      fm.addEventListener("click", function (e) {
-        if (e.target === fm) closeFormModal(id);
-      });
-    });
+    // Escape fecha apenas o modal de exclusão (formulários exigem clique em Cancelar)
     document.addEventListener("keydown", function (e) {
-      if (e.key !== "Escape") return;
-      closeDeleteModal();
-      closeFormModal("modal-novo-gasto");
-      closeFormModal("modal-nova-entrada");
-      closeFormModal("modal-perfil");
+      if (e.key === "Escape") closeDeleteModal();
+    });
+
+    // Impede fechamento dos modais de formulário ao clicar no backdrop
+    ["modal-novo-gasto", "modal-nova-entrada", "modal-perfil"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+      el.addEventListener("mousedown", function (e) {
+        if (e.target === el) e.preventDefault();
+      });
     });
   });
 
@@ -158,11 +159,20 @@
     if (modal) modal.style.display = "none";
   };
 
-  window.openDeleteModal = function (action, msg) {
+  window.openDeleteModal = function (action, msg, titulo, btnLabel, btnIcon) {
     var modal = document.getElementById("modal-delete-all");
     if (!modal) return;
     document.getElementById("modal-delete-msg").textContent = msg;
     document.getElementById("modal-delete-form").action = action;
+    var titleEl = document.getElementById("modal-delete-title");
+    if (titleEl) titleEl.textContent = titulo || "Excluir tudo?";
+    var confirmBtn = document.getElementById("modal-delete-confirm-btn");
+    if (confirmBtn) {
+      var icon = btnIcon || "trash-2";
+      var label = btnLabel || "Confirmar exclusão";
+      confirmBtn.innerHTML = '<i data-lucide="' + icon + '"></i> ' + label;
+      if (typeof lucide !== "undefined") lucide.createIcons({ nodes: [confirmBtn] });
+    }
     modal.style.display = "flex";
     modal.querySelector("button[data-cancel]").focus();
   };

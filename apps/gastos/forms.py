@@ -1,10 +1,11 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, Conta
+from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, Conta, Investimento
 
 User = get_user_model()
 
 import datetime as _dt
+from decimal import Decimal
 
 _MESES = [
     (1,"Janeiro"),(2,"Fevereiro"),(3,"Março"),(4,"Abril"),
@@ -54,6 +55,28 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             "observacao":     forms.Textarea(attrs={"rows": 3}),
         }
 
+    _PCT_CHOICES = [(p, f"{p}%") for p in range(10, 100, 10)]
+
+    dividir_gasto = forms.BooleanField(
+        required=False,
+        label="Dividir este gasto",
+        widget=forms.CheckboxInput(attrs={"id": "id_dividir_gasto"}),
+    )
+    dividir_com = forms.ModelChoiceField(
+        queryset=Responsavel.objects.none(),
+        required=False,
+        label="Dividir com",
+        empty_label="— Selecione o responsável —",
+        widget=forms.Select(attrs={"id": "id_dividir_com", "class": "form-control"}),
+    )
+    pct_responsavel = forms.ChoiceField(
+        choices=_PCT_CHOICES,
+        initial=50,
+        required=False,
+        label="Minha parte",
+        widget=forms.Select(attrs={"id": "id_pct_responsavel", "class": "form-control"}),
+    )
+
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
@@ -65,10 +88,12 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             self.fields["cartao"].queryset = Cartao.objects.filter(ativo=True, user=user)
             self.fields["responsavel"].queryset = Responsavel.objects.filter(ativo=True, user=user)
             self.fields["categoria"].queryset = Categoria.objects.filter(ativo=True, user=user)
+            self.fields["dividir_com"].queryset = Responsavel.objects.filter(ativo=True, user=user)
         else:
             self.fields["cartao"].queryset = Cartao.objects.filter(ativo=True)
             self.fields["responsavel"].queryset = Responsavel.objects.filter(ativo=True)
             self.fields["categoria"].queryset = Categoria.objects.filter(ativo=True)
+            self.fields["dividir_com"].queryset = Responsavel.objects.filter(ativo=True)
 
     def clean(self):
         cleaned = super().clean()
@@ -231,3 +256,50 @@ class SenhaForm(FormControlMixin, forms.Form):
         if nova and confirmar and nova != confirmar:
             self.add_error("confirmar_senha", "As senhas não coincidem.")
         return cleaned
+
+
+class InvestimentoForm(FormControlMixin, forms.ModelForm):
+    class Meta:
+        model = Investimento
+        fields = ["conta", "tipo_investimento", "descricao", "saldo_inicial"]
+        widgets = {
+            "conta":              forms.Select(),
+            "tipo_investimento":  forms.Select(),
+            "descricao":          forms.TextInput(attrs={"placeholder": "Ex: Tesouro Direto, CDB Banco X..."}),
+            "saldo_inicial":      forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
+        }
+        labels = {
+            "conta":              "Conta Bancária",
+            "tipo_investimento":  "Tipo de Investimento",
+            "descricao":          "Descrição",
+            "saldo_inicial":      "Saldo Inicial Aportado (R$)",
+        }
+
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["conta"].queryset = Conta.objects.filter(user=user, ativo=True)
+
+
+class InvestimentoAtualizarSaldoForm(FormControlMixin, forms.Form):
+    TIPO_CHOICES = [
+        ("rendimento",    "Rendimento"),
+        ("aporte",        "Aporte"),
+        ("saque",         "Saque"),
+        ("ajuste_saldo",  "Ajuste de Saldo"),
+    ]
+    tipo = forms.ChoiceField(
+        label="Tipo de movimentação",
+        choices=TIPO_CHOICES,
+        widget=forms.Select(),
+    )
+    valor = forms.DecimalField(
+        label="Valor (R$)",
+        max_digits=14, decimal_places=2, min_value=Decimal("0.01"),
+        widget=forms.NumberInput(attrs={"step": "0.01", "placeholder": "0,00"}),
+    )
+    motivo = forms.CharField(
+        label="Observação (opcional)",
+        max_length=300,
+        required=False,
+        widget=forms.TextInput(attrs={"placeholder": "Ex: Rendimento de maio, Novo aporte..."}),
+    )

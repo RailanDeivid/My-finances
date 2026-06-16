@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}{{ inv.descricao }} — Investimentos{% endblock %}
+{% block page_title %}{{ inv.descricao }}{% endblock %}
+
+{% block content %}
+{% load gastos_tags %}
+{% load static %}
+
+<!-- Breadcrumb -->
+<div style="margin-bottom:16px;font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:8px;">
+  <a href="{% url 'investimento-list' %}" style="color:var(--accent);text-decoration:none;">Investimentos</a>
+  <span>›</span>
+  <span>{{ inv.descricao }}</span>
+  {% if inv.liquidado %}
+  <span class="badge" style="background:#f59e0b22;color:#f59e0b;font-size:11px;">Liquidado em {{ inv.data_liquidacao|date:"d/m/Y" }}</span>
+  {% endif %}
+</div>
+
+<!-- Cards de info -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-label">Saldo Atual</div>
+    <div class="stat-value" style="font-size:18px;">R$ {{ inv.saldo_atual|brl }}</div>
+    <div class="stat-sub">Última atualização: {{ inv.atualizado_em|date:"d/m/Y H:i" }}</div>
+  </div>
+  <div class="stat-card" style="border-top-color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+    <div class="stat-label">Rentabilidade</div>
+    <div class="stat-value" style="font-size:18px;color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+      {% if inv.rentabilidade >= 0 %}+{% endif %}R$ {{ inv.rentabilidade|brl }}
+    </div>
+    <div class="stat-sub">
+      {% if inv.rentabilidade_pct >= 0 %}+{% endif %}{{ inv.rentabilidade_pct }}%
+    </div>
+  </div>
+</div>
+
+{% if not inv.liquidado %}
+<!-- Atualizar Saldo -->
+<div class="tabela-wrapper" style="margin-bottom:24px;">
+  <div class="tabela-header" style="padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">
+      Atualizar Saldo Atual
+    </span>
+    <!-- Botão Liquidar -->
+    <button type="button" class="btn btn-sm"
+            style="color:#22c55e;border-color:#22c55e44;font-size:11px;"
+            onclick="openDeleteModal('{% url 'investimento-liquidar' inv.pk %}', 'O saldo será zerado e o investimento sairá do dashboard. O histórico de movimentações é mantido e ficará disponível nesta página.', 'Liquidar investimento?', 'Confirmar liquidação', 'hand-coins')">
+      <i data-lucide="hand-coins" style="width:13px;height:13px;"></i> Liquidar Investimento
+    </button>
+  </div>
+  <div style="padding:16px 20px;">
+    <form method="post" action="{% url 'investimento-atualizar-saldo' inv.pk %}">
+      {% csrf_token %}
+      <div style="display:grid;grid-template-columns:auto 1fr 2fr auto;gap:12px;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Tipo *</label>
+          {{ form_saldo.tipo }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Valor (R$) *</label>
+          {{ form_saldo.valor }}
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Observação</label>
+          {{ form_saldo.motivo }}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+            <i data-lucide="save"></i> Salvar
+          </button>
+          <a href="{% url 'investimento-detail' inv.pk %}" class="btn btn-danger" style="white-space:nowrap;">
+            Cancelar
+          </a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% else %}
+<!-- Investimento liquidado — sem form de atualização -->
+<div style="display:flex;align-items:center;gap:8px;background:#f59e0b11;border:1px solid #f59e0b33;border-radius:8px;padding:12px 16px;margin-bottom:24px;font-size:13px;color:#f59e0b;">
+  <i data-lucide="archive" style="width:16px;height:16px;flex-shrink:0;"></i>
+  <span>Investimento liquidado em <strong>{{ inv.data_liquidacao|date:"d/m/Y \à\s H:i" }}</strong> — saldo zerado. Abaixo está o histórico completo.</span>
+</div>
+{% endif %}
+
+<!-- Histórico de Movimentações -->
+<div class="tabela-wrapper" style="margin-bottom:24px;">
+  <div class="tabela-header" style="padding:10px 16px;">
+    <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">
+      Histórico de Movimentações
+    </span>
+  </div>
+  <div style="max-height:440px;overflow-y:auto;overflow-x:auto;">
+    <table class="tabela-dados">
+      <thead style="position:sticky;top:0;z-index:3;background:var(--bg-card);">
+        <tr>
+          <th>Data / Hora</th>
+          <th>Tipo</th>
+          <th style="text-align:right;">Valor Anterior</th>
+          <th style="text-align:right;">Novo Valor</th>
+          <th style="text-align:right;">Diferença</th>
+          <th>Observação</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in historico %}
+        <tr>
+          <td style="white-space:nowrap;color:var(--text-muted);font-size:13px;">
+            {{ h.data_movimentacao|date:"d/m/Y H:i" }}
+          </td>
+          <td>
+            {% if h.tipo == 'inicial' %}
+              <span class="badge" style="background:#6366f122;color:#6366f1;font-size:11px;">Inicial</span>
+            {% elif h.tipo == 'aporte' %}
+              <span class="badge" style="background:#22c55e22;color:#22c55e;font-size:11px;">Aporte</span>
+            {% elif h.tipo == 'saque' %}
+              <span class="badge" style="background:#ef444422;color:#ef4444;font-size:11px;">Saque</span>
+            {% elif h.tipo == 'ajuste_saldo' %}
+              <span class="badge" style="background:#a855f722;color:#a855f7;font-size:11px;">Ajuste</span>
+            {% elif h.tipo == 'liquidacao' %}
+              <span class="badge" style="background:#f59e0b22;color:#f59e0b;font-size:11px;">Liquidação</span>
+            {% else %}
+              <span class="badge" style="background:#94a3b822;color:#94a3b8;font-size:11px;">Rendimento</span>
+            {% endif %}
+          </td>
+          <td style="text-align:right;">R$ {{ h.valor_anterior|brl }}</td>
+          <td style="text-align:right;font-weight:600;">R$ {{ h.valor_novo|brl }}</td>
+          <td style="text-align:right;font-weight:700;
+                     color:{% if h.diferenca >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+            {% if h.diferenca >= 0 %}+{% endif %}R$ {{ h.diferenca|brl }}
+          </td>
+          <td style="color:var(--text-muted);">{{ h.motivo|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">
+            Nenhuma movimentação registrada.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Gráfico de Evolução -->
+<div class="tabela-wrapper" style="margin-bottom:24px;">
+  <div class="tabela-header" style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">
+      Evolução dos Investimentos
+    </span>
+  </div>
+  <div style="padding:16px;height:300px;">
+    <canvas id="chartEvolucao"></canvas>
+  </div>
+</div>
+
+<!-- Ações -->
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{% url 'investimento-list' %}" class="btn btn-sm">
+    <i data-lucide="arrow-left"></i> Voltar
+  </a>
+  <button type="button" class="btn btn-sm btn-danger"
+          onclick="openDeleteModal('{% url 'investimento-delete' inv.pk %}', 'Excluir \'{{ inv.descricao|escapejs }}\'? Todo o histórico será removido permanentemente.')">
+    <i data-lucide="trash-2"></i> Excluir Permanentemente
+  </button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  var labels = {{ chart_labels|safe }};
+  var dados  = {{ chart_dados|safe }};
+  if (!labels.length) return;
+
+  var cs     = getComputedStyle(document.documentElement);
+  var muted  = cs.getPropertyValue('--text-muted').trim() || '#64748b';
+  var border = cs.getPropertyValue('--border').trim()     || '#1e293b';
+  var accent = cs.getPropertyValue('--accent').trim()     || '#6366f1';
+
+  var ctx = document.getElementById('chartEvolucao');
+  if (!ctx) return;
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Saldo',
+        data: dados,
+        borderColor: accent,
+        backgroundColor: accent + '22',
+        borderWidth: 2,
+        pointRadius: dados.length <= 30 ? 4 : 2,
+        pointHoverRadius: 6,
+        pointBackgroundColor: accent,
+        fill: true,
+        tension: 0.35,
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              var val = 'Saldo: R$ ' + c.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits:2});
+              if (c.dataIndex > 0) {
+                var diff = c.parsed.y - dados[c.dataIndex - 1];
+                var sign = diff >= 0 ? '+' : '-';
+                val += '  (' + sign + 'R$ ' + Math.abs(diff).toLocaleString('pt-BR', {minimumFractionDigits:2}) + ')';
+              }
+              return ' ' + val;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: muted, font: { size: 10 }, maxTicksLimit: 12, maxRotation: 30 },
+          grid:  { display: false },
+          border: { display: false }
+        },
+        y: {
+          ticks: {
+            color: muted,
+            font: { size: 10 },
+            callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:0}); }
+          },
+          grid:  { color: border },
+          border: { display: false }
+        }
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

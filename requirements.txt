@@ -12,3 +12,8 @@ django-unfold==0.44.0
 
 # Datas para cálculo de parcelas
 python-dateutil==2.9.0
+
+# WhatsApp bot
+openai==1.59.2
+redis==5.2.1
+httpx==0.28.1

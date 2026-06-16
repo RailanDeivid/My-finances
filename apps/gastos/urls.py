@@ -9,6 +9,8 @@ urlpatterns = [
     path("gastos/novo/", views.GastoCreateView.as_view(), name="gasto-create"),
     path("gastos/<int:pk>/editar/", views.GastoUpdateView.as_view(), name="gasto-update"),
     path("gastos/<int:pk>/excluir/", views.GastoDeleteView.as_view(), name="gasto-delete"),
+    path("gastos/<int:pk>/parcela-add/", views.gasto_parcela_add, name="gasto-parcela-add"),
+    path("gastos/<int:pk>/parcela-valor/", views.gasto_parcela_valor, name="gasto-parcela-valor"),
 
     # Cartões
     path("cartoes/", views.CartaoListView.as_view(), name="cartao-list"),
@@ -59,4 +61,12 @@ urlpatterns = [
     # Perfil
     path("perfil/atualizar/", views.perfil_update, name="perfil-update"),
     path("perfil/senha/", views.senha_update, name="senha-update"),
+
+    # Investimentos
+    path("investimentos/", views.InvestimentoListView.as_view(), name="investimento-list"),
+    path("investimentos/novo/", views.InvestimentoCreateView.as_view(), name="investimento-create"),
+    path("investimentos/<int:pk>/", views.InvestimentoDetailView.as_view(), name="investimento-detail"),
+    path("investimentos/<int:pk>/excluir/", views.InvestimentoDeleteView.as_view(), name="investimento-delete"),
+    path("investimentos/<int:pk>/atualizar-saldo/", views.investimento_atualizar_saldo, name="investimento-atualizar-saldo"),
+    path("investimentos/<int:pk>/liquidar/", views.investimento_liquidar, name="investimento-liquidar"),
 ]

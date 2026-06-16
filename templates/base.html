@@ -50,6 +50,11 @@
         <span class="sidebar-text">Contas</span>
       </a>
 
+      <a class="sidebar-item {% if 'investimentos' in request.path %}active{% endif %}" href="{% url 'investimento-list' %}">
+        <span class="sidebar-icon"><i data-lucide="trending-up"></i></span>
+        <span class="sidebar-text">Investimentos</span>
+      </a>
+
       <div class="sidebar-section">Configurações</div>
 
       <a class="sidebar-item {% if 'responsaveis' in request.path %}active{% endif %}" href="{% url 'responsavel-list' %}">
@@ -131,7 +136,7 @@
                   display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
         <i data-lucide="triangle-alert" style="width:30px;height:30px;color:#ef4444;"></i>
       </div>
-      <h3 style="margin:0 0 10px;font-size:19px;font-weight:700;color:var(--text);">Excluir tudo?</h3>
+      <h3 id="modal-delete-title" style="margin:0 0 10px;font-size:19px;font-weight:700;color:var(--text);">Excluir tudo?</h3>
       <p id="modal-delete-msg" style="margin:0 0 28px;color:var(--text-muted);font-size:14px;line-height:1.65;"></p>
       <div style="display:flex;gap:10px;justify-content:center;">
         <button type="button" data-cancel onclick="closeDeleteModal()"
@@ -140,7 +145,7 @@
         </button>
         <form id="modal-delete-form" method="post" style="display:contents;">
           {% csrf_token %}
-          <button type="submit" class="btn btn-primary" style="min-width:160px;font-size:14px;">
+          <button id="modal-delete-confirm-btn" type="submit" class="btn btn-primary" style="min-width:160px;font-size:14px;">
             <i data-lucide="trash-2"></i> Confirmar exclusão
           </button>
         </form>
