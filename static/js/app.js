@@ -17,23 +17,12 @@
   function toggleSidebar() {
     document.body.classList.toggle("sidebar-collapsed");
     var collapsed = document.body.classList.contains("sidebar-collapsed");
-    localStorage.setItem("sidebar-collapsed", collapsed);
     setCookie("sidebar_collapsed", collapsed ? "true" : "false");
   }
 
-  // Sidebar state
+  // Sidebar state — driven solely by cookie (set server-side via template)
   var cookieSidebar = getCookie("sidebar_collapsed");
-  var lsSidebar = localStorage.getItem("sidebar-collapsed");
-  var sidebarCollapsed;
-  if (cookieSidebar === "true" || cookieSidebar === "false") {
-    sidebarCollapsed = cookieSidebar === "true";
-  } else if (lsSidebar === "true" || lsSidebar === "false") {
-    sidebarCollapsed = lsSidebar === "true";
-    setCookie("sidebar_collapsed", lsSidebar);
-  } else {
-    sidebarCollapsed = false;
-  }
-  if (sidebarCollapsed && !document.body.classList.contains("sidebar-collapsed")) {
+  if (cookieSidebar === "true" && !document.body.classList.contains("sidebar-collapsed")) {
     document.body.classList.add("sidebar-collapsed");
   }
 

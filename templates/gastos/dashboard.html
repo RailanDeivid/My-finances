@@ -111,7 +111,7 @@
       <div>
         <div class="stat-label">Saldo do Mês</div>
         <div class="stat-value" style="color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ saldo|brl }}</div>
-        <div class="stat-sub">Contas − Gastos</div>
+        <div class="stat-sub">Anterior + Receitas − Gastos</div>
       </div>
     </div>
   </div>
@@ -423,8 +423,8 @@
   {% endif %}
 </div>
 
-<!-- ④ Gastos por Responsável | Gastos Cartões de Crédito | Pix | Empréstimos -->
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
+<!-- ④ Gastos por Responsável | Gastos Cartões de Crédito | Pix | Débito | Empréstimos -->
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:20px;">
   <div class="tabela-wrapper" style="margin-top:0;">
     <div class="tabela-header" style="padding:10px 16px;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos por Responsável</span>
@@ -517,6 +517,37 @@
       </tbody>
     </table>
   </div>
+  <!-- Débito por Conta -->
+  <div class="tabela-wrapper" style="margin-top:0;">
+    <div class="tabela-header" style="padding:10px 16px;">
+      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Débito por Conta</span>
+    </div>
+    <table class="tabela-dados">
+      <thead><tr><th>Conta</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th></tr></thead>
+      <tbody>
+        {% for d in tabela_por_debito %}
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              {% load static %}
+              {% if d.conta_origem__banco %}
+              <img src="{% static 'img/bancos/'|add:d.conta_origem__banco|add:'.png' %}"
+                   alt="{{ d.conta_origem__banco }}"
+                   style="width:16px;height:16px;border-radius:3px;object-fit:contain;"
+                   onerror="this.style.display='none'">
+              {% endif %}
+              <span style="color:var(--text-primary);font-weight:500;">{{ d.conta_origem__nome }}</span>
+            </div>
+          </td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ d.total|brl }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
   <div class="tabela-wrapper" style="margin-top:0;">
     <div class="tabela-header" style="padding:10px 16px;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Empréstimos</span>
@@ -599,6 +630,7 @@
           {% if t.tipo_pag == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
           {% elif t.tipo_pag == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado{% if t.parcelas %} {{ t.parcelas }}x{% endif %}</span>
           {% elif t.tipo_pag == "pix" %}<span class="badge" style="background:#06b6d420;color:#06b6d4;">Pix</span>
+          {% elif t.tipo_pag == "debito" %}<span class="badge" style="background:#8b5cf620;color:#8b5cf6;">Débito</span>
           {% elif t.tipo_pag == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
           {% else %}<span class="badge">{{ t.tipo_label }}</span>{% endif %}
         </td>
@@ -1039,8 +1071,24 @@
           plugins: {
             legend: {
               display: true, position: 'top', align: 'end',
-              labels: { color: muted, font: { size: 11 }, boxWidth: 14, padding: 14,
-                        usePointStyle: true, pointStyleWidth: 10 }
+              labels: {
+                color: muted, font: { size: 11 }, padding: 16,
+                usePointStyle: true,
+                generateLabels: function(chart) {
+                  var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                  items.forEach(function(item, i) {
+                    if (i === 0) {
+                      item.pointStyle      = 'line';
+                      item.lineWidth       = 2.5;
+                      item.pointStyleWidth = 24;
+                    } else {
+                      item.pointStyle      = 'rectRounded';
+                      item.pointStyleWidth = 12;
+                    }
+                  });
+                  return items;
+                }
+              }
             },
             tooltip: { callbacks: {
               label: function(c) {

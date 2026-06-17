@@ -101,7 +101,7 @@ FIXTURE_DIRS = [BASE_DIR / "fixtures"]
 # ── WhatsApp / OpenAI / Redis ────────────────────────────────────────────────
 OPENAI_KEY         = os.environ.get("OPENAI_KEY", "")
 OPENAI_MODEL       = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-OPENAI_TEMPERATURE = os.environ.get("OPENAI_TEMPERATURE", "0.2")
+OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.2"))
 
 EVOLUTION_API_URL       = os.environ.get("EVOLUTION_API_URL", "http://evolution-api:8080")
 EVOLUTION_INSTANCE_NAME = os.environ.get("EVOLUTION_INSTANCE_NAME", "myfinances")
@@ -192,7 +192,6 @@ UNFOLD = {
                 "collapsible": True,
                 "items": [
                     {"title": "Gastos",        "icon": "receipt",        "link": reverse_lazy("admin:gastos_gasto_changelist")},
-                    {"title": "Parcelas",      "icon": "payments",       "link": reverse_lazy("admin:gastos_parcela_changelist")},
                     {"title": "Categorias",    "icon": "label",          "link": reverse_lazy("admin:gastos_categoria_changelist")},
                 ],
             },

@@ -1,12 +1,13 @@
 import json
 import re
 import uuid
+from collections import OrderedDict, defaultdict
 from datetime import date
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
-from django.db.models import Sum, Q
+from django.db.models import Count, Sum, Q, F
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
@@ -72,6 +73,38 @@ def _auto_saldo_anterior(mes, ano, user=None):
         )
 
 
+def _debitar_conta(gasto):
+    """Desconta valor do saldo da conta_origem (para tipo débito)."""
+    if gasto.tipo_pagamento == "debito" and gasto.conta_origem_id:
+        Conta.objects.filter(pk=gasto.conta_origem_id).update(
+            saldo_atual=F("saldo_atual") - gasto.valor_total
+        )
+
+
+def _reverter_debito(tipo, conta_origem_id, valor):
+    """Restaura o saldo da conta_origem ao reverter um débito."""
+    if tipo == "debito" and conta_origem_id:
+        Conta.objects.filter(pk=conta_origem_id).update(
+            saldo_atual=F("saldo_atual") + valor
+        )
+
+
+def _creditar_conta(entrada):
+    """Soma o valor da entrada no saldo da conta de recebimento."""
+    if entrada.tipo != "saldo_anterior" and not entrada.auto_gerada and entrada.conta_id:
+        Conta.objects.filter(pk=entrada.conta_id).update(
+            saldo_atual=F("saldo_atual") + entrada.valor
+        )
+
+
+def _estornar_credito(tipo, conta_id, valor, auto_gerada=False):
+    """Reverte o crédito de uma entrada ao editar ou excluir."""
+    if tipo != "saldo_anterior" and not auto_gerada and conta_id:
+        Conta.objects.filter(pk=conta_id).update(
+            saldo_atual=F("saldo_atual") - valor
+        )
+
+
 def _recalcular_saldos_a_partir(mes, ano, user=None):
     prox = date(ano, mes, 1) + relativedelta(months=1)
 
@@ -94,6 +127,48 @@ def _recalcular_saldos_a_partir(mes, ano, user=None):
         prox += relativedelta(months=1)
 
 
+_MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+_TIPO_INV_LABELS = {
+    "renda_fixa":        "Renda Fixa",
+    "renda_variavel":    "Renda Variável",
+    "fundo_imobiliario": "Fundo Imobiliário",
+}
+
+
+def _calcular_valor_parceiro(valor_meu: Decimal, pct_meu: Decimal) -> Decimal:
+    pct_outro = Decimal(100) - pct_meu
+    total = valor_meu * Decimal("100") / pct_meu
+    return (total * pct_outro / Decimal("100")).quantize(Decimal("0.01"))
+
+
+def _renumerar_e_adicionar_parcela(grupo, base, novo_total, nova_data, user):
+    for i, g in enumerate(grupo, 1):
+        g.descricao = f"{base} ({i}/{novo_total})"
+        g.save(update_fields=["descricao"])
+    ultima = grupo[-1]
+    Gasto.objects.create(
+        user=user,
+        descricao=f"{base} ({novo_total}/{novo_total})",
+        valor_total=ultima.valor_total,
+        data_compra=nova_data,
+        tipo_pagamento="credito_parcelado",
+        total_parcelas=novo_total,
+        cartao=ultima.cartao,
+        responsavel=ultima.responsavel,
+        categoria=ultima.categoria,
+        pct_divisao=ultima.pct_divisao,
+        grupo_divisao=ultima.grupo_divisao,
+    )
+
+
+class UserFormKwargsMixin:
+    def get_form_kwargs(self):
+        kw = super().get_form_kwargs()
+        kw["user"] = self.request.user
+        return kw
+
+
 class UserOwnedMixin(LoginRequiredMixin):
     """Restringe get_queryset() ao usuário autenticado em todas as CBVs."""
     def get_queryset(self):
@@ -111,15 +186,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         mes, ano = _mes_ano_from_request(self.request)
         ctx["mes"] = mes
         ctx["ano"] = ano
-
-        # Garante que todo usuário tem um responsável principal
-        if not Responsavel.objects.filter(user=user, is_principal=True).exists():
-            nome = user.get_full_name().strip() or user.username
-            Responsavel.objects.get_or_create(
-                user=user,
-                is_principal=True,
-                defaults={"nome": nome, "ativo": True},
-            )
 
         _auto_saldo_anterior(mes, ano, user)
 
@@ -165,14 +231,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             data_compra__year=ano,
         )
 
-        total_entradas = entradas_mes.aggregate(t=Sum("valor"))["t"] or Decimal("0")
         total_gasto = gastos_mes_proprios.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
 
         contas = Conta.objects.filter(user=user, ativo=True)
         total_contas = contas.aggregate(t=Sum("saldo_atual"))["t"] or Decimal("0")
         saldo = total_contas - total_gasto
 
-        ctx["total_entradas"] = total_entradas
         ctx["total_gasto"] = total_gasto
         ctx["saldo"] = saldo
         ctx["qtd_gastos"] = gastos_mes_proprios.count()
@@ -202,6 +266,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
+        ctx["tabela_por_debito"] = (
+            gastos_mes_base.filter(tipo_pagamento="debito")
+            .values("conta_origem__id", "conta_origem__nome", "conta_origem__banco")
+            .annotate(total=Sum("valor_total"))
+            .order_by("-total")
+        )
         ctx["faturas_pagas_ids"] = set(
             FaturaPaga.objects.filter(user=user, mes=mes, ano=ano)
             .values_list("cartao_id", flat=True)
@@ -224,8 +294,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["inv_total_atual"] = sum(i.saldo_atual for i in investimentos_dash)
 
         # Gráfico de evolução mensal dos investimentos no dashboard (carry-forward + barras)
-        from collections import OrderedDict
-        MESES_PT_D = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+        MESES_PT_D = _MESES_ABREV
         todos_inv    = list(Investimento.objects.filter(user=user))
         inv_ids_dash = [i.pk for i in todos_inv]
         hist_dash = InvestimentoHistorico.objects.filter(
@@ -270,15 +339,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["dash_inv_saques_bar"]  = json.dumps(dash_saques_bar)
 
         # Rosca — distribuição por tipo (investimentos ativos no dash)
-        from collections import defaultdict
-        LABEL_MAP_D = {
-            "renda_fixa":        "Renda Fixa",
-            "renda_variavel":    "Renda Variável",
-            "fundo_imobiliario": "Fundo Imobiliário",
-        }
         tipo_dash = defaultdict(float)
         for inv in investimentos_dash:
-            tipo_dash[LABEL_MAP_D.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
+            tipo_dash[_TIPO_INV_LABELS.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
         ctx["dash_rosca_labels"] = json.dumps(list(tipo_dash.keys()))
         ctx["dash_rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_dash.values()])
 
@@ -323,7 +386,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .values("data_compra__year", "data_compra__month", "total")
         )
 
-        meses_nomes = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+        meses_nomes = _MESES_ABREV
         periodo_labels = []
         periodo_valores = []
         for item in meses_com_dados:
@@ -408,11 +471,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["transacoes_mes"] = transacoes
 
         # Tabela: Gastos vs Entradas — Visão Mensal
-        saldo_ant_qs = (
-            Entrada.objects.filter(user=user, tipo="saldo_anterior")
-            .values("data__year", "data__month")
-            .annotate(t=Sum("valor"))
-        )
         entradas_qs = (
             Entrada.objects.filter(user=user).exclude(tipo="saldo_anterior")
             .values("data__year", "data__month")
@@ -425,16 +483,47 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             .annotate(t=Sum("valor_total"))
         )
 
-        saldo_ant_map = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in saldo_ant_qs}
         entradas_map  = {(r["data__year"], r["data__month"]): float(r["t"] or 0) for r in entradas_qs}
         gastos_map    = {(r["data_compra__year"], r["data_compra__month"]): float(r["t"] or 0) for r in gastos_principal_qs}
 
         # Apenas os 12 meses do ano selecionado, independente de ter dados
         todos_meses = [(ano, m) for m in range(1, 13)]
 
-        tabela_mensal = []
-        running = Decimal(str(saldo_ant_map.get(todos_meses[0], 0.0))) if todos_meses else Decimal("0")
+        # Derivar saldo de 1º de Janeiro a partir do saldo atual das contas.
+        # total_contas = balance_jan1 + próprias_entradas_ytd − próprios_débitos_ytd
+        # → balance_jan1 = total_contas − próprias_entradas_ytd + próprios_débitos_ytd
+        _hoje = date.today()
+        if ano == _hoje.year and todos_meses:
+            _ent_ytd = (
+                Entrada.objects.filter(
+                    user=user,
+                    data__year=ano,
+                    data__month__lte=_hoje.month,
+                ).exclude(tipo="saldo_anterior")
+                .aggregate(t=Sum("valor"))["t"] or Decimal("0")
+            )
+            _deb_ytd = (
+                Gasto.objects.filter(
+                    user=user,
+                    tipo_pagamento="debito",
+                    data_compra__year=ano,
+                    data_compra__month__lte=_hoje.month,
+                ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+            )
+            running = total_contas - _ent_ytd + _deb_ytd
+        else:
+            saldo_ant_qs = (
+                Entrada.objects.filter(user=user, tipo="saldo_anterior")
+                .values("data__year", "data__month")
+                .annotate(t=Sum("valor"))
+            )
+            saldo_ant_map = {
+                (r["data__year"], r["data__month"]): float(r["t"] or 0)
+                for r in saldo_ant_qs
+            }
+            running = Decimal(str(saldo_ant_map.get(todos_meses[0], 0.0))) if todos_meses else Decimal("0")
 
+        tabela_mensal = []
         for i, (y, m) in enumerate(todos_meses):
             k = (y, m)
             sa  = running
@@ -452,6 +541,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             running = saldo_atual
 
         ctx["tabela_mensal"] = tabela_mensal
+
+        # Card "Saldo do Mês": usa o carry-forward da tabela para o mês selecionado
+        for col in tabela_mensal:
+            if col["atual"]:
+                ctx["saldo"] = Decimal(str(col["saldo_atual"]))
+                break
 
         # Gráfico ⑥ "Gastos vs Receitas" — inclui atribuídos, segue filtros ativos
         gastos_filtrado_qs = Gasto.objects.filter(_impacto_q(user))
@@ -554,7 +649,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ctx["tabela_parcelados"] = tabela_parcelados
 
         # Tabela Gastos Divididos × Meses
-        from collections import defaultdict
         split_qs = (
             Gasto.objects.filter(
                 user=user,
@@ -679,11 +773,11 @@ class GastoListView(UserOwnedMixin, ListView):
         ctx["categorias"] = Categoria.objects.filter(ativo=True, user=self.request.user)
         ctx["tipos"] = Gasto.TIPO_PAGAMENTO_CHOICES
         ctx["filtros"] = self.request.GET
-        ctx["total_filtrado"] = self.get_queryset().aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_filtrado"] = self.object_list.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
         return ctx
 
 
-class GastoCreateView(UserOwnedMixin, CreateView):
+class GastoCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
     model = Gasto
     form_class = GastoForm
     template_name = "gastos/gasto_form.html"
@@ -692,11 +786,6 @@ class GastoCreateView(UserOwnedMixin, CreateView):
     def get_initial(self):
         hoje = date.today()
         return {"mes_inicio": hoje.month, "ano_inicio": hoje.year}
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
 
     def form_valid(self, form):
         gasto = form.save(commit=False)
@@ -733,6 +822,7 @@ class GastoCreateView(UserOwnedMixin, CreateView):
                 valor_total=valor,
                 tipo_pagamento=gasto.tipo_pagamento,
                 cartao=gasto.cartao,
+                conta_origem=gasto.conta_origem,
                 responsavel=responsavel,
                 categoria=gasto.categoria,
                 observacao=gasto.observacao,
@@ -751,36 +841,22 @@ class GastoCreateView(UserOwnedMixin, CreateView):
                         **kwargs_base,
                     )
             else:
-                Gasto.objects.create(descricao=desc, data_compra=data_inicio, **kwargs_base)
+                g = Gasto.objects.create(descricao=desc, data_compra=data_inicio, **kwargs_base)
+                _debitar_conta(g)
 
         if n:
             if grupo_id:
                 _criar_gastos(gasto.responsavel, valor_meu,   pct_meu,   grupo_id)
                 _criar_gastos(dividir_com,       valor_outro, pct_outro, grupo_id)
             else:
-                descricao_base = gasto.descricao
-                gasto.descricao = f"{descricao_base} (1/{n})"
-                gasto.data_compra = data_inicio
-                gasto.save()
-                for i in range(2, n + 1):
-                    Gasto.objects.create(
-                        descricao=f"{descricao_base} ({i}/{n})",
-                        valor_total=gasto.valor_total,
-                        tipo_pagamento=gasto.tipo_pagamento,
-                        cartao=gasto.cartao,
-                        responsavel=gasto.responsavel,
-                        categoria=gasto.categoria,
-                        data_compra=data_inicio + relativedelta(months=i - 1),
-                        observacao=gasto.observacao,
-                        total_parcelas=n,
-                        user=self.request.user,
-                    )
+                _criar_gastos(gasto.responsavel, gasto.valor_total, None, None)
         else:
             if grupo_id:
                 _criar_gastos(gasto.responsavel, valor_meu,   pct_meu,   grupo_id)
                 _criar_gastos(dividir_com,       valor_outro, pct_outro, grupo_id)
             else:
                 gasto.save()
+                _debitar_conta(gasto)
 
         _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, self.request.user)
         usuario_atribuido = gasto.responsavel.usuario_vinculado
@@ -819,20 +895,27 @@ def _encontrar_grupo_parcelado(gasto, user):
     )
 
 
-class GastoUpdateView(UserOwnedMixin, UpdateView):
+class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
     model = Gasto
     form_class = GastoForm
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
-
     def form_valid(self, form):
-        data_antiga = self.get_object().data_compra
+        old = self.object
+        data_antiga = old.data_compra
+        old_tipo = old.tipo_pagamento
+        old_conta_id = old.conta_origem_id
+        old_valor = old.valor_total
+
+        # Reverte débito anterior antes de salvar
+        _reverter_debito(old_tipo, old_conta_id, old_valor)
+
         gasto = form.save()
+
+        # Aplica novo débito
+        _debitar_conta(gasto)
+
         usuario_atribuido = gasto.responsavel.usuario_vinculado
 
         # Sincroniza com o outro lado do split (se existir)
@@ -849,10 +932,7 @@ class GastoUpdateView(UserOwnedMixin, UpdateView):
             )
             if parceiro:
                 pct_meu   = Decimal(gasto.pct_divisao or 50)
-                pct_outro = Decimal(100) - pct_meu
-                # Recalcula o valor do parceiro proporcionalmente
-                total_compra   = (gasto.valor_total * Decimal("100") / pct_meu)
-                novo_valor_parceiro = (total_compra * pct_outro / Decimal("100")).quantize(Decimal("0.01"))
+                novo_valor_parceiro = _calcular_valor_parceiro(gasto.valor_total, pct_meu)
                 parceiro.descricao      = gasto.descricao
                 parceiro.data_compra    = gasto.data_compra
                 parceiro.tipo_pagamento = gasto.tipo_pagamento
@@ -922,10 +1002,8 @@ def gasto_parcela_valor(request, pk):
             .first()
         )
         if parceiro:
-            pct_meu   = Decimal(gasto.pct_divisao)
-            pct_outro = Decimal(100) - pct_meu
-            total_compra        = novo_valor * Decimal("100") / pct_meu
-            novo_valor_parceiro = (total_compra * pct_outro / Decimal("100")).quantize(Decimal("0.01"))
+            pct_meu = Decimal(gasto.pct_divisao)
+            novo_valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
             parceiro.valor_total = novo_valor_parceiro
             parceiro.save(update_fields=["valor_total"])
 
@@ -948,55 +1026,21 @@ def gasto_parcela_add(request, pk):
     total_atual = len(grupo)
     novo_total = total_atual + 1
 
-    # renomeia parcelas do lado principal
-    for i, g in enumerate(grupo, 1):
-        g.descricao = f"{base} ({i}/{novo_total})"
-        g.save(update_fields=["descricao"])
-
-    ultima = grupo[-1]
-    nova_data = ultima.data_compra + relativedelta(months=1)
-    Gasto.objects.create(
-        user=request.user,
-        descricao=f"{base} ({novo_total}/{novo_total})",
-        valor_total=ultima.valor_total,
-        data_compra=nova_data,
-        tipo_pagamento="credito_parcelado",
-        total_parcelas=novo_total,
-        cartao=ultima.cartao,
-        responsavel=ultima.responsavel,
-        categoria=ultima.categoria,
-        pct_divisao=ultima.pct_divisao,
-        grupo_divisao=ultima.grupo_divisao,
-    )
+    nova_data = grupo[-1].data_compra + relativedelta(months=1)
+    _renumerar_e_adicionar_parcela(grupo, base, novo_total, nova_data, request.user)
 
     # Se é gasto dividido, repete a operação para o outro lado do split
-    if ultima.grupo_divisao:
+    if grupo[-1].grupo_divisao:
         outro_grupo = list(
             Gasto.objects.filter(
                 user=request.user,
-                grupo_divisao=ultima.grupo_divisao,
+                grupo_divisao=grupo[-1].grupo_divisao,
             )
-            .exclude(responsavel=ultima.responsavel)
+            .exclude(responsavel=grupo[-1].responsavel)
             .order_by("data_compra")
         )
         if outro_grupo:
-            for i, g in enumerate(outro_grupo, 1):
-                g.descricao = f"{base} ({i}/{novo_total})"
-                g.save(update_fields=["descricao"])
-            ultima_outro = outro_grupo[-1]
-            Gasto.objects.create(
-                user=request.user,
-                descricao=f"{base} ({novo_total}/{novo_total})",
-                valor_total=ultima_outro.valor_total,
-                data_compra=nova_data,
-                tipo_pagamento="credito_parcelado",
-                total_parcelas=novo_total,
-                cartao=ultima_outro.cartao,
-                responsavel=ultima_outro.responsavel,
-                categoria=ultima_outro.categoria,
-                pct_divisao=ultima_outro.pct_divisao,
-                grupo_divisao=ultima_outro.grupo_divisao,
-            )
+            _renumerar_e_adicionar_parcela(outro_grupo, base, novo_total, nova_data, request.user)
 
     _recalcular_saldos_a_partir(nova_data.month, nova_data.year, request.user)
     messages.success(request, f"Parcela {novo_total}/{novo_total} adicionada ao grupo.")
@@ -1014,6 +1058,8 @@ class GastoDeleteView(UserOwnedMixin, DeleteView):
         usuario_atribuido = gasto.responsavel.usuario_vinculado
         grupo_divisao = gasto.grupo_divisao
         responsavel_pk = gasto.responsavel_id
+        # Salva info do débito antes de deletar
+        _reverter_debito(gasto.tipo_pagamento, gasto.conta_origem_id, gasto.valor_total)
 
         # Extrai base da descrição para renumerar parcelas restantes
         m = _PARCELA_GROUP_RE.match(gasto.descricao)
@@ -1081,14 +1127,18 @@ class CartaoListView(UserOwnedMixin, ListView):
         ctx["mes"] = mes
         ctx["ano"] = ano
         user = self.request.user
-        for cartao in ctx["cartoes"]:
-            cartao.fatura_mes = Gasto.objects.filter(
-                cartao=cartao,
+        fatura_map = {
+            r["cartao_id"]: r["t"]
+            for r in Gasto.objects.filter(
                 user=user,
                 data_compra__month=mes,
                 data_compra__year=ano,
                 tipo_pagamento__in=["credito_avista", "credito_parcelado"],
-            ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+                cartao__isnull=False,
+            ).values("cartao_id").annotate(t=Sum("valor_total"))
+        }
+        for cartao in ctx["cartoes"]:
+            cartao.fatura_mes = fatura_map.get(cartao.pk) or Decimal("0")
         return ctx
 
 
@@ -1228,6 +1278,15 @@ class ResponsavelDeleteView(UserOwnedMixin, DeleteView):
 
 # ── Categorias ─────────────────────────────────────────────────────────
 
+class CategoriaFormMixin:
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["icones"] = Categoria.ICONE_CHOICES
+        ctx["cores"] = Categoria.CORES_CHOICES
+        ctx["icones_presets"] = Categoria.PRESETS
+        return ctx
+
+
 class CategoriaListView(UserOwnedMixin, ListView):
     model = Categoria
     template_name = "categorias/categoria_list.html"
@@ -1239,23 +1298,23 @@ class CategoriaListView(UserOwnedMixin, ListView):
         ctx["mes"] = mes
         ctx["ano"] = ano
         user = self.request.user
+        stats_map = {
+            r["categoria_id"]: r
+            for r in Gasto.objects.filter(
+                user=user,
+                data_compra__month=mes,
+                data_compra__year=ano,
+                categoria__isnull=False,
+            ).values("categoria_id").annotate(t=Sum("valor_total"), qtd=Count("id"))
+        }
         for cat in ctx["categorias"]:
-            cat.total_gastos_mes = Gasto.objects.filter(
-                categoria=cat,
-                user=user,
-                data_compra__month=mes,
-                data_compra__year=ano,
-            ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-            cat.qtd_gastos_mes = Gasto.objects.filter(
-                categoria=cat,
-                user=user,
-                data_compra__month=mes,
-                data_compra__year=ano,
-            ).count()
+            s = stats_map.get(cat.pk, {})
+            cat.total_gastos_mes = s.get("t") or Decimal("0")
+            cat.qtd_gastos_mes = s.get("qtd", 0)
         return ctx
 
 
-class CategoriaCreateView(UserOwnedMixin, CreateView):
+class CategoriaCreateView(CategoriaFormMixin, UserOwnedMixin, CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
@@ -1271,13 +1330,10 @@ class CategoriaCreateView(UserOwnedMixin, CreateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo"] = "Nova Categoria"
-        ctx["icones"] = Categoria.ICONE_CHOICES
-        ctx["cores"] = Categoria.CORES_CHOICES
-        ctx["icones_presets"] = Categoria.PRESETS
         return ctx
 
 
-class CategoriaUpdateView(UserOwnedMixin, UpdateView):
+class CategoriaUpdateView(CategoriaFormMixin, UserOwnedMixin, UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
@@ -1290,9 +1346,6 @@ class CategoriaUpdateView(UserOwnedMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo"] = "Editar Categoria"
-        ctx["icones"] = Categoria.ICONE_CHOICES
-        ctx["cores"] = Categoria.CORES_CHOICES
-        ctx["icones_presets"] = Categoria.PRESETS
         return ctx
 
 
@@ -1335,21 +1388,17 @@ class EntradaListView(UserOwnedMixin, ListView):
         return ctx
 
 
-class EntradaCreateView(UserOwnedMixin, CreateView):
+class EntradaCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
-
     def form_valid(self, form):
         entrada = form.save(commit=False)
         entrada.user = self.request.user
         entrada.save()
+        _creditar_conta(entrada)
         _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
         messages.success(self.request, "Entrada registrada com sucesso.")
         next_url = self.request.POST.get("next") or self.success_url
@@ -1361,20 +1410,21 @@ class EntradaCreateView(UserOwnedMixin, CreateView):
         return ctx
 
 
-class EntradaUpdateView(UserOwnedMixin, UpdateView):
+class EntradaUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user
-        return kwargs
-
     def form_valid(self, form):
-        data_antiga = self.get_object().data
+        old_tipo      = self.object.tipo
+        old_conta_id  = self.object.conta_id
+        old_valor     = self.object.valor
+        old_auto      = self.object.auto_gerada
+        data_antiga   = self.object.data
         entrada = form.save()
+        _estornar_credito(old_tipo, old_conta_id, old_valor, old_auto)
+        _creditar_conta(entrada)
         _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
         if entrada.data != data_antiga:
             _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
@@ -1393,7 +1443,12 @@ class EntradaDeleteView(UserOwnedMixin, DeleteView):
     success_url = reverse_lazy("entrada-list")
 
     def form_valid(self, form):
-        mes, ano = self.object.data.month, self.object.data.year
+        mes, ano     = self.object.data.month, self.object.data.year
+        tipo         = self.object.tipo
+        conta_id     = self.object.conta_id
+        valor        = self.object.valor
+        auto_gerada  = self.object.auto_gerada
+        _estornar_credito(tipo, conta_id, valor, auto_gerada)
         response = super().form_valid(form)
         _recalcular_saldos_a_partir(mes, ano, self.request.user)
         messages.success(self.request, "Entrada excluída com sucesso.")
@@ -1603,8 +1658,7 @@ class InvestimentoListView(LoginRequiredMixin, TemplateView):
         Retorna (labels, dados_patrimonio, aportes_bar, saques_bar, conta_series).
         conta_series[id] = {"labels", "dados", "aportes_bar", "saques_bar"}
         """
-        from collections import OrderedDict
-        MESES_PT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+        MESES_PT = _MESES_ABREV
 
         registros = list(
             historico_qs.order_by("data_movimentacao")
@@ -1734,30 +1788,19 @@ class InvestimentoListView(LoginRequiredMixin, TemplateView):
         ]
 
         # Gráfico de rosca — distribuição por tipo (apenas ativos)
-        from collections import defaultdict
-        LABEL_MAP = {
-            "renda_fixa":        "Renda Fixa",
-            "renda_variavel":    "Renda Variável",
-            "fundo_imobiliario": "Fundo Imobiliário",
-        }
         tipo_totais = defaultdict(float)
         for inv in ativos:
-            tipo_totais[LABEL_MAP.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
+            tipo_totais[_TIPO_INV_LABELS.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
         ctx["rosca_labels"] = json.dumps(list(tipo_totais.keys()))
         ctx["rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_totais.values()])
 
         return ctx
 
 
-class InvestimentoCreateView(LoginRequiredMixin, CreateView):
+class InvestimentoCreateView(UserFormKwargsMixin, LoginRequiredMixin, CreateView):
     model = Investimento
     form_class = InvestimentoForm
     success_url = reverse_lazy("investimento-list")
-
-    def get_form_kwargs(self):
-        kw = super().get_form_kwargs()
-        kw["user"] = self.request.user
-        return kw
 
     def form_valid(self, form):
         inv = form.save(commit=False)

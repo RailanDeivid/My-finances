@@ -2,7 +2,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_POST
 
-ADMIN_SESSION_KEY = "_admin_panel_auth"
+from .middleware import ADMIN_SESSION_KEY
 
 
 def admin_login_view(request):

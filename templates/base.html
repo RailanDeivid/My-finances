@@ -6,11 +6,11 @@
   <title>{% block title %}MyFinances{% endblock %}</title>
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=2">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=2">
-  <script defer src="{% static 'js/lucide.min.js' %}?v=2"></script>
-  <script defer src="{% static 'js/app.js' %}?v=5"></script>
-  <script defer src="{% static 'js/gastos.js' %}?v=5"></script>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
+  <script defer src="{% static 'js/lucide.min.js' %}"></script>
+  <script defer src="{% static 'js/app.js' %}"></script>
+  <script defer src="{% static 'js/gastos.js' %}"></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="dark-theme{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %}">
@@ -25,44 +25,44 @@
     <div style="flex:1;overflow-y:auto;">
       <div class="sidebar-section">Menu</div>
 
-      <a class="sidebar-item {% if request.path == '/' %}active{% endif %}" href="{% url 'dashboard' %}">
+      <a class="sidebar-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
         <span class="sidebar-icon"><i data-lucide="layout-dashboard"></i></span>
         <span class="sidebar-text">Dashboard</span>
       </a>
 
-      <a class="sidebar-item {% if 'gastos' in request.path and 'entradas' not in request.path %}active{% endif %}" href="{% url 'gasto-list' %}">
+      <a class="sidebar-item {% if 'gasto' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'gasto-list' %}">
         <span class="sidebar-icon"><i data-lucide="banknote-arrow-down"></i></span>
         <span class="sidebar-text">Gastos</span>
       </a>
 
-      <a class="sidebar-item {% if 'entradas' in request.path %}active{% endif %}" href="{% url 'entrada-list' %}">
+      <a class="sidebar-item {% if 'entrada' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'entrada-list' %}">
         <span class="sidebar-icon"><i data-lucide="banknote-arrow-up"></i></span>
         <span class="sidebar-text">Entradas</span>
       </a>
 
-      <a class="sidebar-item {% if 'cartoes' in request.path %}active{% endif %}" href="{% url 'cartao-list' %}">
+      <a class="sidebar-item {% if 'cartao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'cartao-list' %}">
         <span class="sidebar-icon"><i data-lucide="credit-card"></i></span>
         <span class="sidebar-text">Cartões</span>
       </a>
 
-      <a class="sidebar-item {% if 'contas' in request.path %}active{% endif %}" href="{% url 'conta-list' %}">
+      <a class="sidebar-item {% if 'conta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'conta-list' %}">
         <span class="sidebar-icon"><i data-lucide="landmark"></i></span>
         <span class="sidebar-text">Contas</span>
       </a>
 
-      <a class="sidebar-item {% if 'investimentos' in request.path %}active{% endif %}" href="{% url 'investimento-list' %}">
+      <a class="sidebar-item {% if 'investimento' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'investimento-list' %}">
         <span class="sidebar-icon"><i data-lucide="trending-up"></i></span>
         <span class="sidebar-text">Investimentos</span>
       </a>
 
       <div class="sidebar-section">Configurações</div>
 
-      <a class="sidebar-item {% if 'responsaveis' in request.path %}active{% endif %}" href="{% url 'responsavel-list' %}">
+      <a class="sidebar-item {% if 'responsavel' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'responsavel-list' %}">
         <span class="sidebar-icon"><i data-lucide="users"></i></span>
         <span class="sidebar-text">Responsáveis</span>
       </a>
 
-      <a class="sidebar-item {% if 'categorias' in request.path %}active{% endif %}" href="{% url 'categoria-list' %}">
+      <a class="sidebar-item {% if 'categoria' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'categoria-list' %}">
         <span class="sidebar-icon"><i data-lucide="tag"></i></span>
         <span class="sidebar-text">Categorias</span>
       </a>

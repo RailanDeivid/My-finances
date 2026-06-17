@@ -103,6 +103,14 @@
       {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
     </div>
 
+    <!-- 3b. Conta de Débito (condicional) -->
+    <div class="form-group" id="conta-origem-row"
+         style="display:{% if form.instance.tipo_pagamento == 'debito' %}block{% else %}none{% endif %};">
+      <label class="form-label" for="{{ form.conta_origem.id_for_label }}">Conta de Débito *</label>
+      {{ form.conta_origem }}
+      {% if form.conta_origem.errors %}<div class="field-error">{{ form.conta_origem.errors.0 }}</div>{% endif %}
+    </div>
+
     <!-- 4. Descrição -->
     <div class="form-group">
       <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição *</label>
@@ -377,8 +385,11 @@ function pgCancelarEdit(pk) {
     var tipo = tipoSelect.value;
     var isParcelado = tipo === 'credito_parcelado';
     var isCartao    = TIPOS_CARTAO.indexOf(tipo) !== -1;
+    var isDebito    = tipo === 'debito';
 
     if (cartaoRow) cartaoRow.style.display = isCartao ? 'block' : 'none';
+    var contaRow = document.getElementById('conta-origem-row');
+    if (contaRow) contaRow.style.display = isDebito ? 'block' : 'none';
 
     if (isParcelado) {
       parcelasRow.style.display    = 'block';

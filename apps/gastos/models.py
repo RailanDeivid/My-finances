@@ -271,7 +271,7 @@ class Entrada(models.Model):
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default="salario")
     descricao = models.CharField(max_length=255, blank=True)
     valor = models.DecimalField(max_digits=10, decimal_places=2)
-    data = models.DateField()
+    data = models.DateField(db_index=True)
     conta = models.ForeignKey(
         "Conta", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="entradas", help_text="Conta bancária de recebimento.",
@@ -296,24 +296,22 @@ class Entrada(models.Model):
 
 class Gasto(models.Model):
     TIPO_PAGAMENTO_CHOICES = [
-        ("credito_avista", "Crédito à Vista"),
+        ("credito_avista",    "Crédito à Vista"),
         ("credito_parcelado", "Crédito Parcelado"),
-        ("pix", "Pix / Transferência"),
-        ("emprestimo", "Empréstimo"),
+        ("pix",               "Pix / Transferência"),
+        ("debito",            "Débito"),
+        ("emprestimo",        "Empréstimo"),
     ]
 
     TIPOS_CARTAO = {"credito_avista", "credito_parcelado"}
+    TIPOS_CONTA  = {"debito"}
 
     descricao = models.CharField(max_length=255)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2)
-    tipo_pagamento = models.CharField(max_length=25, choices=TIPO_PAGAMENTO_CHOICES)
+    tipo_pagamento = models.CharField(max_length=25, choices=TIPO_PAGAMENTO_CHOICES, db_index=True)
     cartao = models.ForeignKey(
         "Cartao", on_delete=models.PROTECT, related_name="gastos",
         null=True, blank=True,
-    )
-    nome_pessoa = models.CharField(
-        max_length=150, blank=True, default="",
-        help_text="Nome da pessoa destinatária (para 'Pagamento a Pessoa').",
     )
     responsavel = models.ForeignKey(
         "Responsavel", on_delete=models.PROTECT, related_name="gastos"
@@ -321,7 +319,7 @@ class Gasto(models.Model):
     categoria = models.ForeignKey(
         "Categoria", on_delete=models.SET_NULL, null=True, blank=True, related_name="gastos"
     )
-    data_compra = models.DateField(help_text="Data em que a compra foi realizada")
+    data_compra = models.DateField(db_index=True, help_text="Data em que a compra foi realizada")
     observacao = models.TextField(blank=True)
     total_parcelas = models.PositiveSmallIntegerField(
         null=True, blank=True,
@@ -334,6 +332,11 @@ class Gasto(models.Model):
     pct_divisao = models.PositiveSmallIntegerField(
         null=True, blank=True,
         help_text="Percentual desta parte no gasto dividido (ex: 60 = 60%).",
+    )
+    conta_origem = models.ForeignKey(
+        "Conta", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="gastos_debito",
+        help_text="Conta debitada (obrigatória para tipo Débito).",
     )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, related_name="gastos_proprios",
@@ -348,25 +351,6 @@ class Gasto(models.Model):
 
     def __str__(self):
         return f"{self.descricao} — R$ {self.valor_total} ({self.data_compra})"
-
-class Parcela(models.Model):
-    gasto = models.ForeignKey(
-        "Gasto", on_delete=models.CASCADE, related_name="parcelas"
-    )
-    numero = models.PositiveSmallIntegerField(help_text="Ex: 1 de 12")
-    valor = models.DecimalField(max_digits=10, decimal_places=2)
-    data_vencimento = models.DateField()
-    pago = models.BooleanField(default=False)
-    data_pagamento = models.DateField(null=True, blank=True)
-
-    class Meta:
-        verbose_name = "Parcela"
-        verbose_name_plural = "Parcelas"
-        ordering = ["data_vencimento"]
-
-    def __str__(self):
-        return f"Parcela {self.numero}/{self.gasto.total_parcelas} — {self.gasto.descricao}"
-
 
 class FaturaPaga(models.Model):
     cartao = models.ForeignKey(

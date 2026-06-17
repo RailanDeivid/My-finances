@@ -136,6 +136,7 @@
           {% if g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
           {% elif g.tipo_pagamento == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado</span>
           {% elif g.tipo_pagamento == "pix" %}<span class="badge badge-pix">Pix</span>
+          {% elif g.tipo_pagamento == "debito" %}<span class="badge" style="background:#8b5cf620;color:#8b5cf6;">Débito</span>
           {% elif g.tipo_pagamento == "emprestimo" %}<span class="badge badge-emprestimo">Empréstimo</span>
           {% else %}<span class="badge">{{ g.get_tipo_pagamento_display }}</span>{% endif %}
         </td>

@@ -6,19 +6,7 @@
 {% load gastos_tags %}
 
 <!-- Cards de resumo -->
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
-  <div class="stat-card" style="border-top-color:#6366f1;">
-    <div style="display:flex;align-items:center;gap:14px;">
-      <span class="icon-badge icon-badge-lg" style="background:#6366f118;">
-        <i data-lucide="trending-up" style="width:22px;height:22px;stroke:#6366f1;"></i>
-      </span>
-      <div>
-        <div class="stat-label">Total Investido</div>
-        <div class="stat-value">R$ {{ total_inicial|brl }}</div>
-        <div class="stat-sub">Saldo inicial aportado</div>
-      </div>
-    </div>
-  </div>
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
   <div class="stat-card" style="border-top-color:#3b82f6;">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:#3b82f618;">
@@ -71,6 +59,7 @@
         <th>Investimento</th>
         <th>Conta Bancária</th>
         <th>Tipo</th>
+        <th style="text-align:right;">Total Investido</th>
         <th style="text-align:right;">Saldo Atual</th>
         <th style="text-align:right;">Rentabilidade</th>
         <th>Última Atualização</th>
@@ -104,6 +93,7 @@
             <span class="badge" style="background:#22c55e22;color:#22c55e;font-size:10px;">Fundo Imob.</span>
           {% endif %}
         </td>
+        <td style="text-align:right;color:var(--text-muted);">R$ {{ inv.saldo_inicial|brl }}</td>
         <td style="text-align:right;font-weight:700;">R$ {{ inv.saldo_atual|brl }}</td>
         <td style="text-align:right;font-weight:700;color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
           {% if inv.rentabilidade >= 0 %}+{% endif %}R$ {{ inv.rentabilidade|brl }}
@@ -128,7 +118,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7">
+        <td colspan="8">
           <div style="text-align:center;padding:40px 16px;color:var(--text-muted);">
             <i data-lucide="trending-up" style="width:40px;height:40px;margin-bottom:12px;opacity:.3;display:block;margin:0 auto 12px;"></i>
             Nenhum investimento ativo. Clique em <strong>Novo Investimento</strong> para começar.
@@ -380,9 +370,28 @@
           display: true,
           position: 'top',
           align: 'end',
-          labels: { color: muted, font: { size: 11 }, boxWidth: 14, padding: 14,
-                    usePointStyle: true, pointStyleWidth: 10,
-                    filter: function(item) { return item.text !== 'Saques' || allSaquesBar.some(function(v){return v>0;}); }
+          labels: {
+            color: muted,
+            font: { size: 11 },
+            padding: 16,
+            usePointStyle: true,
+            generateLabels: function(chart) {
+              var items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+              items.forEach(function(item, i) {
+                if (i === 0) {
+                  item.pointStyle      = 'line';
+                  item.lineWidth       = 2.5;
+                  item.pointStyleWidth = 24;
+                } else {
+                  item.pointStyle      = 'rectRounded';
+                  item.pointStyleWidth = 12;
+                }
+              });
+              return items;
+            },
+            filter: function(item) {
+              return item.text !== 'Saques' || allSaquesBar.some(function(v){return v>0;});
+            }
           }
         },
         tooltip: {

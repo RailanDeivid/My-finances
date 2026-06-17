@@ -41,7 +41,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         model = Gasto
         fields = [
             "descricao", "valor_total", "data_compra", "tipo_pagamento",
-            "total_parcelas", "cartao", "responsavel", "categoria", "observacao",
+            "total_parcelas", "cartao", "conta_origem", "responsavel", "categoria", "observacao",
         ]
         widgets = {
             "descricao":      forms.TextInput(attrs={"placeholder": "Ex: Mercado, Farmácia..."}),
@@ -50,6 +50,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             "tipo_pagamento": forms.Select(attrs={"id": "id_tipo_pagamento"}),
             "total_parcelas": forms.NumberInput(attrs={"min": "2", "max": "60"}),
             "cartao":         forms.Select(attrs={"id": "id_cartao"}),
+            "conta_origem":   forms.Select(attrs={"id": "id_conta_origem"}),
             "responsavel":    forms.Select(attrs={"id": "id_responsavel"}),
             "categoria":      forms.Select(),
             "observacao":     forms.Textarea(attrs={"rows": 3}),
@@ -84,16 +85,17 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         self.fields["total_parcelas"].required = False
         self.fields["cartao"].required = False
         self.fields["cartao"].empty_label = "— Sem cartão —"
+        self.fields["conta_origem"].required = False
+        self.fields["conta_origem"].empty_label = "— Selecione a conta —"
+        from .models import Conta as _Conta
+        kw = {"ativo": True}
         if user is not None:
-            self.fields["cartao"].queryset = Cartao.objects.filter(ativo=True, user=user)
-            self.fields["responsavel"].queryset = Responsavel.objects.filter(ativo=True, user=user)
-            self.fields["categoria"].queryset = Categoria.objects.filter(ativo=True, user=user)
-            self.fields["dividir_com"].queryset = Responsavel.objects.filter(ativo=True, user=user)
-        else:
-            self.fields["cartao"].queryset = Cartao.objects.filter(ativo=True)
-            self.fields["responsavel"].queryset = Responsavel.objects.filter(ativo=True)
-            self.fields["categoria"].queryset = Categoria.objects.filter(ativo=True)
-            self.fields["dividir_com"].queryset = Responsavel.objects.filter(ativo=True)
+            kw["user"] = user
+        self.fields["cartao"].queryset       = Cartao.objects.filter(**kw)
+        self.fields["responsavel"].queryset  = Responsavel.objects.filter(**kw)
+        self.fields["categoria"].queryset    = Categoria.objects.filter(**kw)
+        self.fields["dividir_com"].queryset  = Responsavel.objects.filter(**kw)
+        self.fields["conta_origem"].queryset = _Conta.objects.filter(**kw)
 
     def clean(self):
         cleaned = super().clean()
@@ -109,6 +111,12 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             cleaned["ano_inicio"] = None
         if tipo == "credito_parcelado" and not parcelas:
             self.add_error("total_parcelas", "Informe o número de parcelas para compra parcelada.")
+        # Débito: exige conta_origem
+        if tipo == "debito":
+            if not cleaned.get("conta_origem"):
+                self.add_error("conta_origem", "Selecione a conta de débito.")
+        else:
+            cleaned["conta_origem"] = None
         if tipo != "credito_parcelado":
             cleaned["total_parcelas"] = None
             cleaned["mes_inicio"] = None

@@ -3,6 +3,13 @@ from .base import *
 
 DEBUG = False
 
+_sk = os.environ.get("SECRET_KEY", "")
+if not _sk or "insecure" in _sk:
+    raise RuntimeError(
+        "SECRET_KEY env var must be set to a secure value in production."
+    )
+SECRET_KEY = _sk
+
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()]
 
 # HTTPS / cookies seguros
