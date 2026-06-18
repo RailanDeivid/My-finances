@@ -5,7 +5,67 @@
 {% block content %}
 {% load gastos_tags %}
 
-{% include "includes/mes_ano_filtro.html" %}
+<!-- Filtros -->
+<form method="get" class="filtros-form" style="margin-bottom:18px;">
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+    <div class="filtro-group">
+      <label class="filtro-label">Mês</label>
+      <select name="mes" class="auto-submit">
+        <option value="">— Todos —</option>
+        <option value="1"  {% if filtros.mes == "1"  %}selected{% endif %}>Janeiro</option>
+        <option value="2"  {% if filtros.mes == "2"  %}selected{% endif %}>Fevereiro</option>
+        <option value="3"  {% if filtros.mes == "3"  %}selected{% endif %}>Março</option>
+        <option value="4"  {% if filtros.mes == "4"  %}selected{% endif %}>Abril</option>
+        <option value="5"  {% if filtros.mes == "5"  %}selected{% endif %}>Maio</option>
+        <option value="6"  {% if filtros.mes == "6"  %}selected{% endif %}>Junho</option>
+        <option value="7"  {% if filtros.mes == "7"  %}selected{% endif %}>Julho</option>
+        <option value="8"  {% if filtros.mes == "8"  %}selected{% endif %}>Agosto</option>
+        <option value="9"  {% if filtros.mes == "9"  %}selected{% endif %}>Setembro</option>
+        <option value="10" {% if filtros.mes == "10" %}selected{% endif %}>Outubro</option>
+        <option value="11" {% if filtros.mes == "11" %}selected{% endif %}>Novembro</option>
+        <option value="12" {% if filtros.mes == "12" %}selected{% endif %}>Dezembro</option>
+      </select>
+    </div>
+    <div class="filtro-group">
+      <label class="filtro-label">Ano</label>
+      <select name="ano" class="auto-submit">
+        <option value="">— Todos —</option>
+        <option value="2024" {% if filtros.ano == "2024" %}selected{% endif %}>2024</option>
+        <option value="2025" {% if filtros.ano == "2025" %}selected{% endif %}>2025</option>
+        <option value="2026" {% if filtros.ano == "2026" %}selected{% endif %}>2026</option>
+        <option value="2027" {% if filtros.ano == "2027" %}selected{% endif %}>2027</option>
+      </select>
+    </div>
+    <div class="filtro-group">
+      <label class="filtro-label">Tipo</label>
+      <select name="tipo" class="auto-submit">
+        <option value="">— Todos —</option>
+        {% for val, label in tipos_entrada %}
+        <option value="{{ val }}" {% if filtros.tipo == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filtro-group">
+      <a href="{% url 'entrada-list' %}" class="btn btn-sm" style="margin-top:18px;">Limpar</a>
+    </div>
+  </div>
+</form>
+
+<!-- Resumo por tipo -->
+{% if totais_por_tipo %}
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+  {% for tipo_val, tipo_total in totais_por_tipo.items %}
+  {% if tipo_total %}
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px 16px;min-width:130px;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-muted);margin-bottom:4px;">
+      {% if tipo_val == "salario" %}Salário{% elif tipo_val == "bonus" %}Bônus{% else %}Outros{% endif %}
+    </div>
+    <div style="font-size:16px;font-weight:700;color:#22c55e;">R$ {{ tipo_total|brl }}</div>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
 
 <div class="page-header">
   <h1 style="display:flex;align-items:center;gap:8px;">
@@ -32,7 +92,7 @@
         <th>Data</th>
         <th>Tipo</th>
         <th>Descrição</th>
-        <th style="text-align:right;">Valor</th>
+        <th>Valor</th>
         <th></th>
       </tr>
     </thead>
@@ -74,6 +134,15 @@
       </tr>
       {% endfor %}
     </tbody>
+    {% if entradas %}
+    <tfoot>
+      <tr style="border-top:2px solid var(--border);">
+        <td colspan="3" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total</td>
+        <td style="text-align:right;font-weight:700;color:#22c55e;padding:8px 12px;">R$ {{ total_filtrado|brl }}</td>
+        <td></td>
+      </tr>
+    </tfoot>
+    {% endif %}
   </table>
 </div>
 

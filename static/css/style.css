@@ -68,10 +68,11 @@ body.light-theme .busca-input          { background: #faf9f7; color: var(--text-
 body.light-theme .linhas-label select  { background: #faf9f7; color: var(--text-primary); border-color: var(--border); }
 
 /* Tabela */
-body.light-theme .tabela-dados thead  { background: #faf9f7; }
-body.light-theme .tabela-dados th     { color: var(--text-muted); border-bottom-color: var(--border); }
+body.light-theme .tabela-dados thead  { background: #ffffff; }
+body.light-theme .tabela-dados th     { color: var(--text-muted); border-bottom-color: var(--border); background: #ffffff; }
 body.light-theme .tabela-dados td     { color: var(--text-primary); border-bottom-color: var(--border); }
 body.light-theme .tabela-dados tbody tr:hover { background: #faf9f7; }
+body.light-theme .tabela-header       { background: #ffffff; border-bottom-color: var(--border); }
 
 /* Painel colunas */
 body.light-theme .col-vis-panel       { background: #ffffff; box-shadow: 0 4px 16px rgba(0,0,0,.12); }
@@ -94,6 +95,59 @@ body.light-theme ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 /* Input de data — ícone calendário */
 body.light-theme input[type="date"]::-webkit-calendar-picker-indicator { filter: none; opacity: 0.5; }
+
+/* Tooltip do card — fundo hardcoded precisa virar branco */
+body.light-theme .card-tooltip {
+  background: #ffffff;
+  color: var(--text-muted);
+  box-shadow: 0 4px 16px rgba(0,0,0,.14);
+}
+body.light-theme .card-tooltip::after { border-top-color: var(--border); }
+
+/* Cabeçalho da tabela: hover usa rgba branco no dark, precisa de cinza no light */
+body.light-theme .tabela-dados th:hover { background-color: rgba(0,0,0,.03); }
+
+/* Bandeira badge — rgba branco fica invisível no fundo claro */
+body.light-theme .bandeira-badge { background: rgba(0,0,0,.08); color: var(--text-primary); }
+
+/* Active state do sidebar com verde (accent) no light */
+body.light-theme .sidebar-item.active { background: rgba(22,163,74,.10); }
+
+/* Form control (modal e páginas de formulário) */
+body.light-theme .form-control { background: #faf9f7; color: var(--text-primary); border-color: var(--border); }
+body.light-theme select.form-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555555'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+body.light-theme .form-group input,
+body.light-theme .form-group select,
+body.light-theme .form-group textarea { background: #faf9f7; color: var(--text-primary); border-color: var(--border); }
+
+/* Mes-filtro select */
+body.light-theme .mes-filtro select { background: #faf9f7; color: var(--text-primary); border-color: var(--border); }
+
+/* Modal inline — o fundo do card já usa var(--bg-card) que vira #fff no light */
+/* Alertas no tema claro — cores legíveis sobre fundo branco */
+body.light-theme .alert-success { background: rgba(22,163,74,.10);  color: #15803d; border-color: rgba(22,163,74,.3); }
+body.light-theme .alert-error,
+body.light-theme .alert-danger  { background: rgba(220,38,38,.10);  color: #dc2626; border-color: rgba(220,38,38,.3); }
+body.light-theme .alert-warning { background: rgba(202,138,4,.10);  color: #b45309; border-color: rgba(202,138,4,.3); }
+body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4ed8; border-color: rgba(37,99,235,.3); }
+
+/* Badges — cores com contraste adequado no tema claro (fundo branco) */
+body.light-theme .badge-avista     { color: #1d4ed8; background: rgba(29,78,216,.10); }
+body.light-theme .badge-parcelado  { color: #c2410c; background: rgba(194,65,12,.10); }
+body.light-theme .badge-pix        { color: #0e7490; background: rgba(14,116,144,.10); }
+body.light-theme .badge-debito     { color: #6d28d9; background: rgba(109,40,217,.10); }
+body.light-theme .badge-emprestimo { color: #9a3412; background: rgba(154,52,18,.10); }
+body.light-theme .badge-salario    { color: #15803d; background: rgba(21,128,61,.10); }
+body.light-theme .badge-bonus      { color: #1d4ed8; background: rgba(29,78,216,.10); }
+body.light-theme .badge-outro      { color: #6d28d9; background: rgba(109,40,217,.10); }
+body.light-theme .badge-saldo-ant  { color: #334155; background: rgba(51,65,85,.10); }
+body.light-theme .badge-success    { color: #15803d; background: rgba(21,128,61,.10); }
+body.light-theme .badge-danger     { color: #dc2626; background: rgba(220,38,38,.10); }
 
 /* ========================== SIDEBAR ========================== */
 :root {
@@ -364,6 +418,26 @@ body.sidebar-collapsed .sidebar-footer        { padding: 12px 6px; }
 body.sidebar-collapsed .user-menu-dropdown    { left: calc(100% + 8px); right: auto; bottom: 8px; width: 240px; }
 body.sidebar-collapsed .topbar             { left: var(--sidebar-w-collapsed); }
 body.sidebar-collapsed .main-content       { margin-left: var(--sidebar-w-collapsed); }
+
+/* Tooltip da sidebar recolhida — posicionado via JS no <body> */
+#sidebar-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+#sidebar-tooltip.visible { opacity: 1; }
+
 
 /* ========================== TOPBAR ========================== */
 .topbar {
@@ -826,6 +900,37 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 }
 
 /* ========================== TABELA ========================== */
+.tabela-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.tabela-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 16px;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.tabela-empty-state-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.tabela-empty-state-text {
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .tabela-wrapper {
   overflow-x: auto;
   border-radius: 8px;
@@ -849,7 +954,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 .tabela-dados th {
   padding: 10px 12px;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -859,9 +964,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  background: var(--bg-secondary);
   transition: background-color 0.15s, color 0.15s;
 }
 .tabela-dados th:hover { background-color: rgba(255,255,255,0.04); color: var(--text-primary); }
+.tabela-dados th:last-child,
+.tabela-dados th:empty { cursor: default; }
 
 .sort-icon {
   display: inline-block;

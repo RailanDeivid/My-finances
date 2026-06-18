@@ -218,10 +218,71 @@
     if (selA) selA.value = now.getFullYear();
   }
 
+  function initTableSort() {
+    document.querySelectorAll(".tabela-dados").forEach(function (table) {
+      var headers = Array.from(table.querySelectorAll("thead th"));
+      headers.forEach(function (th, colIdx) {
+        if (!th.textContent.trim()) return;
+        var icon = document.createElement("i");
+        icon.className = "sort-icon";
+        icon.textContent = "⇅";
+        th.appendChild(icon);
+        th.dataset.sortDir = "";
+
+        th.addEventListener("click", function () {
+          var asc = th.dataset.sortDir !== "asc";
+          headers.forEach(function (h) {
+            h.dataset.sortDir = "";
+            var si = h.querySelector(".sort-icon");
+            if (si) { si.textContent = "⇅"; si.classList.remove("sort-ativo"); }
+          });
+          th.dataset.sortDir = asc ? "asc" : "desc";
+          icon.textContent = asc ? "↑" : "↓";
+          icon.classList.add("sort-ativo");
+
+          var tbody = table.querySelector("tbody");
+          if (!tbody) return;
+          var rows = Array.from(tbody.querySelectorAll("tr")).filter(function (r) {
+            return r.querySelectorAll("td").length > 1;
+          });
+          rows.sort(function (a, b) {
+            var aCell = a.querySelectorAll("td")[colIdx];
+            var bCell = b.querySelectorAll("td")[colIdx];
+            if (!aCell || !bCell) return 0;
+            var aText = aCell.textContent.replace(/\s+/g, " ").trim();
+            var bText = bCell.textContent.replace(/\s+/g, " ").trim();
+
+            var dateRe = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+            var aDate = aText.match(dateRe);
+            var bDate = bText.match(dateRe);
+            if (aDate && bDate) {
+              var av = +new Date(aDate[3], aDate[2] - 1, aDate[1]);
+              var bv = +new Date(bDate[3], bDate[2] - 1, bDate[1]);
+              return asc ? av - bv : bv - av;
+            }
+
+            var cleanNum = function (s) {
+              return parseFloat(s.replace(/[^\d,]/g, "").replace(",", "."));
+            };
+            var aNum = cleanNum(aText);
+            var bNum = cleanNum(bText);
+            if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
+
+            return asc
+              ? aText.localeCompare(bText, "pt-BR")
+              : bText.localeCompare(aText, "pt-BR");
+          });
+          rows.forEach(function (r) { tbody.appendChild(r); });
+        });
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initGastoForm();
     initCartaoForm();
     initMesFiltro();
     initGastoModal();
+    initTableSort();
   });
 })();

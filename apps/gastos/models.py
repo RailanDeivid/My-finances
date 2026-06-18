@@ -412,12 +412,12 @@ class Conta(models.Model):
         "outro":       "#64748b",
     }
 
-    # SVG para nubank, picpay, inter, caixa e outro
+    # SVG para nubank, picpay, inter e outro; PNG para caixa
     BANCO_LOGO_EXT = {
         "nubank":  "svg",
         "inter":   "svg",
         "picpay":  "svg",
-        "caixa":   "svg",
+        "caixa":   "png",
         "outro":   "svg",
     }
 

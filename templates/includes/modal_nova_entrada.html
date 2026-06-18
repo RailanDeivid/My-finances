@@ -56,6 +56,19 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label" for="me_responsavel">Responsável</label>
+        <select name="responsavel" id="me_responsavel" class="form-control">
+          <option value="">— Sem responsável —</option>
+          {% if responsavel_principal %}
+          <option value="{{ responsavel_principal.pk }}" selected>{{ responsavel_principal.nome }}</option>
+          {% endif %}
+          {% for r in responsaveis_ativos %}
+          <option value="{{ r.pk }}">{{ r.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
         <label class="form-label" for="me_descricao">Descrição</label>
         <input type="text" name="descricao" id="me_descricao" class="form-control"
                placeholder="Ex: Salário junho...">

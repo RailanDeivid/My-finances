@@ -6,14 +6,14 @@
   <title>{% block title %}MyFinances{% endblock %}</title>
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}">
-  <script defer src="{% static 'js/lucide.min.js' %}"></script>
-  <script defer src="{% static 'js/app.js' %}"></script>
-  <script defer src="{% static 'js/gastos.js' %}"></script>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=15">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=15">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=15"></script>
+  <script defer src="{% static 'js/app.js' %}?v=15"></script>
+  <script defer src="{% static 'js/gastos.js' %}?v=15"></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="dark-theme{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %}">
+<body class="{% if request.COOKIES.theme == 'light' %}light-theme{% else %}dark-theme{% endif %}{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %}">
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">
@@ -83,6 +83,17 @@
           {{ request.user.get_full_name|default:request.user.username }}
         </span>
       </button>
+
+      <button type="button" onclick="toggleTheme()"
+              class="sidebar-item" style="width:100%;background:none;border:none;cursor:pointer;text-align:left;">
+        <span class="sidebar-icon" id="theme-icon-wrap">
+          <i data-lucide="{% if request.COOKIES.theme == 'light' %}moon{% else %}sun{% endif %}"></i>
+        </span>
+        <span class="sidebar-text" id="theme-label">
+          {% if request.COOKIES.theme == 'light' %}Modo Escuro{% else %}Modo Claro{% endif %}
+        </span>
+      </button>
+
       <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
         <button type="submit" class="sidebar-item" style="width:100%;background:none;border:none;cursor:pointer;text-align:left;color:var(--danger);">
@@ -100,11 +111,11 @@
     <div style="display:flex;align-items:center;gap:14px;">
       <button type="button" onclick="openFormModal('modal-nova-entrada')"
               class="btn" style="font-size:12px;padding:6px 14px;background:#22c55e;color:#fff;border-color:#22c55e;">
-        <i data-lucide="banknote-arrow-up"></i> Nova Entrada
+        <i data-lucide="banknote-arrow-up"></i> <span class="topbar-btn-text">Nova Entrada</span>
       </button>
       <button type="button" onclick="openFormModal('modal-novo-gasto')"
               class="btn btn-danger" style="font-size:12px;padding:6px 14px;">
-        <i data-lucide="banknote-arrow-down"></i> Novo Gasto
+        <i data-lucide="banknote-arrow-down"></i> <span class="topbar-btn-text">Novo Gasto</span>
       </button>
     </div>
   </div>

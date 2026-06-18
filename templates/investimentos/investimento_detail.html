@@ -18,18 +18,31 @@
 
 <!-- Cards de info -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;">
-  <div class="stat-card">
-    <div class="stat-label">Saldo Atual</div>
-    <div class="stat-value" style="font-size:18px;">R$ {{ inv.saldo_atual|brl }}</div>
-    <div class="stat-sub">Última atualização: {{ inv.atualizado_em|date:"d/m/Y H:i" }}</div>
-  </div>
-  <div class="stat-card" style="border-top-color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
-    <div class="stat-label">Rentabilidade</div>
-    <div class="stat-value" style="font-size:18px;color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
-      {% if inv.rentabilidade >= 0 %}+{% endif %}R$ {{ inv.rentabilidade|brl }}
+  <div class="stat-card" style="border-left-color:#3b82f6;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:#3b82f618;">
+        <i data-lucide="wallet" style="width:22px;height:22px;stroke:#3b82f6;"></i>
+      </span>
+      <div>
+        <div class="stat-label">Saldo Atual</div>
+        <div class="stat-value" style="font-size:20px;">R$ {{ inv.saldo_atual|brl }}</div>
+        <div class="stat-sub">Atualizado em {{ inv.atualizado_em|date:"d/m/Y H:i" }}</div>
+      </div>
     </div>
-    <div class="stat-sub">
-      {% if inv.rentabilidade_pct >= 0 %}+{% endif %}{{ inv.rentabilidade_pct }}%
+  </div>
+  <div class="stat-card" style="border-left-color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %}18;">
+        <i data-lucide="{% if inv.rentabilidade >= 0 %}trending-up{% else %}trending-down{% endif %}"
+           style="width:22px;height:22px;stroke:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};"></i>
+      </span>
+      <div>
+        <div class="stat-label">Rentabilidade</div>
+        <div class="stat-value" style="font-size:20px;color:{% if inv.rentabilidade >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+          {% if inv.rentabilidade >= 0 %}+{% endif %}R$ {{ inv.rentabilidade|brl }}
+        </div>
+        <div class="stat-sub">{% if inv.rentabilidade_pct >= 0 %}+{% endif %}{{ inv.rentabilidade_pct }}%</div>
+      </div>
     </div>
   </div>
 </div>
@@ -97,9 +110,9 @@
         <tr>
           <th>Data / Hora</th>
           <th>Tipo</th>
-          <th style="text-align:right;">Valor Anterior</th>
-          <th style="text-align:right;">Novo Valor</th>
-          <th style="text-align:right;">Diferença</th>
+          <th>Valor Anterior</th>
+          <th>Novo Valor</th>
+          <th>Diferença</th>
           <th>Observação</th>
         </tr>
       </thead>

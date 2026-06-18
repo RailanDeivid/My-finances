@@ -7,7 +7,7 @@
 
 <!-- Cards de resumo -->
 <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
-  <div class="stat-card" style="border-top-color:#3b82f6;">
+  <div class="stat-card" style="border-left-color:#3b82f6;">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:#3b82f618;">
         <i data-lucide="wallet" style="width:22px;height:22px;stroke:#3b82f6;"></i>
@@ -19,7 +19,7 @@
       </div>
     </div>
   </div>
-  <div class="stat-card" style="border-top-color:{% if total_rentab >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+  <div class="stat-card" style="border-left-color:{% if total_rentab >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:{% if total_rentab >= 0 %}#22c55e{% else %}#ef4444{% endif %}18;">
         <i data-lucide="{% if total_rentab >= 0 %}trending-up{% else %}trending-down{% endif %}"
@@ -59,9 +59,9 @@
         <th>Investimento</th>
         <th>Conta Bancária</th>
         <th>Tipo</th>
-        <th style="text-align:right;">Total Investido</th>
-        <th style="text-align:right;">Saldo Atual</th>
-        <th style="text-align:right;">Rentabilidade</th>
+        <th>Total Investido</th>
+        <th>Saldo Atual</th>
+        <th>Rentabilidade</th>
         <th>Última Atualização</th>
         <th></th>
       </tr>
@@ -117,14 +117,12 @@
         </td>
       </tr>
       {% empty %}
-      <tr>
-        <td colspan="8">
-          <div style="text-align:center;padding:40px 16px;color:var(--text-muted);">
-            <i data-lucide="trending-up" style="width:40px;height:40px;margin-bottom:12px;opacity:.3;display:block;margin:0 auto 12px;"></i>
-            Nenhum investimento ativo. Clique em <strong>Novo Investimento</strong> para começar.
-          </div>
-        </td>
-      </tr>
+      <tr><td colspan="8">
+        <div class="tabela-empty-state">
+          <div class="tabela-empty-state-icon"><i data-lucide="trending-up" style="width:22px;height:22px;"></i></div>
+          <span class="tabela-empty-state-text">Nenhum investimento ativo. Clique em <strong>Novo Investimento</strong> para começar.</span>
+        </div>
+      </td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -147,7 +145,7 @@
         <tr>
           <th>Investimento</th>
           <th>Conta</th>
-          <th style="text-align:right;">Saldo Inicial</th>
+          <th>Saldo Inicial</th>
           <th>Liquidado em</th>
           <th></th>
         </tr>
@@ -297,7 +295,7 @@
   var allSaquesBar  = {{ chart_saques_bar|safe }};
   var porConta      = {{ chart_por_conta|safe }};
 
-  var cs     = getComputedStyle(document.documentElement);
+  var cs     = getComputedStyle(document.body);
   var muted  = cs.getPropertyValue('--text-muted').trim() || '#64748b';
   var border = cs.getPropertyValue('--border').trim()     || '#1e293b';
   var accent = '#6366f1';

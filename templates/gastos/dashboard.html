@@ -78,8 +78,9 @@
 </form>
 
 <!-- ① Cards -->
-<div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-  <div class="stat-card" style="border-top-color:{% if total_contas > 0 %}#22c55e{% else %}#64748b{% endif %};">
+<div class="stats-grid">
+  <!-- Saldo em Contas -->
+  <div class="stat-card" style="border-left-color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:#22c55e18;">
         <i data-lucide="landmark" style="width:22px;height:22px;stroke:#22c55e;"></i>
@@ -87,11 +88,76 @@
       <div>
         <div class="stat-label">Saldo em Contas</div>
         <div class="stat-value" style="color:{% if total_contas >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ total_contas|brl }}</div>
-        <div class="stat-sub">{{ contas|length }} conta{{ contas|length|pluralize:",s" }}</div>
+        <div class="stat-sub">{{ contas|length }} conta{{ contas|length|pluralize:",s" }} ativa{{ contas|length|pluralize:",s" }}</div>
       </div>
     </div>
   </div>
-  <div class="stat-card" style="border-top-color:#ef4444;">
+  <!-- Total Cartões -->
+  {% with pct=total_cartao|pct_diff:total_cartao_ant %}
+  <div class="stat-card" style="border-left-color:#6366f1;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:#6366f118;">
+        <i data-lucide="credit-card" style="width:22px;height:22px;stroke:#6366f1;"></i>
+      </span>
+      <div>
+        <div class="stat-label">Total Cartões</div>
+        <div class="stat-value" style="color:#6366f1;">R$ {{ total_cartao|brl }}</div>
+        <div class="stat-sub">
+          {% if pct is not None %}
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
+              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            </span> vs mês ant.
+          {% else %}Crédito à vista e parcelado{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  <!-- Total Débito -->
+  {% with pct=total_debito|pct_diff:total_debito_ant %}
+  <div class="stat-card" style="border-left-color:#f59e0b;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:#f59e0b18;">
+        <i data-lucide="hand-coins" style="width:22px;height:22px;stroke:#f59e0b;"></i>
+      </span>
+      <div>
+        <div class="stat-label">Total Débito</div>
+        <div class="stat-value" style="color:#f59e0b;">R$ {{ total_debito|brl }}</div>
+        <div class="stat-sub">
+          {% if pct is not None %}
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
+              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            </span> vs mês ant.
+          {% else %}Débito em conta{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  <!-- Total Pix/Transferência -->
+  {% with pct=total_pix|pct_diff:total_pix_ant %}
+  <div class="stat-card" style="border-left-color:#06b6d4;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:#06b6d418;">
+        <img src="{% static 'img/pix.svg' %}" alt="Pix" style="width:22px;height:22px;filter:brightness(0) saturate(100%) invert(71%) sepia(97%) saturate(1308%) hue-rotate(161deg) brightness(95%)">
+      </span>
+      <div>
+        <div class="stat-label">Total Pix / Transfer.</div>
+        <div class="stat-value" style="color:#06b6d4;">R$ {{ total_pix|brl }}</div>
+        <div class="stat-sub">
+          {% if pct is not None %}
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
+              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            </span> vs mês ant.
+          {% else %}Pix e transferências{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+  <!-- Total Gasto -->
+  {% with pct=total_gasto|pct_diff:total_gasto_ant %}
+  <div class="stat-card" style="border-left-color:#ef4444;">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:#ef444418;">
         <i data-lucide="banknote-arrow-down" style="width:22px;height:22px;stroke:#ef4444;"></i>
@@ -99,11 +165,20 @@
       <div>
         <div class="stat-label">Total Gasto</div>
         <div class="stat-value" style="color:#ef4444;">R$ {{ total_gasto|brl }}</div>
-        <div class="stat-sub">{{ qtd_gastos }} lançamento{{ qtd_gastos|pluralize:",s" }}</div>
+        <div class="stat-sub">
+          {{ qtd_gastos }} lançamento{{ qtd_gastos|pluralize:",s" }}
+          {% if pct is not None %} ·
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
+              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            </span>
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
-  <div class="stat-card" style="border-top-color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">
+  {% endwith %}
+  <!-- Saldo do Mês -->
+  <div class="stat-card" style="border-left-color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};{% if saldo < 0 %}background:rgba(239,68,68,.06);{% endif %}">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %}18;">
         <i data-lucide="wallet" style="width:22px;height:22px;stroke:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};"></i>
@@ -111,14 +186,16 @@
       <div>
         <div class="stat-label">Saldo do Mês</div>
         <div class="stat-value" style="color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ saldo|brl }}</div>
-        <div class="stat-sub">Anterior + Receitas − Gastos</div>
+        <div class="stat-sub">
+          {% if saldo < 0 %}<span style="color:#ef4444;font-weight:600;">⚠ Saldo negativo</span>{% else %}Anterior + Receitas − Gastos{% endif %}
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Contas Bancárias + Investimentos — lado a lado -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+<div class="dash-duo-grid" style="gap:16px;margin-bottom:20px;">
 
   <!-- Contas Bancárias -->
   <div class="tabela-wrapper" style="margin-bottom:0;">
@@ -133,7 +210,7 @@
           <th>Conta</th>
           <th>Banco</th>
           <th>Tipo</th>
-          <th style="text-align:right;">Saldo</th>
+          <th>Saldo</th>
         </tr>
       </thead>
       <tbody>
@@ -154,7 +231,7 @@
             </div>
           </td>
           <td style="color:var(--text-muted);">{{ c.get_banco_display|default:"—" }}</td>
-          <td><span class="badge" style="background:var(--accent)22;color:var(--accent);">{{ c.get_tipo_display }}</span></td>
+          <td><span class="badge" style="background:#22c55e22;color:#22c55e;">{{ c.get_tipo_display }}</span></td>
           <td style="text-align:right;font-weight:700;color:{% if c.saldo_atual >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ c.saldo_atual|brl }}</td>
         </tr>
         {% endfor %}
@@ -185,7 +262,7 @@
           <th>Banco / Conta</th>
           <th>Investimento</th>
           <th>Tipo</th>
-          <th style="text-align:right;">Saldo Atual</th>
+          <th>Saldo Atual</th>
         </tr>
       </thead>
       <tbody>
@@ -202,7 +279,7 @@
             </div>
           </td>
           <td>
-            <a href="{% url 'investimento-detail' inv.pk %}" style="color:var(--text);text-decoration:none;font-weight:500;">
+            <a href="{% url 'investimento-detail' inv.pk %}" style="color:var(--text-primary);text-decoration:none;font-weight:500;">
               {{ inv.descricao }}
             </a>
           </td>
@@ -244,7 +321,7 @@
       <tr>
         <th style="min-width:140px;position:sticky;left:0;background:var(--bg-card);z-index:1;"></th>
         {% for col in tabela_mensal %}
-        <th style="text-align:right;white-space:nowrap;{% if col.atual %}color:var(--accent);{% endif %}">{{ col.label }}</th>
+        <th style="white-space:nowrap;{% if col.atual %}color:var(--accent);{% endif %}">{{ col.label }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -341,7 +418,10 @@
   </table>
   </div>
   {% else %}
-  <div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:13px;">Nenhum gasto dividido registrado ainda.</div>
+  <div class="tabela-empty-state">
+    <div class="tabela-empty-state-icon"><i data-lucide="users" style="width:22px;height:22px;"></i></div>
+    <span class="tabela-empty-state-text">Nenhum gasto dividido registrado ainda.</span>
+  </div>
   {% endif %}
 </div>
 
@@ -385,7 +465,10 @@
   </table>
   </div>
   {% else %}
-  <div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:13px;">Nenhum gasto parcelado registrado ainda.</div>
+  <div class="tabela-empty-state">
+    <div class="tabela-empty-state-icon"><i data-lucide="credit-card" style="width:22px;height:22px;"></i></div>
+    <span class="tabela-empty-state-text">Nenhum gasto parcelado registrado ainda.</span>
+  </div>
   {% endif %}
 </div>
 
@@ -400,7 +483,7 @@
       <tr>
         <th style="min-width:140px;position:sticky;left:0;background:var(--bg-card);z-index:1;">Responsável</th>
         {% for col in tabela_mensal %}
-        <th style="text-align:right;white-space:nowrap;{% if col.atual %}color:var(--accent);{% endif %}">{{ col.label }}</th>
+        <th style="white-space:nowrap;{% if col.atual %}color:var(--accent);{% endif %}">{{ col.label }}</th>
         {% endfor %}
       </tr>
     </thead>
@@ -419,26 +502,37 @@
     </tbody>
   </table>
   {% else %}
-  <div style="text-align:center;padding:32px 16px;color:var(--text-muted);font-size:13px;">Nenhum gasto por responsável registrado ainda.</div>
+  <div class="tabela-empty-state">
+    <div class="tabela-empty-state-icon"><i data-lucide="bar-chart-2" style="width:22px;height:22px;"></i></div>
+    <span class="tabela-empty-state-text">Nenhum gasto por responsável registrado ainda.</span>
+  </div>
   {% endif %}
 </div>
 
 <!-- ④ Gastos por Responsável | Gastos Cartões de Crédito | Pix | Débito | Empréstimos -->
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:20px;">
+<div class="dash-penta-grid" style="gap:16px;margin-bottom:20px;">
   <div class="tabela-wrapper" style="margin-top:0;">
     <div class="tabela-header" style="padding:10px 16px;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos por Responsável</span>
     </div>
     <table class="tabela-dados">
-      <thead><tr><th>Responsável</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th></tr></thead>
+      <thead><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:right;">%</th></tr></thead>
       <tbody>
         {% for r in tabela_por_responsavel %}
         <tr>
           <td><a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ r.responsavel__id }}" style="color:var(--text-primary);text-decoration:none;">{{ r.responsavel__nome }}</a></td>
           <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ r.total|brl }}</td>
+          <td style="text-align:right;font-size:11px;color:var(--text-muted);">
+            {% with pct=r.total|pct_of:total_gasto %}{% if pct is not None %}{{ pct }}%{% else %}—{% endif %}{% endwith %}
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        <tr><td colspan="2">
+          <div class="tabela-empty-state">
+            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
+            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -448,7 +542,7 @@
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos Cartões de Crédito</span>
     </div>
     <table class="tabela-dados">
-      <thead><tr><th>Cartão</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
+      <thead><tr><th>Cartão</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
         {% for c in tabela_por_cartao %}
         <tr>
@@ -475,7 +569,12 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        <tr><td colspan="3">
+          <div class="tabela-empty-state">
+            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
+            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -485,7 +584,7 @@
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Pix / Transferência</span>
     </div>
     <table class="tabela-dados">
-      <thead><tr><th>Responsável</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
+      <thead><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
         {% for p in tabela_por_pix %}
         <tr>
@@ -512,7 +611,12 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        <tr><td colspan="3">
+          <div class="tabela-empty-state">
+            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
+            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -523,7 +627,7 @@
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Débito por Conta</span>
     </div>
     <table class="tabela-dados">
-      <thead><tr><th>Conta</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th></tr></thead>
+      <thead><tr><th>Conta</th><th>Total {{ mes }}/{{ ano }}</th></tr></thead>
       <tbody>
         {% for d in tabela_por_debito %}
         <tr>
@@ -542,7 +646,12 @@
           <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ d.total|brl }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="2" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        <tr><td colspan="2">
+          <div class="tabela-empty-state">
+            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
+            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -553,7 +662,7 @@
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Empréstimos</span>
     </div>
     <table class="tabela-dados">
-      <thead><tr><th>Responsável</th><th style="text-align:right;">Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
+      <thead><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
         {% for e in tabela_por_emprestimo %}
         <tr>
@@ -580,7 +689,12 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3" style="text-align:center;color:var(--text-muted);padding:16px;">Sem gastos</td></tr>
+        <tr><td colspan="3">
+          <div class="tabela-empty-state">
+            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
+            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+          </div>
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -601,9 +715,10 @@
         <th>Descrição</th>
         <th>Categoria</th>
         <th>Responsável</th>
+        <th>Cartão</th>
         <th>Tipo</th>
-        <th style="text-align:right;">Valor</th>
-        <th></th>
+        <th>Parcelas</th>
+        <th>Valor</th>
       </tr>
     </thead>
     <tbody>
@@ -627,28 +742,46 @@
         </td>
         <td>{{ t.responsavel|default:"—" }}</td>
         <td>
+          {% if t.cartao %}
+            <span class="badge badge-cartao" style="background:{{ t.cartao_cor }}22;color:{{ t.cartao_cor }};">{{ t.cartao }}</span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td>
           {% if t.tipo_pag == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
-          {% elif t.tipo_pag == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado{% if t.parcelas %} {{ t.parcelas }}x{% endif %}</span>
-          {% elif t.tipo_pag == "pix" %}<span class="badge" style="background:#06b6d420;color:#06b6d4;">Pix</span>
-          {% elif t.tipo_pag == "debito" %}<span class="badge" style="background:#8b5cf620;color:#8b5cf6;">Débito</span>
-          {% elif t.tipo_pag == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
-          {% else %}<span class="badge">{{ t.tipo_label }}</span>{% endif %}
+          {% elif t.tipo_pag == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado</span>
+          {% elif t.tipo_pag == "pix" %}<span class="badge badge-pix">Pix</span>
+          {% elif t.tipo_pag == "debito" %}<span class="badge badge-debito">Débito</span>
+          {% elif t.tipo_pag == "emprestimo" %}<span class="badge badge-emprestimo">Empréstimo</span>
+          {% else %}<span class="badge badge-outro">{{ t.tipo_label }}</span>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if t.parcelas %}
+            {{ t.parcelas }}x
+            {% if t.dividido %}<br><span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>{% endif %}
+          {% elif t.dividido %}
+            <span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ t.valor|brl }}</td>
-        <td style="white-space:nowrap;">
-          {% if t.atribuido %}
-            <span style="font-size:10px;color:var(--text-muted);">Visível</span>
-          {% elif t.pk %}
-            <a href="{% url 'gasto-update' t.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
-            <a href="{% url 'gasto-delete' t.pk %}" class="btn btn-sm btn-danger" data-confirm="Excluir '{{ t.descricao }}'?"><i data-lucide="trash-2"></i></a>
-          {% endif %}
-        </td>
       </tr>
       {% endif %}{% endfor %}
       {% if not transacoes_mes %}
-      <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhum gasto neste período.</td></tr>
+      <tr><td colspan="8">
+        <div class="tabela-empty-state">
+          <div class="tabela-empty-state-icon"><i data-lucide="receipt" style="width:22px;height:22px;"></i></div>
+          <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
+        </div>
+      </td></tr>
       {% endif %}
     </tbody>
+    {% if transacoes_mes %}
+    <tfoot>
+      <tr style="border-top:2px solid var(--border);">
+        <td colspan="7" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total</td>
+        <td style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">R$ {{ total_gasto|brl }}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
   </table>
   </div>
 </div>
@@ -669,10 +802,11 @@
         <th>Data</th>
         <th>Tipo</th>
         <th>Descrição</th>
-        <th>Categoria / Cartão</th>
+        <th>Categoria</th>
+        <th>Cartão</th>
+        <th>Parcelas</th>
         <th>Responsável</th>
-        <th style="text-align:right;">Valor</th>
-        <th></th>
+        <th>Valor</th>
       </tr>
     </thead>
     <tbody>
@@ -682,20 +816,21 @@
         <td>
           {% if t.tipo == "entrada" %}
             {% if t.tipo_label == "Saldo Mês Anterior" %}
-              <span class="badge" style="background:var(--accent)22;color:var(--accent);">Saldo Ant.</span>
+              <span class="badge badge-saldo-ant">Saldo Ant.</span>
             {% elif t.tipo_label == "Salário" %}
-              <span class="badge badge-success">Salário</span>
+              <span class="badge badge-salario">Salário</span>
             {% elif t.tipo_label == "Bônus" %}
-              <span class="badge badge-avista">Bônus</span>
+              <span class="badge badge-bonus">Bônus</span>
             {% else %}
-              <span class="badge">Outros</span>
+              <span class="badge badge-outro">Outros</span>
             {% endif %}
           {% else %}
             {% if t.tipo_pag == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
             {% elif t.tipo_pag == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado{% if t.parcelas %} {{ t.parcelas }}x{% endif %}</span>
-            {% elif t.tipo_pag == "pix" %}<span class="badge" style="background:#06b6d420;color:#06b6d4;">Pix</span>
-            {% elif t.tipo_pag == "emprestimo" %}<span class="badge" style="background:#f9731620;color:#f97316;">Empréstimo</span>
-            {% else %}<span class="badge">{{ t.tipo_label }}</span>{% endif %}
+            {% elif t.tipo_pag == "pix" %}<span class="badge badge-pix">Pix</span>
+            {% elif t.tipo_pag == "debito" %}<span class="badge badge-debito">Débito</span>
+            {% elif t.tipo_pag == "emprestimo" %}<span class="badge badge-emprestimo">Empréstimo</span>
+            {% else %}<span class="badge badge-outro">{{ t.tipo_label }}</span>{% endif %}
           {% endif %}
         </td>
         <td style="font-weight:500;">
@@ -709,39 +844,49 @@
           {% endif %}
         </td>
         <td>
-          {% if t.tipo == "gasto" %}
-            {% if t.categoria %}
-              <span style="display:inline-flex;align-items:center;gap:5px;">
-                <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:{{ t.categoria.cor }}22;">
-                  <i data-lucide="{{ t.categoria.icone }}" style="width:10px;height:10px;stroke:{{ t.categoria.cor }};"></i>
-                </span>{{ t.categoria.nome }}
-              </span>
-            {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-            {% if t.cartao %}<span style="font-size:10px;color:var(--text-muted);margin-left:6px;">{{ t.cartao }}</span>{% endif %}
-          {% else %}—{% endif %}
+          {% if t.tipo == "gasto" and t.categoria %}
+            <span style="display:inline-flex;align-items:center;gap:5px;">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:{{ t.categoria.cor }}22;">
+                <i data-lucide="{{ t.categoria.icone }}" style="width:10px;height:10px;stroke:{{ t.categoria.cor }};"></i>
+              </span>{{ t.categoria.nome }}
+            </span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td>
+          {% if t.tipo == "gasto" and t.cartao %}
+            <span class="badge badge-cartao" style="background:{{ t.cartao_cor }}22;color:{{ t.cartao_cor }};">{{ t.cartao }}</span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if t.parcelas %}
+            {{ t.parcelas }}x
+            {% if t.dividido %}<br><span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>{% endif %}
+          {% elif t.dividido %}
+            <span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td>{{ t.responsavel|default:"—" }}</td>
         <td style="text-align:right;font-weight:600;color:{% if t.tipo == 'gasto' %}#ef4444{% elif t.valor < 0 %}#ef4444{% else %}#22c55e{% endif %};">
           {% if t.tipo == "gasto" %}-{% endif %}R$ {{ t.valor|brl }}
         </td>
-        <td style="white-space:nowrap;">
-          {% if t.atribuido %}
-            <span style="font-size:10px;color:var(--text-muted);">Visível</span>
-          {% elif t.tipo == "gasto" %}
-            <a href="{% url 'gasto-update' t.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
-            <a href="{% url 'gasto-delete' t.pk %}" class="btn btn-sm btn-danger" data-confirm="Excluir '{{ t.descricao }}'?"><i data-lucide="trash-2"></i></a>
-          {% elif not t.auto_gerada %}
-            <a href="{% url 'entrada-update' t.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
-            <a href="{% url 'entrada-delete' t.pk %}" class="btn btn-sm btn-danger" data-confirm="Excluir esta entrada?"><i data-lucide="trash-2"></i></a>
-          {% else %}
-            <span style="font-size:10px;color:var(--text-muted);">Auto</span>
-          {% endif %}
-        </td>
       </tr>
       {% empty %}
-      <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">Nenhuma movimentação neste período.</td></tr>
+      <tr><td colspan="8">
+        <div class="tabela-empty-state">
+          <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:22px;height:22px;"></i></div>
+          <span class="tabela-empty-state-text">Nenhuma movimentação neste período.</span>
+        </div>
+      </td></tr>
       {% endfor %}
     </tbody>
+    {% if transacoes_mes %}
+    <tfoot>
+      <tr style="border-top:2px solid var(--border);">
+        <td colspan="6" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Saídas</td>
+        <td colspan="2" style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">− R$ {{ total_gasto|brl }}</td>
+      </tr>
+    </tfoot>
+    {% endif %}
   </table>
   </div>
 </div>
@@ -797,7 +942,7 @@
 </div>
 
 <!-- ── Gráficos de Investimentos ──────────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:20px;">
+<div class="dash-inv-grid" style="gap:16px;margin-top:20px;">
 
   <!-- Evolução -->
   <div class="tabela-wrapper" style="margin-bottom:0;">
@@ -841,11 +986,13 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 (function() {
-  var style    = getComputedStyle(document.documentElement);
+  var style    = getComputedStyle(document.body);
   var accent   = style.getPropertyValue('--accent').trim()      || '#16a34a';
   var muted    = style.getPropertyValue('--text-muted').trim()  || '#9a9db5';
   var border   = style.getPropertyValue('--border').trim()      || '#2e3040';
   var textMain = style.getPropertyValue('--text-primary').trim()|| '#e2e4f0';
+  var isDark   = !document.body.classList.contains('light-theme');
+  var dlShadow = isDark ? 'rgba(0,0,0,0.55)' : 'rgba(0,0,0,0.75)';
 
   var labels  = {{ categorias_labels|safe }};
   var valores = {{ categorias_valores|safe }};
@@ -900,8 +1047,8 @@
           },
           datalabels: {
             color: '#fff',
-            textShadowBlur: 4,
-            textShadowColor: 'rgba(0,0,0,0.5)',
+            textShadowBlur: 6,
+            textShadowColor: dlShadow,
             font: { size: 10, weight: '700' },
             formatter: function(value) {
               var pct = value / totalCat * 100;
@@ -1132,6 +1279,8 @@
             legend: { position: 'bottom', labels: { color: muted, font: { size: 10 }, padding: 10, boxWidth: 12 } },
             datalabels: {
               color: '#fff',
+              textShadowBlur: 6,
+              textShadowColor: dlShadow,
               font: { size: 10, weight: 'bold' },
               formatter: function(v) {
                 var pct = (v / totalRosca * 100).toFixed(1);

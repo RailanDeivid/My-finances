@@ -90,7 +90,7 @@
         <th>Tipo</th>
         <th>Descrição</th>
         <th>Responsável</th>
-        <th style="text-align:right;">Valor</th>
+        <th>Valor</th>
         <th></th>
       </tr>
     </thead>
@@ -123,12 +123,10 @@
   </table>
 </div>
 {% else %}
-<div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
-  <i data-lucide="inbox" style="width:40px;height:40px;stroke:var(--text-muted);margin-bottom:12px;display:block;margin-left:auto;margin-right:auto;"></i>
-  <div style="font-size:15px;font-weight:600;margin-bottom:6px;">Nenhuma entrada vinculada</div>
-  <div style="font-size:13px;margin-bottom:16px;">Ao adicionar uma entrada, selecione esta conta para vinculá-la aqui.</div>
-  <a href="{% url 'entrada-create' %}" class="btn btn-primary"><i data-lucide="plus"></i> Adicionar Entrada</a>
-</div>
+{% url 'entrada-create' as create_url %}
+{% with es_icon="banknote-arrow-up" es_title="Nenhuma entrada vinculada" es_description="Ao adicionar uma entrada, selecione esta conta para vinculá-la aqui." es_url=create_url es_button="Adicionar Entrada" %}
+  {% include "includes/empty_state.html" %}
+{% endwith %}
 {% endif %}
 
 {% endblock %}

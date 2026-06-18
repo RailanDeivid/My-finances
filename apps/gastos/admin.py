@@ -1,10 +1,41 @@
 from django.contrib import admin
 from django.contrib import messages as django_messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
+from django.utils.html import format_html
 from unfold.admin import ModelAdmin, TabularInline
 from .models import (
     Gasto, Cartao, Responsavel, Categoria, Entrada,
     Conta, Investimento, InvestimentoHistorico, FaturaPaga, PagamentoFeito,
 )
+
+User = get_user_model()
+
+admin.site.unregister(User)
+
+@admin.register(User)
+class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
+    compressed_fields = False
+    form = UserChangeForm
+    add_form = UserCreationForm
+    readonly_fields = ['password_change_link']
+    fieldsets = (
+        (None, {'fields': ('username', 'password_change_link')}),
+        ('Informações pessoais', {'fields': ('first_name', 'last_name', 'email')}),
+        ('Permissões', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Datas importantes', {'fields': ('last_login', 'date_joined')}),
+    )
+    add_fieldsets = BaseUserAdmin.add_fieldsets
+
+    def password_change_link(self, obj):
+        if obj and obj.pk:
+            return format_html(
+                '<a href="../password/" style="color:#16a34a;font-weight:600;font-size:14px;">'
+                '🔑 Alterar senha deste usuário</a>'
+            )
+        return '—'
+    password_change_link.short_description = 'Senha'
 
 
 def excluir_gastos_selecionados(modeladmin, request, queryset):
