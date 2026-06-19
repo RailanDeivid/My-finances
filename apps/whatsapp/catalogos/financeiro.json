@@ -1,0 +1,21 @@
+{
+  "intents": {
+    "gasto":   ["gastei","comprei","paguei","compras","despesa","saída","saida","débito","debito"],
+    "entrada": ["recebi","salário","salario","entrada","renda","ganho","receita","depósito","deposito"],
+    "cartao":  ["novo cartão","novo cartao","cadastrar cartão","cadastrar cartao","adicionar cartão"],
+    "resumo":  ["resumo","extrato","saldo","quanto gastei","quanto tenho","balanço","balanco","relatório"],
+    "menu":    ["menu","início","inicio","voltar","home"],
+    "cancelar":["cancelar","sair","parar","stop"]
+  },
+  "tipo_pagamento": {
+    "pix":               ["pix","transferência","transferencia","ted","doc","transf"],
+    "credito_avista":    ["à vista","avista","a vista","crédito à vista","credito a vista"],
+    "credito_parcelado": ["parcelado","parcelas","prestações","prestacoes"],
+    "emprestimo":        ["empréstimo","emprestimo"]
+  },
+  "tipo_entrada": {
+    "salario": ["salário","salario","sal","pagamento","holerite"],
+    "bonus":   ["bônus","bonus","gratificação","premiação","extra"],
+    "outros":  ["outros","outro","misc","freelance","freela"]
+  }
+}

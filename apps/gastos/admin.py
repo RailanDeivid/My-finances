@@ -12,6 +12,20 @@ from .models import (
 
 User = get_user_model()
 
+from apps.whatsapp.models import UserProfile
+
+
+class UserProfileInline(TabularInline):
+    model = UserProfile
+    compressed_fields = False
+    extra = 1
+    max_num = 1
+    fields = ("whatsapp_number",)
+    verbose_name = "WhatsApp"
+    verbose_name_plural = "Número de WhatsApp"
+    can_delete = False
+
+
 admin.site.unregister(User)
 
 @admin.register(User)
@@ -19,6 +33,7 @@ class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
     compressed_fields = False
     form = UserChangeForm
     add_form = UserCreationForm
+    inlines = [UserProfileInline]
     readonly_fields = ['password_change_link']
     fieldsets = (
         (None, {'fields': ('username', 'password_change_link')}),

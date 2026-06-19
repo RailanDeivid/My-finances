@@ -1,5 +1,7 @@
 import json
 import logging
+import random
+import time
 from datetime import date
 from decimal import Decimal
 
@@ -9,41 +11,123 @@ from django.db.models import Sum
 from openai import OpenAI
 
 from apps.gastos.models import Cartao, Entrada, Gasto, Responsavel
-from .prompts import make_intent_messages
-from .session import clear_session, get_session, save_session
+from .access_control import is_authorized
+from .prompts import get_catalog, make_intent_messages
+from .session import clear_session, get_session, is_first_contact_today, save_session
 
 logger = logging.getLogger(__name__)
 _llm = OpenAI(api_key=settings.OPENAI_KEY)
+_catalog = get_catalog()
+
+
+def _build_map(section: str) -> dict:
+    """Constrói dict alias→chave a partir do catalog (arrays diretos)."""
+    result = {}
+    for key, aliases in _catalog[section].items():
+        for alias in aliases:
+            result[alias.lower()] = key
+    return result
+
 
 # ── Texto fixo ────────────────────────────────────────────────────────────────
 
-MENU_TEXT = (
-    "💰 *MyFinances*\n\n"
+MENU_OPTIONS = (
     "O que deseja fazer?\n\n"
-    "1 · Novo gasto\n"
-    "2 · Nova entrada\n"
-    "3 · Novo cartão\n"
-    "4 · Resumo do mês\n\n"
-    "_Digite o número ou descreva diretamente.\n"
-    "Ex: \"gastei 150 no mercado no pix\"_"
+    "1️⃣  Registrar gasto\n"
+    "2️⃣  Registrar entrada\n"
+    "3️⃣  Ver resumo do mês\n"
+    "4️⃣  Cadastrar cartão\n\n"
+    "_Ou me conte diretamente, ex: \"gastei 50 no mercado no pix\"_"
 )
 
+MENU_TEXT = MENU_OPTIONS  # compat — usado em confirmações e erros
+
+_MSG_SPLIT = "\x00SPLIT\x00"  # separador interno para envio em 2 mensagens
+
+_GREETINGS = {
+    "manha": [
+        "Bom dia, *{name}*! Vamos começar bem o dia?",
+        "Oi, *{name}*! Bom dia! No que posso ajudar?",
+        "Bom dia, *{name}*! Pronto pra organizar as finanças?",
+    ],
+    "tarde": [
+        "Boa tarde, *{name}*! No que posso ajudar?",
+        "Oi, *{name}*! Boa tarde! Bora registrar alguma coisa?",
+        "Eae, *{name}*! Boa tarde! O que vamos fazer hoje?",
+    ],
+    "noite": [
+        "Boa noite, *{name}*! Vamos fechar as contas do dia?",
+        "Oi, *{name}*! Boa noite! No que posso ajudar?",
+        "Eae, *{name}*! Boa noite! Bora registrar?",
+    ],
+    "madrugada": [
+        "Ainda acordado, *{name}*? Bora registrar logo e descansar!",
+        "Oi, *{name}*! Noite coruja! No que posso ajudar?",
+    ],
+    "fds": [
+        "Eae, *{name}*! Curtindo o fim de semana? No que posso ajudar?",
+        "Oi, *{name}*! Fim de semana e já gerenciando as finanças?",
+        "Olá, *{name}*! Bom descanso! O que precisa registrar?",
+    ],
+}
+
+
+def _first_name(user) -> str:
+    name = (user.first_name or user.username or "").strip()
+    return name.split()[0].capitalize() if name else "você"
+
+
+def _choose_greeting(name: str) -> str:
+    now = date.today()
+    hora = __import__("datetime").datetime.now().hour
+    dia_semana = now.weekday()  # 0=seg … 6=dom
+
+    if dia_semana >= 5:
+        pool = _GREETINGS["fds"]
+    elif hora < 5:
+        pool = _GREETINGS["madrugada"]
+    elif hora < 12:
+        pool = _GREETINGS["manha"]
+    elif hora < 18:
+        pool = _GREETINGS["tarde"]
+    else:
+        pool = _GREETINGS["noite"]
+
+    return random.choice(pool).format(name=name)
+
+
+_RETURN_GREETINGS = [
+    "Eae, *{name}*! Que bom ter você de volta.",
+    "Oi, *{name}*! De volta por aqui.",
+    "Olá, *{name}*! Bom te ver de novo.",
+    "Eae, *{name}*! Precisando de mais alguma coisa?",
+]
+
+
+def welcome_message(user, phone: str = "", push_name: str = "") -> str:
+    # Prioridade: pushName do WhatsApp → first_name do Django → username
+    name = (push_name.split()[0].capitalize() if push_name.strip()
+            else _first_name(user))
+    if phone and not is_first_contact_today(phone):
+        greeting = random.choice(_RETURN_GREETINGS).format(name=name)
+    else:
+        greeting = _choose_greeting(name)
+    return f"{greeting}{_MSG_SPLIT}{MENU_OPTIONS}"
+
 CANCEL_WORDS = {"cancelar", "sair", "parar", "stop", "menu", "início", "inicio", "voltar"}
+
 
 # ── Mapeamentos de choices ────────────────────────────────────────────────────
 
 TIPO_PAG_MAP = {
-    "1": "credito_avista",  "credito_avista": "credito_avista",
-    "2": "credito_parcelado", "credito_parcelado": "credito_parcelado",
-    "parcelado": "credito_parcelado", "parcelado credito": "credito_parcelado",
-    "3": "pix", "pix": "pix", "transferencia": "pix", "transferência": "pix",
-    "4": "emprestimo", "emprestimo": "emprestimo", "empréstimo": "emprestimo",
+    "1": "credito_avista", "2": "credito_parcelado", "3": "pix", "4": "emprestimo",
+    **_build_map("tipo_pagamento"),
+    "credito_avista": "credito_avista", "credito_parcelado": "credito_parcelado",
 }
 
 TIPO_ENT_MAP = {
-    "1": "salario", "salario": "salario", "salário": "salario",
-    "2": "bonus",   "bonus": "bonus",     "bônus": "bonus",
-    "3": "outros",  "outros": "outros",   "outro": "outros",
+    "1": "salario", "2": "bonus", "3": "outros",
+    **_build_map("tipo_entrada"),
 }
 
 BANDEIRA_MAP = {
@@ -360,10 +444,40 @@ def _resumo(user) -> str:
     )
 
 
+# ── Preços por modelo (USD por token) ────────────────────────────────────────
+
+_MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "gpt-4o-mini":        (0.15 / 1_000_000, 0.60 / 1_000_000),
+    "gpt-4o":             (5.00 / 1_000_000, 15.00 / 1_000_000),
+    "gpt-4-turbo":        (10.00 / 1_000_000, 30.00 / 1_000_000),
+    "gpt-3.5-turbo":      (0.50 / 1_000_000, 1.50 / 1_000_000),
+}
+
+
+def _save_llm_usage(user, operation: str, model: str, usage, latency_ms: int) -> None:
+    try:
+        from .models import LLMUsage
+        price_in, price_out = _MODEL_PRICING.get(model, (0.0, 0.0))
+        cost = Decimal(str(usage.prompt_tokens * price_in + usage.completion_tokens * price_out))
+        LLMUsage.objects.create(
+            user=user,
+            operation=operation,
+            model=model,
+            tokens_input=usage.prompt_tokens,
+            tokens_output=usage.completion_tokens,
+            tokens_total=usage.total_tokens,
+            cost_usd=cost,
+            latency_ms=latency_ms,
+        )
+    except Exception as e:
+        logger.warning("Falha ao salvar LLMUsage: %s", e)
+
+
 # ── LLM ───────────────────────────────────────────────────────────────────────
 
-def _call_llm_intent(message: str) -> dict:
+def _call_llm_intent(message: str, user=None) -> dict:
     try:
+        t0 = time.monotonic()
         resp = _llm.chat.completions.create(
             model=settings.OPENAI_MODEL,
             messages=make_intent_messages(message),
@@ -371,6 +485,8 @@ def _call_llm_intent(message: str) -> dict:
             temperature=float(settings.OPENAI_TEMPERATURE),
             max_tokens=300,
         )
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        _save_llm_usage(user, "intent_extraction", settings.OPENAI_MODEL, resp.usage, latency_ms)
         return json.loads(resp.choices[0].message.content)
     except Exception as e:
         logger.error("LLM error: %s", e)
@@ -392,14 +508,14 @@ def _next_step(entity: str, fields: dict, after: str | None = None) -> str | Non
     return None  # todos coletados
 
 
-def process_message(phone: str, user, text: str) -> str:
+def process_message(phone: str, user, text: str, push_name: str = "") -> str:
     text = text.strip()
     text_lower = text.lower()
 
     # ── Cancelar em qualquer estado ──────────────────────────────────────────
     if text_lower in CANCEL_WORDS:
         clear_session(phone)
-        return f"Ok, operação cancelada.\n\n{MENU_TEXT}"
+        return f"Ok, operação cancelada. ✋\n\n{MENU_OPTIONS}"
 
     session = get_session(phone)
     state = session["state"]
@@ -416,7 +532,7 @@ def process_message(phone: str, user, text: str) -> str:
             extracted_fields = {}
         else:
             # NLP
-            result = _call_llm_intent(text)
+            result = _call_llm_intent(text, user=user)
             intent = result.get("intent", "desconhecido")
 
             if intent == "resumo":
@@ -425,11 +541,11 @@ def process_message(phone: str, user, text: str) -> str:
 
             if intent == "menu":
                 clear_session(phone)
-                return MENU_TEXT
+                return welcome_message(user, phone, push_name)
 
             if intent not in ("gasto", "entrada", "cartao"):
                 clear_session(phone)
-                return f"Não entendi. 🤔\n\n{MENU_TEXT}"
+                return welcome_message(user, phone, push_name)
 
             entity = intent
             llm_fields = result.get("fields", {}) or {}
@@ -543,21 +659,21 @@ def process_message(phone: str, user, text: str) -> str:
             clear_session(phone)
             try:
                 if entity == "gasto":
-                    return _save_gasto(user, fields) + f"\n\n{MENU_TEXT}"
+                    return _save_gasto(user, fields) + f"\n\n{MENU_OPTIONS}"
                 if entity == "entrada":
-                    return _save_entrada(user, fields) + f"\n\n{MENU_TEXT}"
+                    return _save_entrada(user, fields) + f"\n\n{MENU_OPTIONS}"
                 if entity == "cartao":
-                    return _save_cartao(user, fields) + f"\n\n{MENU_TEXT}"
+                    return _save_cartao(user, fields) + f"\n\n{MENU_OPTIONS}"
             except Exception as e:
                 logger.error("Erro ao salvar %s: %s", entity, e)
-                return f"❌ Erro ao salvar. Tente novamente.\n\n{MENU_TEXT}"
+                return f"❌ Erro ao salvar. Tente novamente.\n\n{MENU_OPTIONS}"
 
         if text in ("2", "n", "não", "nao", "cancelar"):
             clear_session(phone)
-            return f"❌ Cancelado.\n\n{MENU_TEXT}"
+            return f"❌ Cancelado.\n\n{MENU_OPTIONS}"
 
         return _build_confirm(entity, fields)
 
     # fallback
     clear_session(phone)
-    return MENU_TEXT
+    return welcome_message(user, phone, push_name)

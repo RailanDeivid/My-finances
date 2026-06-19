@@ -1,55 +1,36 @@
-INTENT_SYSTEM = """Você é um assistente financeiro. Extraia a intenção e campos da mensagem em português.
-Responda APENAS com JSON válido, sem markdown, sem explicações."""
+import json
+from pathlib import Path
 
-INTENT_USER = """Analise a mensagem e retorne JSON:
-{
-  "intent": "gasto|entrada|cartao|resumo|menu|cancelar|desconhecido",
-  "fields": {
-    "descricao": "string ou null",
-    "valor": numero_decimal_ou_null,
-    "tipo_pagamento": "credito_avista|credito_parcelado|pix|emprestimo|null",
-    "total_parcelas": numero_inteiro_ou_null,
-    "tipo_entrada": "salario|bonus|outros|null",
-    "cartao_nome_hint": "nome parcial do cartão mencionado ou null",
-    "responsavel_nome_hint": "nome da pessoa mencionada como responsável ou null"
-  }
-}
+_CATALOG_PATH = Path(__file__).parent / "catalogos" / "financeiro.json"
+_catalog: dict = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
 
-Regras de intent:
-- "gastei", "comprei", "paguei", "compras" → intent=gasto
-- "recebi", "salário", "entrada" → intent=entrada
-- "novo cartão", "cadastrar cartão" → intent=cartao
-- "resumo", "extrato", "saldo" → intent=resumo
-- "menu", "início", "voltar" → intent=menu
-- "cancelar", "sair", "parar" → intent=cancelar
 
-Regras de tipo_pagamento:
-- parcelado / xN / NxM / em Nx / parcelas → credito_parcelado
-- à vista / avista / crédito sem parcelamento → credito_avista
-- pix / transferência / ted / doc → pix
-- empréstimo → emprestimo
+def get_catalog() -> dict:
+    return _catalog
 
-Regras de valor:
-- "155 reias/reais" → 155.0
-- "R$49,90" → 49.9
-- "5x de 144" → valor=144.0 (valor por parcela), total_parcelas=5
-- "1k" → 1000.0
 
-Regras de cartao_nome_hint:
-- Extraia qualquer nome de cartão mencionado: "latam pass", "nubank", "inter", "itaú", "elo"
-- Se mencionar bandeira (elo, visa, master) sem nome, retorne a bandeira como hint
-- Se não mencionar cartão, retorne null
+# ── Prompt compacto (~180 tokens vs ~550 anteriores) ─────────────────────────
 
-Regras de responsavel_nome_hint:
-- "do João", "da Maria", "do railan" → extraia o nome ("João", "Maria", "railan")
-- "pra mim", "meu" → retorne null (não tem como saber quem é)
-- Se não mencionar pessoa, retorne null
+_SYSTEM = "Extrator de intenção financeira pt-BR. JSON puro, sem markdown."
 
-Mensagem: {message}"""
+_USER = (
+    "Msg: {message}\n\n"
+    '{"intent":"gasto|entrada|cartao|resumo|menu|desconhecido",'
+    '"fields":{"descricao":str,"valor":float,"tipo_pagamento":"credito_avista|credito_parcelado|pix|emprestimo",'
+    '"total_parcelas":int,"tipo_entrada":"salario|bonus|outros",'
+    '"cartao_nome_hint":str,"responsavel_nome_hint":str}}\n\n'
+    "Regras:\n"
+    "intent: gasto→gastei/comprei/paguei | entrada→recebi/salário | cartao→novo/cadastrar cartão | resumo→saldo/extrato\n"
+    "pgto: pix→pix/transf/ted | avista→à vista | parcelado→Nx/parcelado | emprestimo→empréstimo\n"
+    "valor: '5x de 100'→valor=100,parcelas=5 | '1k'→1000 | 'R$49,90'→49.9\n"
+    "cartao_nome_hint: nome do cartão mencionado (nubank,inter,itaú…) ou null\n"
+    "responsavel_nome_hint: 'do João'→'João', 'pra mim'→null\n"
+    "null em campos não mencionados"
+)
 
 
 def make_intent_messages(message: str) -> list:
     return [
-        {"role": "system", "content": INTENT_SYSTEM},
-        {"role": "user", "content": INTENT_USER.format(message=message)},
+        {"role": "system", "content": _SYSTEM},
+        {"role": "user", "content": _USER.replace("{message}", message)},
     ]

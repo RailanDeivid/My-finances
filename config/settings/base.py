@@ -10,6 +10,12 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-key-change-me")
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:8001",
+    "http://127.0.0.1:8001",
+    "https://myfinances.railandeivid.com.br",
+]
+
 INSTALLED_APPS = [
     "unfold",
     "unfold.contrib.filters",
@@ -132,7 +138,7 @@ UNFOLD = {
     "SITE_TITLE": "MyFinances — Painel Admin",
     "SITE_HEADER": "MyFinances",
     "SITE_SUBHEADER": "Controle de finanças pessoal",
-    "SITE_LOGO": {
+    "SITE_ICON": {
         "light": lambda r: static("img/piggy-bank.svg"),
         "dark":  lambda r: static("img/piggy-bank.svg"),
     },
@@ -209,8 +215,10 @@ UNFOLD = {
                 "separator": True,
                 "collapsible": True,
                 "items": [
-                    {"title": "Usuários",      "icon": "manage_accounts","link": reverse_lazy("admin:auth_user_changelist")},
-                    {"title": "Grupos",        "icon": "groups",         "link": reverse_lazy("admin:auth_group_changelist")},
+                    {"title": "Usuários",          "icon": "manage_accounts", "link": reverse_lazy("admin:auth_user_changelist")},
+                    {"title": "Grupos",            "icon": "groups",          "link": reverse_lazy("admin:auth_group_changelist")},
+                    {"title": "Contatos WhatsApp", "icon": "chat",            "link": reverse_lazy("admin:whatsapp_whatsappaccess_changelist")},
+                    {"title": "Uso de LLM",        "icon": "query_stats",     "link": reverse_lazy("admin:whatsapp_llmusage_changelist")},
                 ],
             },
         ],
