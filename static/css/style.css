@@ -1294,7 +1294,7 @@ body.light-theme .perfil-card { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 
 /* Mobile pequeno */
 @media (max-width: 480px) {
-  .main-content        { padding-left: 10px; padding-right: 10px; }
+  .main-content        { padding-left: 10px; padding-right: 10px; padding-bottom: 16px; }
 
   .dashboard-titulo    { font-size: 20px; }
 
@@ -1311,4 +1311,15 @@ body.light-theme .perfil-card { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
   .busca-input-wrapper { width: 100%; }
 
   .modal-box           { margin: 12px; max-width: calc(100% - 24px); }
+
+  /* Topbar compacto */
+  .topbar              { padding: 0 10px; gap: 6px; }
+  .topbar-title        { font-size: 12px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* Telas muito pequenas (≤360px): esconde botões da topbar */
+@media (max-width: 360px) {
+  .topbar > div:last-child { display: none; }
+  .topbar-title            { max-width: none; }
+  .main-content            { padding-left: 8px; padding-right: 8px; }
 }

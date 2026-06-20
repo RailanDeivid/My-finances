@@ -11,6 +11,7 @@ urlpatterns = [
     path("gastos/<int:pk>/excluir/", views.GastoDeleteView.as_view(), name="gasto-delete"),
     path("gastos/<int:pk>/parcela-add/", views.gasto_parcela_add, name="gasto-parcela-add"),
     path("gastos/<int:pk>/parcela-valor/", views.gasto_parcela_valor, name="gasto-parcela-valor"),
+    path("gastos/<int:pk>/parcelas-excluir-a-partir/", views.gasto_parcelas_delete_from, name="gasto-parcelas-delete-from"),
 
     # Cartões
     path("cartoes/", views.CartaoListView.as_view(), name="cartao-list"),

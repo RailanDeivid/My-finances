@@ -91,18 +91,20 @@
   }
 
   // ── Modal Novo Gasto ─────────────────────────────────────────────────────
-  var _mgMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var _mgMeses = window.MESES || ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   window.mgGastoTipoToggle = function (tipo) {
-    var TIPOS_C = ['credito_avista', 'credito_parcelado'];
+    var TIPOS_C = TIPOS_CARTAO;
     var isC = TIPOS_C.indexOf(tipo) !== -1;
     var isP = tipo === 'credito_parcelado';
+    var isA = tipo === 'credito_avista';
     var isD = tipo === 'debito';
     var el;
     el = document.getElementById('mg-cartao-row');       if (el) el.style.display = isC ? 'block' : 'none';
     el = document.getElementById('mg-conta-origem-row'); if (el) el.style.display = isD ? 'block' : 'none';
     el = document.getElementById('mg-parcelas-row');     if (el) el.style.display = isP ? 'block' : 'none';
-    el = document.getElementById('mg-inicio-row');       if (el) el.style.display = isP ? 'block' : 'none';
+    el = document.getElementById('mg-inicio-row');       if (el) el.style.display = (isP || isA) ? 'block' : 'none';
+    el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : 'Mês de início das parcelas';
     el = document.getElementById('mg_label_valor');      if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
     var dataRow = document.getElementById('mg-data-row');
     if (dataRow) {
@@ -150,11 +152,29 @@
     var n = parseInt((document.getElementById('mg_total_parcelas') || {}).value || 0, 10) || 0;
     if (v > 0 && n > 0) {
       var total = v * n;
-      el.textContent = '💳 Total da compra: R$ ' + total.toLocaleString('pt-BR', {minimumFractionDigits:2}) +
-                       '  (' + n + 'x de R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2}) + ')';
+      el.textContent = '💳 Total da compra: ' + window.formatBRL(total) +
+                       '  (' + n + 'x de ' + window.formatBRL(v) + ')';
       el.style.display = 'block';
     } else {
       el.style.display = 'none';
+    }
+  };
+
+  window.mgToggleRecorrente = function (checked) {
+    var el = document.getElementById('mg-recorrente-opcoes');
+    if (el) el.style.display = checked ? 'block' : 'none';
+    if (checked) mgAtualizarRecorrenteInfo();
+  };
+
+  window.mgAtualizarRecorrenteInfo = function () {
+    var sel = document.getElementById('mg_recorrente_meses');
+    var txt = document.getElementById('mg-recorrente-info-txt');
+    if (!sel || !txt) return;
+    var val = sel.value;
+    if (val === 'sempre') {
+      txt.textContent = 'Um gasto será gerado todo mês até dezembro de 2050.';
+    } else {
+      txt.textContent = 'Um gasto será gerado para cada um dos próximos ' + val + ' meses.';
     }
   };
 
@@ -190,9 +210,8 @@
     if (val > 0 && previewDiv) {
       var vMeu   = Math.round(val * pctMeu / 100 * 100) / 100;
       var vOutro = Math.round((val - vMeu) * 100) / 100;
-      var fmt = function(x) { return 'R$ ' + x.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); };
-      if (valMeuEl)   valMeuEl.textContent   = fmt(vMeu);
-      if (valOutroEl) valOutroEl.textContent = fmt(vOutro);
+      if (valMeuEl)   valMeuEl.textContent   = window.formatBRL(vMeu);
+      if (valOutroEl) valOutroEl.textContent = window.formatBRL(vOutro);
       previewDiv.style.display = 'grid';
     } else if (previewDiv) {
       previewDiv.style.display = 'none';
@@ -202,6 +221,8 @@
   function initGastoModal() {
     var mgTipo = document.getElementById("mg_tipo_pagamento");
     if (mgTipo) mgGastoTipoToggle(mgTipo.value);
+    var chkR = document.getElementById('mg_recorrente');
+    if (chkR) { chkR.checked = false; mgToggleRecorrente(false); }
 
     var inp  = document.getElementById('mg_valor_total');
     var parc = document.getElementById('mg_total_parcelas');

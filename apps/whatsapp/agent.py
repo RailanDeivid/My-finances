@@ -11,7 +11,6 @@ from django.db.models import Sum
 from openai import OpenAI
 
 from apps.gastos.models import Cartao, Entrada, Gasto, Responsavel
-from .access_control import is_authorized
 from .prompts import get_catalog, make_intent_messages
 from .session import clear_session, get_session, is_first_contact_today, save_session
 

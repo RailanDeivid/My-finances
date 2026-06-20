@@ -29,7 +29,7 @@
         <select name="responsavel" id="mg_responsavel" class="form-control" required>
           <option value="">— Selecione —</option>
           {% for r in modal_gasto_form.responsavel.field.queryset %}
-          <option value="{{ r.pk }}">{{ r }}</option>
+          <option value="{{ r.pk }}" {% if r.pk == responsavel_principal.pk %}selected{% endif %}>{{ r }}</option>
           {% endfor %}
         </select>
       </div>
@@ -71,7 +71,7 @@
       </div>
 
       <!-- Grid: Valor + Parcelas + Data (posicionamento explícito por JS) -->
-      <div id="mg-grid-valores" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div id="mg-grid-valores" class="form-grid-2">
         <div class="form-group" style="grid-column:1;grid-row:1;">
           <label class="form-label" for="mg_valor_total" id="mg_label_valor">Valor Total (R$) *</label>
           <input type="number" name="valor_total" id="mg_valor_total" class="form-control"
@@ -93,10 +93,10 @@
 
       <div id="mg-inicio-row" style="display:none;margin-bottom:16px;">
         <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">
+          <div id="mg-inicio-label" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">
             Mês de início das parcelas
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div class="form-grid-2">
             <div>
               <label class="form-label" for="mg_mes_inicio">Mês da 1ª Parcela</label>
               <select name="mes_inicio" id="mg_mes_inicio" class="form-control" onchange="mgAtualizarPreview()">
@@ -133,6 +133,30 @@
         </select>
       </div>
 
+      <!-- Compra Recorrente -->
+      <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
+          <input type="checkbox" name="recorrente" id="mg_recorrente" onchange="mgToggleRecorrente(this.checked)"
+                 style="width:16px;height:16px;accent-color:#8b5cf6;cursor:pointer;">
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Compra Recorrente</span>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:2px;">assinatura, mensalidade...</span>
+        </label>
+        <div id="mg-recorrente-opcoes" style="display:none;margin-top:12px;">
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:12px;">Repetir por</label>
+            <select name="recorrente_meses" id="mg_recorrente_meses" class="form-control" onchange="mgAtualizarRecorrenteInfo()">
+              {% for val, label in modal_gasto_form.recorrente_meses.field.choices %}
+              <option value="{{ val }}" {% if val == "12" %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div id="mg-recorrente-info" style="padding:8px 10px;background:#8b5cf611;border-radius:6px;font-size:12px;color:#a78bfa;">
+            <i data-lucide="info" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
+            <span id="mg-recorrente-info-txt">Um gasto será gerado para cada um dos próximos 12 meses.</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Divisão de gastos -->
       <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
@@ -152,7 +176,7 @@
             </select>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:10px;">
+          <div class="form-grid-2" style="margin-bottom:10px;">
             <div>
               <label class="form-label" style="font-size:12px;">Minha parte</label>
               <select name="pct_responsavel" id="mg_pct_responsavel" class="form-control" onchange="mgAtualizarDivisao()">

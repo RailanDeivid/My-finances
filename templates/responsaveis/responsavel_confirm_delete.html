@@ -7,18 +7,28 @@
 <div class="dialog-body">
   Tem certeza que deseja excluir o responsável <strong>"{{ object.nome }}"</strong>?
 </div>
-{% if object.gastos.count %}
-<div class="dialog-warn">
-  <i data-lucide="triangle-alert" style="width:14px;height:14px;vertical-align:-2px;"></i>
-  Este responsável possui <strong>{{ object.gastos.count }} gasto(s)</strong> associado(s).
-  A exclusão pode falhar se houver gastos vinculados.
+
+{% if tem_gastos_externos %}
+<div class="dialog-warn" style="border-color:#ef4444;background:#ef444415;">
+  <i data-lucide="ban" style="width:14px;height:14px;vertical-align:-2px;color:#ef4444;"></i>
+  Este responsável possui gastos atribuídos por outro usuário. <strong>Não é possível excluí-lo.</strong>
 </div>
-{% endif %}
-<form method="post">
-  {% csrf_token %}
-  <div class="dialog-actions">
-    <a href="{% url 'responsavel-list' %}" class="btn btn-danger">Cancelar</a>
-    <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+<div style="display:flex;justify-content:center;margin-top:16px;">
+  <a href="{% url 'responsavel-list' %}" class="btn btn-primary">Voltar</a>
+</div>
+{% else %}
+  {% if gastos_proprios_count %}
+  <div class="dialog-warn">
+    <i data-lucide="triangle-alert" style="width:14px;height:14px;vertical-align:-2px;"></i>
+    Este responsável possui <strong>{{ gastos_proprios_count }} gasto(s)</strong> que também serão excluídos permanentemente.
   </div>
-</form>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="dialog-actions">
+      <a href="{% url 'responsavel-list' %}" class="btn btn-danger">Cancelar</a>
+      <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+    </div>
+  </form>
+{% endif %}
 {% endblock %}

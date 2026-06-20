@@ -66,6 +66,22 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
   margin-bottom: 16px;
 }
 
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
+}
+
 .form-label {
   display: block;
   font-size: 12px;
@@ -143,7 +159,7 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
 /* ========================== CARDS ESTATÍSTICAS ========================== */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -297,7 +313,44 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: var(--text-muted);
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 14px;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-line {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
 }
 
 /* ========================== FILTROS MÊS ========================== */
@@ -388,8 +441,13 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 
 /* Notebook (≤1500px): 6 cards → 3; 5 tabelas → 3 */
 @media (max-width: 1500px) {
-  .stats-grid      { grid-template-columns: repeat(3, 1fr); }
+  .stats-grid      { grid-template-columns: repeat(4, 1fr); }
   .dash-penta-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Tablet largo (≤1024px): stats 3 cols */
+@media (max-width: 1024px) {
+  .stats-grid      { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* Tablet (≤900px): grids de 2 cols empilham; charts empilha */
@@ -398,21 +456,81 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .dash-inv-grid   { grid-template-columns: 1fr; }
   .charts-grid     { grid-template-columns: 1fr !important; }
   .dash-penta-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid      { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* Mobile (≤768px): 2 cards por linha, topbar só ícone */
+/* Mobile (≤768px): 2 cards por linha, topbar só ícone, filtros empilham */
 @media (max-width: 768px) {
-  .stats-grid      { grid-template-columns: repeat(2, 1fr); }
-  .dash-penta-grid { grid-template-columns: repeat(2, 1fr); }
-  .page-header     { flex-wrap: wrap; gap: 10px; }
-  .mes-filtro      { flex-wrap: wrap; }
-  .topbar-btn-text { display: none; }
+  .stats-grid       { grid-template-columns: repeat(2, 1fr); }
+  .dash-penta-grid  { grid-template-columns: repeat(2, 1fr); }
+  .page-header      { flex-wrap: wrap; gap: 8px; }
+  .page-header h1   { font-size: 16px; }
+  .topbar-btn-text  { display: none; }
+
+  /* Filtro do dashboard empilha em coluna */
+  .mes-filtro {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px;
+  }
+  .mes-filtro > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  /* Selects dentro do filtro ocupam 100% */
+  .mes-filtro select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  /* Linha Mês+Ano fica em flex row */
+  .mes-filtro > div > div {
+    display: flex;
+    gap: 6px;
+  }
+  .mes-filtro > div > div select {
+    flex: 1;
+    min-width: 0 !important;
+  }
+
+  /* Filtros-form (gastos/entradas): 2 por linha */
+  .filtro-group {
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+  }
+  .filtro-group select,
+  .filtro-group input { width: 100%; min-width: 0; }
+
+  /* Chart header empilha */
+  .chart-header     { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .chart-legend     { gap: 10px; }
+
+  /* Tabela wrapper altura menor no mobile */
+  .tabela-wrapper   { max-height: 400px; }
 }
 
-/* Mobile pequeno (≤480px): 1 coluna */
+/* Mobile pequeno (≤480px): 1 coluna em tudo */
 @media (max-width: 480px) {
   .stats-grid      { grid-template-columns: 1fr; }
   .dash-penta-grid { grid-template-columns: 1fr; }
+
+  /* Filtro-group 1 por linha */
+  .filtro-group    { flex: 1 1 100%; }
+
+  /* Page header stack */
+  .page-header     { flex-direction: column; align-items: flex-start; }
+
+  /* Topbar mais compacto */
+  .topbar-title    { font-size: 12px; }
+
+  /* Tabela wrapper altura menor ainda */
+  .tabela-wrapper  { max-height: 320px; }
+
+  /* Stat card: valor menor */
+  .stat-value      { font-size: 17px; }
+  .stat-label      { font-size: 9px; }
 }
 
 /* ========================== RESPONSÁVEIS CARDS ========================== */

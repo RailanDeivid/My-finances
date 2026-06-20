@@ -298,4 +298,26 @@
       sortTable(th);
     });
   }());
+
+  // ── Utilitários globais ───────────────────────────────────────────────────
+  window.MESES = [
+    'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+    'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
+  ];
+
+  window.MESES_ABREV = [
+    'Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'
+  ];
+
+  window.formatBRL = function (value) {
+    return 'R$ ' + Number(value).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  window.parseDateBR = function (txt) {
+    var dm = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    return dm ? parseInt(dm[3] + dm[2] + dm[1]) : null;
+  };
 })();

@@ -13,7 +13,7 @@ _MESES = [
     (9,"Setembro"),(10,"Outubro"),(11,"Novembro"),(12,"Dezembro"),
 ]
 _ANO_ATUAL = _dt.date.today().year
-_ANOS = [(y, y) for y in range(_ANO_ATUAL, _ANO_ATUAL + 7)]
+_ANOS = [(y, y) for y in range(2026, 2051)]
 
 
 class FormControlMixin:
@@ -57,6 +57,22 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         }
 
     _PCT_CHOICES = [(p, f"{p}%") for p in range(10, 100, 10)]
+
+    recorrente = forms.BooleanField(
+        required=False,
+        label="Compra Recorrente",
+        widget=forms.CheckboxInput(attrs={"id": "id_recorrente"}),
+    )
+    recorrente_meses = forms.ChoiceField(
+        choices=(
+            [("sempre", "Sempre (até 2050)")]
+            + [(str(i), f"{i} meses") for i in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 18, 24, 36, 48, 60]]
+        ),
+        initial="12",
+        required=False,
+        label="Repetir por",
+        widget=forms.Select(attrs={"id": "id_recorrente_meses", "class": "form-control"}),
+    )
 
     dividir_gasto = forms.BooleanField(
         required=False,
@@ -119,6 +135,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             cleaned["conta_origem"] = None
         if tipo != "credito_parcelado":
             cleaned["total_parcelas"] = None
+        if tipo not in ("credito_parcelado", "credito_avista"):
             cleaned["mes_inicio"] = None
             cleaned["ano_inicio"] = None
         return cleaned

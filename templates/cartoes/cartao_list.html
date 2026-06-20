@@ -210,7 +210,34 @@
       <div class="cc-top">
         <div class="cc-chip"></div>
         <div class="cc-bandeira">
-          {% if cartao.get_bandeira_display %}<div>{{ cartao.get_bandeira_display }}</div>{% endif %}
+          {% if cartao.bandeira == 'visa' %}
+            <svg width="52" height="18" viewBox="0 0 52 18" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:4px;">
+              <rect width="52" height="18" rx="3" fill="#1A1F71"/>
+              <text x="26" y="13" text-anchor="middle" fill="#F7B600" font-size="12" font-weight="900" font-style="italic" font-family="Arial,sans-serif" letter-spacing="1">VISA</text>
+            </svg>
+          {% elif cartao.bandeira == 'mastercard' %}
+            <svg width="44" height="28" viewBox="0 0 44 28" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:4px;">
+              <circle cx="15" cy="14" r="13" fill="#EB001B"/>
+              <circle cx="29" cy="14" r="13" fill="#F79E1B" opacity="0.9"/>
+            </svg>
+          {% elif cartao.bandeira == 'elo' %}
+            <svg width="46" height="20" viewBox="0 0 46 20" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:4px;">
+              <rect width="46" height="20" rx="3" fill="#FFD700"/>
+              <text x="23" y="14" text-anchor="middle" fill="#000" font-size="11" font-weight="700" font-family="Arial,sans-serif">elo</text>
+            </svg>
+          {% elif cartao.bandeira == 'amex' %}
+            <svg width="52" height="18" viewBox="0 0 52 18" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:4px;">
+              <rect width="52" height="18" rx="3" fill="#2E77BC"/>
+              <text x="26" y="13" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" font-family="Arial,sans-serif" letter-spacing=".5">AMEX</text>
+            </svg>
+          {% elif cartao.bandeira == 'hipercard' %}
+            <svg width="62" height="18" viewBox="0 0 62 18" xmlns="http://www.w3.org/2000/svg" style="display:block;margin-bottom:4px;">
+              <rect width="62" height="18" rx="3" fill="#CC0000"/>
+              <text x="31" y="13" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="Arial,sans-serif">Hipercard</text>
+            </svg>
+          {% elif cartao.bandeira %}
+            <div style="margin-bottom:4px;font-size:10px;font-weight:700;opacity:.8;">{{ cartao.get_bandeira_display }}</div>
+          {% endif %}
           <span class="cc-bandeira-badge">{{ cartao.get_tipo_display }}</span>
         </div>
       </div>

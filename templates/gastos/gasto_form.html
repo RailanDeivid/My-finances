@@ -36,7 +36,7 @@
     </div>
 
     <!-- Info somente leitura -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+    <div class="form-grid-2" style="gap:12px;margin-bottom:16px;">
       <div class="form-group" style="margin:0;">
         <label class="form-label">Responsável</label>
         <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.responsavel }}</div>
@@ -64,7 +64,7 @@
     </div>
 
     <!-- Editáveis -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div class="form-grid-2" style="margin-bottom:16px;">
       <div class="form-group" style="margin:0;">
         <label class="form-label">Valor da Parcela (R$) *</label>
         {{ form.valor_total }}
@@ -119,7 +119,7 @@
     </div>
 
     <!-- 5. Valor + Nº Parcelas + Data -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" id="valor-parcelas-grid">
+    <div class="form-grid-2" id="valor-parcelas-grid">
       <div class="form-group" style="grid-column:1;grid-row:1;">
         <label class="form-label" id="label-valor">Valor Total (R$) *</label>
         {{ form.valor_total }}
@@ -144,7 +144,7 @@
     <div id="inicio-parcelas-row" style="display:none;margin-bottom:16px;">
       <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">Mês de início das parcelas</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:end;">
+        <div class="form-grid-2" style="align-items:end;">
           <div>
             <label class="form-label" for="id_mes_inicio">Mês da 1ª Parcela *</label>
             {{ form.mes_inicio }}
@@ -189,7 +189,7 @@
           <label class="form-label" for="id_dividir_com" style="font-size:12px;">Dividir com</label>
           {{ form.dividir_com }}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+        <div class="form-grid-2" style="gap:12px;margin-bottom:12px;">
           <div>
             <label class="form-label" for="id_pct_responsavel" style="font-size:12px;">Minha parte</label>
             {{ form.pct_responsavel }}
@@ -287,7 +287,7 @@
             </form>
           </td>
 
-          <!-- Ações: editar valor / excluir -->
+          <!-- Ações: editar valor / excluir / excluir a partir daqui -->
           <td style="text-align:right;white-space:nowrap;">
             <div id="act-normal-{{ p.pk }}" style="display:inline-flex;gap:4px;align-items:center;">
               <button type="button" onclick="pgIniciarEdit('{{ p.pk }}')"
@@ -298,6 +298,12 @@
                       onclick="openDeleteModal('{% url 'gasto-delete' p.pk %}', 'Excluir parcela {{ forloop.counter }}/{{ parcelas_grupo|length }}? Esta ação não pode ser desfeita.')">
                 <i data-lucide="trash-2"></i>
               </button>
+              {% if not forloop.first %}
+              <button type="button" class="btn btn-sm btn-danger" title="Excluir esta e todas as seguintes"
+                      onclick="openDeleteModal('{% url 'gasto-parcelas-delete-from' p.pk %}', 'Excluir a parcela {{ forloop.counter }}/{{ parcelas_grupo|length }} e todas as seguintes? Esta ação não pode ser desfeita.')">
+                <i data-lucide="scissors"></i>
+              </button>
+              {% endif %}
             </div>
             <div id="act-edit-{{ p.pk }}" style="display:none;gap:4px;align-items:center;">
               <button type="button" onclick="pgCancelarEdit('{{ p.pk }}')"
@@ -428,7 +434,7 @@ function pgCancelarEdit(pk) {
     }
   }
 
-  var mesesCompletos = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesesCompletos = window.MESES || ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   function atualizarPreview() {
     if (!tipoSelect || tipoSelect.value !== 'credito_parcelado') { previewParc.style.display = 'none'; return; }

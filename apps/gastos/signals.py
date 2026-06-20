@@ -5,8 +5,18 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
+def criar_categorias_padrao(user):
+    from .models import Categoria
+    for nome, icone, cor in Categoria.PRESETS:
+        Categoria.objects.get_or_create(
+            user=user,
+            nome=nome,
+            defaults={"icone": icone, "cor": cor, "ativo": True},
+        )
+
+
 @receiver(post_save, sender=User)
-def criar_responsavel_para_usuario(sender, instance, created, **kwargs):
+def setup_novo_usuario(sender, instance, created, **kwargs):
     if not created:
         return
     from .models import Responsavel
@@ -16,3 +26,4 @@ def criar_responsavel_para_usuario(sender, instance, created, **kwargs):
         is_principal=True,
         defaults={"nome": nome, "ativo": True},
     )
+    criar_categorias_padrao(instance)

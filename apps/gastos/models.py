@@ -76,36 +76,67 @@ class Cartao(models.Model):
 class Categoria(models.Model):
     # (nome, icone_lucide, cor_padrão) — usado no formulário
     PRESETS = [
+        # Alimentação
         ("Supermercado",  "shopping-cart",  "#22c55e"),
         ("Alimentação",   "utensils",       "#f97316"),
-        ("Restaurante",   "utensils",       "#ef4444"),
         ("Café",          "coffee",         "#eab308"),
-        ("Bar/Bebida",    "wine",           "#8b5cf6"),
-        ("Transporte",    "car",            "#3b82f6"),
+        ("Bar / Bebida",  "wine",           "#8b5cf6"),
+        ("Pizza",         "pizza",          "#ef4444"),
+        ("Lanche",        "sandwich",       "#f59e0b"),
+        ("Dieta",         "salad",          "#22c55e"),
+        ("Açougue",       "beef",           "#dc2626"),
+        ("Peixaria",      "fish",           "#06b6d4"),
+        ("Padaria",       "cake",           "#eab308"),
+        ("Sorvete",       "ice-cream-2",    "#ec4899"),
+        ("Doces",         "cookie",         "#f472b6"),
+        # Transporte
+        ("Carro",         "car",            "#3b82f6"),
         ("Combustível",   "fuel",           "#f97316"),
-        ("Uber/Taxi",     "map-pin",        "#eab308"),
+        ("Uber / Taxi",   "map-pin",        "#eab308"),
         ("Viagem",        "plane",          "#06b6d4"),
-        ("Hotel",         "building",       "#14b8a6"),
+        ("Ônibus",        "bus",            "#f97316"),
+        ("Trem / Metrô",  "train",          "#64748b"),
+        ("Bicicleta",     "bike",           "#22c55e"),
+        ("Navio",         "ship",           "#0ea5e9"),
+        ("GPS / Rota",    "navigation",     "#06b6d4"),
+        # Moradia
+        ("Casa",          "home",           "#f59e0b"),
+        ("Apartamento",   "building-2",     "#14b8a6"),
+        ("Manutenção",    "wrench",         "#78716c"),
+        ("Móveis",        "sofa",           "#f59e0b"),
+        ("Decoração",     "lamp",           "#a855f7"),
+        ("Climatização",  "thermometer",    "#38bdf8"),
+        ("Energia",       "zap",            "#eab308"),
+        ("Água",          "droplets",       "#06b6d4"),
+        ("Gás",           "flame",          "#f97316"),
+        ("Limpeza",       "trash-2",        "#64748b"),
+        # Saúde
         ("Farmácia",      "pill",           "#22c55e"),
         ("Saúde",         "heart-pulse",    "#ef4444"),
+        ("Bem-estar",     "heart",          "#ec4899"),
+        ("Médico",        "stethoscope",    "#3b82f6"),
+        ("Academia",      "dumbbell",       "#22c55e"),
+        # Educação
         ("Educação",      "graduation-cap", "#6366f1"),
         ("Livros",        "book-open",      "#8b5cf6"),
+        # Lazer
         ("Lazer",         "tv",             "#ec4899"),
         ("Games",         "gamepad-2",      "#6366f1"),
         ("Música",        "music",          "#8b5cf6"),
+        # Vestuário
         ("Vestuário",     "shirt",          "#64748b"),
         ("Calçados",      "shopping-bag",   "#78716c"),
-        ("Casa",          "home",           "#f59e0b"),
-        ("Manutenção",    "wrench",         "#78716c"),
-        ("Energia",       "zap",            "#eab308"),
-        ("Água",          "droplets",       "#06b6d4"),
+        # Tecnologia
         ("Celular",       "smartphone",     "#3b82f6"),
         ("Tecnologia",    "laptop",         "#6366f1"),
         ("Assinaturas",   "credit-card",    "#64748b"),
+        # Pessoal
         ("Pet",           "paw-print",      "#f97316"),
         ("Beleza",        "sparkles",       "#ec4899"),
         ("Presentes",     "gift",           "#ef4444"),
-        ("Academia",      "dumbbell",       "#22c55e"),
+        # Finanças
+        ("Empréstimo",    "landmark",       "#6366f1"),
+        # Outros
         ("Outros",        "wallet",         "#888888"),
     ]
 
@@ -182,6 +213,7 @@ class Categoria(models.Model):
         ("coins",           "Investimento"),
         ("calculator",      "Impostos"),
         ("shield",          "Seguro"),
+        ("landmark",        "Empréstimo"),
         # Família / Pessoal
         ("baby",            "Filhos"),
         ("paw-print",       "Pet"),
@@ -328,6 +360,10 @@ class Gasto(models.Model):
     grupo_divisao = models.UUIDField(
         null=True, blank=True, default=None, db_index=True,
         help_text="UUID compartilhado entre os dois lados de um gasto dividido.",
+    )
+    grupo_recorrente = models.UUIDField(
+        null=True, blank=True, default=None, db_index=True,
+        help_text="UUID compartilhado entre as ocorrências de um gasto recorrente.",
     )
     pct_divisao = models.PositiveSmallIntegerField(
         null=True, blank=True,

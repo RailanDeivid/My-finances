@@ -1,22 +1,18 @@
-{% extends "base.html" %}
-{% block title %}Excluir Investimento{% endblock %}
-{% block content %}
-<div style="max-width:480px;margin:40px auto;">
-  <div class="tabela-wrapper" style="padding:28px;">
-    <h2 style="margin:0 0 12px;font-size:17px;color:#ef4444;">Excluir Investimento</h2>
-    <p style="color:var(--text-muted);margin-bottom:20px;">
-      Confirma a exclusão de <strong>{{ object.descricao }}</strong>?
-      Todo o histórico de movimentações será removido permanentemente.
-    </p>
-    <form method="post">
-      {% csrf_token %}
-      <div style="display:flex;gap:12px;">
-        <button type="submit" class="btn btn-danger">
-          <i data-lucide="trash-2"></i> Confirmar Exclusão
-        </button>
-        <a href="{% url 'investimento-list' %}" class="btn">Cancelar</a>
-      </div>
-    </form>
-  </div>
+{% extends "base_dialog.html" %}
+{% block title %}Excluir Investimento — MyFinances{% endblock %}
+
+{% block dialog_content %}
+<div class="dialog-icon"><i data-lucide="trash-2"></i></div>
+<div class="dialog-title">Excluir Investimento</div>
+<div class="dialog-body">
+  Confirma a exclusão de <strong>{{ object.descricao }}</strong>?<br>
+  <span style="font-size:12px;">Todo o histórico de movimentações será removido permanentemente.</span>
 </div>
+<form method="post">
+  {% csrf_token %}
+  <div class="dialog-actions">
+    <a href="{% url 'investimento-list' %}" class="btn btn-danger">Cancelar</a>
+    <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
+  </div>
+</form>
 {% endblock %}

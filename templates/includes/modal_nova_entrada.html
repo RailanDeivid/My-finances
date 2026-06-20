@@ -28,12 +28,12 @@
         <label class="form-label" for="me_tipo">Tipo *</label>
         <select name="tipo" id="me_tipo" class="form-control" required>
           {% for val, label in modal_entrada_form.tipo.field.choices %}
-          {% if val %}<option value="{{ val }}">{{ label }}</option>{% endif %}
+          {% if val and val != "saldo_anterior" %}<option value="{{ val }}">{{ label }}</option>{% endif %}
           {% endfor %}
         </select>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="form-grid-2">
         <div class="form-group">
           <label class="form-label" for="me_valor">Valor (R$) *</label>
           <input type="number" name="valor" id="me_valor" class="form-control"

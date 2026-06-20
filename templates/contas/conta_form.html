@@ -40,7 +40,7 @@
       {% if form.nome.errors %}<div class="field-error">{{ form.nome.errors.0 }}</div>{% endif %}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div class="form-grid-2">
       <div class="form-group">
         <label class="form-label">Banco</label>
         {{ form.banco }}
@@ -65,7 +65,7 @@
       {% if form.saldo_atual.errors %}<div class="field-error">{{ form.saldo_atual.errors.0 }}</div>{% endif %}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center;">
+    <div class="form-grid-2" style="align-items:center;">
       <div class="form-group">
         <label class="form-label">Cor</label>
         {{ form.cor }}

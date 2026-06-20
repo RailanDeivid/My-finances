@@ -5,8 +5,6 @@
 {% block content %}
 {% load gastos_tags %}
 
-{% include "includes/mes_ano_filtro.html" %}
-
 <div class="page-header">
   <h1>Categorias</h1>
   <a href="{% url 'categoria-create' %}" class="btn btn-primary">
@@ -21,8 +19,6 @@
         <th>Categoria</th>
         <th style="text-align:center;">Ícone</th>
         <th style="text-align:center;">Status</th>
-        <th style="text-align:center;">Qtd {{ mes }}/{{ ano }}</th>
-        <th>Total {{ mes }}/{{ ano }}</th>
         <th></th>
       </tr>
     </thead>
@@ -45,16 +41,6 @@
         <td style="text-align:center;">
           {% if cat.ativo %}<span class="badge badge-success">Ativa</span>{% else %}<span class="badge badge-danger">Inativa</span>{% endif %}
         </td>
-        <td style="text-align:center;color:var(--text-muted);">
-          {% if cat.qtd_gastos_mes > 0 %}{{ cat.qtd_gastos_mes }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
-        </td>
-        <td style="text-align:right;font-weight:600;">
-          {% if cat.total_gastos_mes > 0 %}
-            <span style="color:var(--accent);">R$ {{ cat.total_gastos_mes|brl }}</span>
-          {% else %}
-            <span style="color:var(--text-muted);">—</span>
-          {% endif %}
-        </td>
         <td style="white-space:nowrap;">
           <a href="{% url 'categoria-update' cat.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
@@ -66,7 +52,7 @@
       </tr>
       {% empty %}
       <tr>
-        <td colspan="6">
+        <td colspan="4">
           {% url 'categoria-create' as create_url %}
           {% with es_icon="tag" es_title="Nenhuma categoria cadastrada" es_description="Crie categorias para organizar e visualizar seus gastos por tipo." es_url=create_url es_button="Adicionar primeira categoria" %}
             {% include "includes/empty_state.html" %}
