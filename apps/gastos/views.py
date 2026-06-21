@@ -12,6 +12,7 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView
 )
@@ -24,6 +25,25 @@ from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, Entrad
 
 _PERIODO_DEFAULT_MES = 7
 _PERIODO_DEFAULT_ANO = 2026
+
+
+def _safe_next_url(request, fallback="/"):
+    """Valida o parâmetro POST 'next'; retorna fallback se for URL externa (previne Open Redirect)."""
+    nxt = request.POST.get("next", "")
+    if nxt and url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        return nxt
+    return str(fallback)
+
+
+def _safe_json(data):
+    """JSON-serializa e escapa HTML com unicode escapes para prevenir XSS em <script> |safe."""
+    return (
+        json.dumps(data)
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+        .replace("'", "\\u0027")
+    )
 
 
 def _mes_ano_from_request(request, prefix=""):
@@ -215,12 +235,15 @@ class SimpleCreateMixin:
         obj.save()
         if self.success_message:
             messages.success(self.request, self.success_message)
-        return HttpResponseRedirect(self.success_url)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
 
 class SimpleUpdateMixin:
     """form_valid genérico: exibe mensagem de sucesso e delega ao pai."""
     success_message = ""
+
+    def get_success_url(self):
+        return _safe_next_url(self.request, str(self.success_url))
 
     def form_valid(self, form):
         if self.success_message:
@@ -231,6 +254,9 @@ class SimpleUpdateMixin:
 class SimpleDeleteMixin:
     """form_valid genérico: exibe mensagem de sucesso e delega ao pai."""
     success_message = ""
+
+    def get_success_url(self):
+        return _safe_next_url(self.request, str(self.success_url))
 
     def form_valid(self, form):
         if self.success_message:
@@ -479,17 +505,17 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
                 dash_saques_bar.append(round(saques_d.get(chave, 0), 2))
                 cur += relativedelta(months=1)
 
-        ctx["dash_inv_labels"]      = json.dumps(dash_labels)
-        ctx["dash_inv_dados"]       = json.dumps(dash_dados)
-        ctx["dash_inv_aportes_bar"] = json.dumps(dash_aportes_bar)
-        ctx["dash_inv_saques_bar"]  = json.dumps(dash_saques_bar)
+        ctx["dash_inv_labels"]      = _safe_json(dash_labels)
+        ctx["dash_inv_dados"]       = _safe_json(dash_dados)
+        ctx["dash_inv_aportes_bar"] = _safe_json(dash_aportes_bar)
+        ctx["dash_inv_saques_bar"]  = _safe_json(dash_saques_bar)
 
         # Rosca — distribuição por tipo (investimentos ativos no dash)
         tipo_dash = defaultdict(float)
         for inv in investimentos_dash:
             tipo_dash[_TIPO_INV_LABELS.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
-        ctx["dash_rosca_labels"] = json.dumps(list(tipo_dash.keys()))
-        ctx["dash_rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_dash.values()])
+        ctx["dash_rosca_labels"] = _safe_json(list(tipo_dash.keys()))
+        ctx["dash_rosca_dados"]  = _safe_json([round(v, 2) for v in tipo_dash.values()])
 
         # Por categoria (gráfico pizza) — ano completo, respeita filtros ativos
         gastos_cat_qs = Gasto.objects.filter(
@@ -502,11 +528,11 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
-        ctx["categorias_labels"] = json.dumps([
+        ctx["categorias_labels"] = _safe_json([
             c["categoria__nome"] or "Sem categoria" for c in por_categoria
         ])
-        ctx["categorias_valores"] = json.dumps([float(c["total"]) for c in por_categoria])
-        ctx["categorias_cores"] = json.dumps([
+        ctx["categorias_valores"] = _safe_json([float(c["total"]) for c in por_categoria])
+        ctx["categorias_cores"] = _safe_json([
             c["categoria__cor"] or "#888888" for c in por_categoria
         ])
 
@@ -962,6 +988,12 @@ class GastoCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
     def form_valid(self, form):
         gasto = form.save(commit=False)
         gasto.user = self.request.user
+
+        # tipo "recorrente" é um alias de UI: salva como credito_avista e força recorrente=True
+        if gasto.tipo_pagamento == "recorrente":
+            gasto.tipo_pagamento = "credito_avista"
+            form.cleaned_data["recorrente"] = True
+
         n = gasto.total_parcelas if gasto.tipo_pagamento == "credito_parcelado" else None
 
         data_inicio = gasto.data_compra
@@ -1012,6 +1044,7 @@ class GastoCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
                 grupo_divisao=grupo,
                 pct_divisao=pct,
                 grupo_recorrente=grupo_recorrente_id,
+                cartao_adicional=gasto.cartao_adicional,
             )
             desc = gasto.descricao
             if n:
@@ -1063,8 +1096,7 @@ class GastoCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
             messages.success(self.request, "Gasto dividido e registrado para os dois responsáveis.")
         else:
             messages.success(self.request, "Gasto registrado com sucesso.")
-        next_url = self.request.POST.get("next") or self.success_url
-        return HttpResponseRedirect(next_url)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -1098,6 +1130,14 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
 
+    def get_initial(self):
+        initial = super().get_initial()
+        obj = self.object or self.get_object()
+        if obj and obj.data_compra:
+            initial["mes_inicio"] = obj.data_compra.month
+            initial["ano_inicio"] = obj.data_compra.year
+        return initial
+
     def form_valid(self, form):
         old = self.object
         data_antiga = old.data_compra
@@ -1108,7 +1148,19 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         # Reverte débito anterior antes de salvar
         _reverter_debito(old_tipo, old_conta_id, old_valor)
 
-        gasto = form.save()
+        gasto = form.save(commit=False)
+
+        # Aplica mes_inicio/ano_inicio como data_compra para crédito à vista
+        if gasto.tipo_pagamento == "credito_avista":
+            mes_ini = form.cleaned_data.get("mes_inicio")
+            ano_ini = form.cleaned_data.get("ano_inicio")
+            if mes_ini and ano_ini:
+                try:
+                    gasto.data_compra = date(int(ano_ini), int(mes_ini), 1)
+                except (ValueError, TypeError):
+                    pass
+
+        gasto.save()
 
         # Aplica novo débito
         _debitar_conta(gasto)
@@ -1151,7 +1203,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
             if gasto.data_compra != data_antiga:
                 _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, usuario_atribuido)
         messages.success(self.request, "Gasto atualizado com sucesso.")
-        return HttpResponseRedirect(self.success_url)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -1174,7 +1226,7 @@ def gasto_parcela_valor(request, pk):
         return HttpResponseRedirect(reverse_lazy("gasto-update", kwargs={"pk": pk}))
 
     gasto = get_object_or_404(Gasto, pk=pk, user=request.user)
-    next_url = request.POST.get("next") or reverse_lazy("gasto-update", kwargs={"pk": pk})
+    next_url = _safe_next_url(request, reverse_lazy("gasto-update", kwargs={"pk": pk}))
 
     try:
         novo_valor = Decimal(request.POST["valor_total"].replace(",", "."))
@@ -1353,18 +1405,24 @@ class CartaoListView(MesAnoMixin, UserOwnedMixin, ListView):
         ctx = super().get_context_data(**kwargs)
         mes, ano = self.mes, self.ano
         user = self.request.user
+        qs_faturas = Gasto.objects.filter(
+            user=user,
+            data_compra__month=mes,
+            data_compra__year=ano,
+            tipo_pagamento__in=["credito_avista", "credito_parcelado"],
+            cartao__isnull=False,
+        )
         fatura_map = {
             r["cartao_id"]: r["t"]
-            for r in Gasto.objects.filter(
-                user=user,
-                data_compra__month=mes,
-                data_compra__year=ano,
-                tipo_pagamento__in=["credito_avista", "credito_parcelado"],
-                cartao__isnull=False,
-            ).values("cartao_id").annotate(t=Sum("valor_total"))
+            for r in qs_faturas.values("cartao_id").annotate(t=Sum("valor_total"))
+        }
+        adicional_map = {
+            r["cartao_id"]: r["t"]
+            for r in qs_faturas.filter(cartao_adicional=True).values("cartao_id").annotate(t=Sum("valor_total"))
         }
         for cartao in ctx["cartoes"]:
             cartao.fatura_mes = fatura_map.get(cartao.pk) or Decimal("0")
+            cartao.adicional_mes = adicional_map.get(cartao.pk) or Decimal("0")
         return ctx
 
 
@@ -1377,16 +1435,33 @@ class CartaoDetailView(MesAnoMixin, UserOwnedMixin, DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         mes, ano = self.mes, self.ano
-        ctx["gastos"] = (
+        request = self.request
+
+        tipo_cartao = request.GET.get("tipo_cartao", "")
+        responsavel_id = request.GET.get("responsavel_filtro", "")
+
+        qs = (
             Gasto.objects.filter(
-                cartao=self.object, user=self.request.user,
+                cartao=self.object, user=request.user,
                 data_compra__month=mes, data_compra__year=ano,
             )
             .select_related("responsavel", "categoria")
             .order_by("-data_compra")
         )
-        ctx["total_fatura"] = ctx["gastos"].aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        if tipo_cartao == "principal":
+            qs = qs.filter(cartao_adicional=False)
+        elif tipo_cartao == "adicional":
+            qs = qs.filter(cartao_adicional=True)
+        if responsavel_id:
+            qs = qs.filter(responsavel_id=responsavel_id)
+
+        ctx["gastos"] = qs
+        ctx["total_fatura"] = qs.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_adicional"] = qs.filter(cartao_adicional=True).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
         ctx["mes_ant"], ctx["ano_ant"], ctx["mes_prox"], ctx["ano_prox"] = _mes_vizinhos(mes, ano)
+        ctx["responsaveis"] = Responsavel.objects.filter(user=request.user, ativo=True).order_by("nome")
+        ctx["filtro_tipo_cartao"] = tipo_cartao
+        ctx["filtro_responsavel"] = responsavel_id
         return ctx
 
 
@@ -1446,19 +1521,86 @@ class ResponsavelListView(MesAnoMixin, UserOwnedMixin, ListView):
     session_prefix = "responsaveis"
 
     def get_queryset(self):
-        return super().get_queryset().filter(is_principal=False)
+        # Exclui o próprio responsável do login (principal ou vinculado ao mesmo user)
+        return (
+            super().get_queryset()
+            .filter(is_principal=False)
+            .exclude(usuario_vinculado=self.request.user)
+        )
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         user = self.request.user
+        mes, ano = self.mes, self.ano
+
+        responsavel_id = self.request.GET.get("responsavel")
+        cartao_id = self.request.GET.get("cartao")
+        ctx["filtro_responsavel"] = responsavel_id
+        ctx["filtro_cartao"] = cartao_id
+        ctx["cartoes_lista"] = Cartao.objects.filter(ativo=True, user=user)
+
         gastos_mes = (
-            Gasto.objects.filter(_impacto_q(user), data_compra__month=self.mes, data_compra__year=self.ano)
+            Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
             .values("responsavel__id")
             .annotate(total=Sum("valor_total"))
         )
         ctx["gastos_por_resp"] = {r["responsavel__id"]: r["total"] for r in gastos_mes}
-        ctx["mes_atual"] = self.mes
-        ctx["ano_atual"] = self.ano
+        ctx["mes_atual"] = mes
+        ctx["ano_atual"] = ano
+
+        # Gastos detalhados por responsável para as tabelas (exclui o próprio login)
+        gastos_q = Q(
+            user=user,
+            data_compra__month=mes,
+            data_compra__year=ano,
+            responsavel__is_principal=False,
+        )
+        gastos_q &= ~Q(responsavel__usuario_vinculado=user)
+        if responsavel_id:
+            gastos_q &= Q(responsavel_id=responsavel_id)
+        if cartao_id:
+            gastos_q &= Q(cartao_id=cartao_id)
+
+        gastos_qs = (
+            Gasto.objects.filter(gastos_q)
+            .select_related("responsavel", "cartao")
+            .order_by("-data_compra", "descricao")
+        )
+
+        gastos_por_resp_tabela = defaultdict(list)
+        totais_por_resp = defaultdict(Decimal)
+        for g in gastos_qs:
+            m = _PARCELA_GROUP_RE.match(g.descricao)
+            if m:
+                parcela_num = int(m.group(2))
+                parcela_total = int(m.group(3))
+                desc_base = m.group(1).strip()
+            else:
+                parcela_num = None
+                parcela_total = g.total_parcelas
+                desc_base = g.descricao
+            gastos_por_resp_tabela[g.responsavel_id].append({
+                "pk": g.pk,
+                "descricao": desc_base,
+                "tipo_pagamento": g.tipo_pagamento,
+                "tipo_label": g.get_tipo_pagamento_display(),
+                "parcela_num": parcela_num,
+                "parcela_total": parcela_total,
+                "cartao": g.cartao,
+                "valor_total": g.valor_total,
+                "data_compra": g.data_compra,
+            })
+            totais_por_resp[g.responsavel_id] += g.valor_total
+
+        ctx["gastos_por_resp_tabela"] = dict(gastos_por_resp_tabela)
+        ctx["totais_por_resp"] = dict(totais_por_resp)
+
+        # IDs de responsáveis marcados como "acerto pago" no mês/ano filtrado
+        ctx["acertos_ids"] = set(
+            PagamentoFeito.objects.filter(user=user, mes=mes, ano=ano, tipo="acerto")
+            .values_list("responsavel_id", flat=True)
+        )
+
         return ctx
 
 
@@ -1504,7 +1646,7 @@ class ResponsavelDeleteView(UserOwnedMixin, DeleteView):
         resp = self.object
         if Gasto.objects.filter(responsavel=resp).exclude(user=self.request.user).exists():
             messages.error(self.request, "Este responsável possui gastos atribuídos por outro usuário e não pode ser excluído.")
-            return HttpResponseRedirect(self.success_url)
+            return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
         datas = list(
             Gasto.objects.filter(responsavel=resp, user=self.request.user)
             .values_list("data_compra__month", "data_compra__year").distinct()
@@ -1612,14 +1754,47 @@ class EntradaCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
         return initial
 
     def form_valid(self, form):
+        is_recorrente = form.cleaned_data.get("recorrente", False)
         entrada = form.save(commit=False)
         entrada.user = self.request.user
-        entrada.save()
-        _creditar_conta(entrada)
-        _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
-        messages.success(self.request, "Entrada registrada com sucesso.")
-        next_url = self.request.POST.get("next") or self.success_url
-        return HttpResponseRedirect(next_url)
+        entrada.recorrente = is_recorrente
+
+        if is_recorrente:
+            entrada.data = entrada.data.replace(day=1)
+            grupo_id = uuid.uuid4()
+            entrada.grupo_recorrente = grupo_id
+            entrada.auto_gerada = False
+            entrada.save()
+            _creditar_conta(entrada)
+            _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
+
+            fim = date(2050, 12, 1)
+            proximo = entrada.data + relativedelta(months=1)
+            bulk = []
+            while proximo <= fim:
+                bulk.append(Entrada(
+                    tipo=entrada.tipo,
+                    descricao=entrada.descricao,
+                    valor=entrada.valor,
+                    data=proximo,
+                    conta=entrada.conta,
+                    responsavel=entrada.responsavel,
+                    auto_gerada=True,
+                    recorrente=True,
+                    grupo_recorrente=grupo_id,
+                    user=self.request.user,
+                ))
+                proximo += relativedelta(months=1)
+            Entrada.objects.bulk_create(bulk)
+            total = len(bulk) + 1
+            messages.success(self.request, f"Entrada recorrente criada — {total} meses gerados até dez/2050.")
+        else:
+            entrada.save()
+            _creditar_conta(entrada)
+            _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
+            messages.success(self.request, "Entrada registrada com sucesso.")
+
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -1646,7 +1821,7 @@ class EntradaUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         if entrada.data != data_antiga:
             _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
         messages.success(self.request, "Entrada atualizada com sucesso.")
-        return HttpResponseRedirect(self.success_url)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
@@ -1716,7 +1891,6 @@ def entrada_delete_all(request):
 
 @login_required
 def perfil_update(request):
-    next_url = request.POST.get("next") or "/"
     if request.method == "POST":
         form = PerfilForm(request.POST, instance=request.user)
         if form.is_valid():
@@ -1726,12 +1900,11 @@ def perfil_update(request):
             for field_errors in form.errors.values():
                 for error in field_errors:
                     messages.error(request, error)
-    return HttpResponseRedirect(next_url)
+    return HttpResponseRedirect(_safe_next_url(request, "/"))
 
 
 @login_required
 def senha_update(request):
-    next_url = request.POST.get("next") or "/"
     if request.method == "POST":
         form = SenhaForm(request.user, request.POST)
         if form.is_valid():
@@ -1743,15 +1916,45 @@ def senha_update(request):
             for field_errors in form.errors.values():
                 for error in field_errors:
                     messages.error(request, error)
-    return HttpResponseRedirect(next_url)
+    return HttpResponseRedirect(_safe_next_url(request, "/"))
 
 
 # ── API interna ─────────────────────────────────────────────────────────
 
 @login_required
 def cartoes_por_responsavel(request, responsavel_id=None):
+    if responsavel_id:
+        get_object_or_404(Responsavel, pk=responsavel_id, user=request.user)
     cartoes = Cartao.objects.filter(ativo=True, user=request.user).values("id", "nome", "tipo")
     return JsonResponse(list(cartoes), safe=False)
+
+
+@login_required
+def categoria_criar_ajax(request):
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Método inválido."}, status=405)
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Dados inválidos."}, status=400)
+    nome = (body.get("nome") or "").strip()
+    cor = (body.get("cor") or "#888888").strip()
+    icone = (body.get("icone") or "").strip()
+    if not nome:
+        return JsonResponse({"ok": False, "error": "Nome é obrigatório."})
+    if len(nome) > 100:
+        return JsonResponse({"ok": False, "error": "Nome muito longo (máx 100 caracteres)."})
+    import re as _re
+    if not _re.match(r"^#[0-9A-Fa-f]{6}$", cor):
+        cor = "#888888"
+    valid_icones = {val for val, _ in Categoria.ICONE_CHOICES}
+    if icone not in valid_icones:
+        icone = ""
+    existing = Categoria.objects.filter(user=request.user, nome__iexact=nome).first()
+    if existing:
+        return JsonResponse({"ok": True, "id": existing.pk, "nome": existing.nome, "created": False})
+    cat = Categoria.objects.create(user=request.user, nome=nome, cor=cor, icone=icone, ativo=True)
+    return JsonResponse({"ok": True, "id": cat.pk, "nome": cat.nome, "created": True})
 
 
 @login_required
@@ -1766,8 +1969,7 @@ def fatura_toggle_pago(request, cartao_id):
     )
     if not created:
         obj.delete()
-    next_url = request.POST.get("next") or reverse_lazy("dashboard")
-    return HttpResponseRedirect(next_url)
+    return HttpResponseRedirect(_safe_next_url(request, reverse_lazy("dashboard")))
 
 
 @login_required
@@ -1775,7 +1977,7 @@ def pagamento_toggle(request, tipo, responsavel_id):
     if request.method != "POST":
         from django.http import HttpResponseNotAllowed
         return HttpResponseNotAllowed(["POST"])
-    if tipo not in ("pix", "emprestimo"):
+    if tipo not in ("pix", "emprestimo", "acerto"):
         from django.http import Http404
         raise Http404
     responsavel = get_object_or_404(Responsavel, pk=responsavel_id, user=request.user)
@@ -1785,8 +1987,7 @@ def pagamento_toggle(request, tipo, responsavel_id):
     )
     if not created:
         obj.delete()
-    next_url = request.POST.get("next") or reverse_lazy("dashboard")
-    return HttpResponseRedirect(next_url)
+    return HttpResponseRedirect(_safe_next_url(request, reverse_lazy("dashboard")))
 
 
 # ── Contas ─────────────────────────────────────────────────────────────
@@ -1981,11 +2182,11 @@ class InvestimentoListView(LoginRequiredMixin, TemplateView):
             historico_qs, inv_conta_map, inv_inicial_map
         )
 
-        ctx["chart_labels"]      = json.dumps(all_labels)
-        ctx["chart_dados"]       = json.dumps(all_dados)
-        ctx["chart_aportes_bar"] = json.dumps(all_aportes_bar)
-        ctx["chart_saques_bar"]  = json.dumps(all_saques_bar)
-        ctx["chart_por_conta"]   = json.dumps(conta_series)
+        ctx["chart_labels"]      = _safe_json(all_labels)
+        ctx["chart_dados"]       = _safe_json(all_dados)
+        ctx["chart_aportes_bar"] = _safe_json(all_aportes_bar)
+        ctx["chart_saques_bar"]  = _safe_json(all_saques_bar)
+        ctx["chart_por_conta"]   = _safe_json(conta_series)
         ctx["contas_com_inv"]  = [
             {"id": c.pk, "nome": c.nome}
             for c in ctx["contas"]
@@ -1996,8 +2197,8 @@ class InvestimentoListView(LoginRequiredMixin, TemplateView):
         tipo_totais = defaultdict(float)
         for inv in ativos:
             tipo_totais[_TIPO_INV_LABELS.get(inv.tipo_investimento, inv.tipo_investimento)] += float(inv.saldo_atual)
-        ctx["rosca_labels"] = json.dumps(list(tipo_totais.keys()))
-        ctx["rosca_dados"]  = json.dumps([round(v, 2) for v in tipo_totais.values()])
+        ctx["rosca_labels"] = _safe_json(list(tipo_totais.keys()))
+        ctx["rosca_dados"]  = _safe_json([round(v, 2) for v in tipo_totais.values()])
 
         return ctx
 
@@ -2021,7 +2222,7 @@ class InvestimentoCreateView(UserFormKwargsMixin, LoginRequiredMixin, CreateView
             motivo="Aporte inicial",
         )
         messages.success(self.request, "Investimento criado com sucesso.")
-        return HttpResponseRedirect(self.success_url)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def form_invalid(self, form):
         messages.error(self.request, "Corrija os erros abaixo.")
@@ -2065,8 +2266,8 @@ class InvestimentoDetailView(LoginRequiredMixin, DetailView):
         chart_qs = historico.order_by("data_movimentacao")
         labels = [h.data_movimentacao.strftime("%d/%m/%Y %H:%M") for h in chart_qs]
         dados  = [float(h.valor_novo) for h in chart_qs]
-        ctx["chart_labels"] = json.dumps(labels)
-        ctx["chart_dados"]  = json.dumps(dados)
+        ctx["chart_labels"] = _safe_json(labels)
+        ctx["chart_dados"]  = _safe_json(dados)
         return ctx
 
 

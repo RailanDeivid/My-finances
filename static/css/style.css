@@ -5,6 +5,19 @@
    evita layout shift quando lucide.createIcons() substitui o <i> por <svg>. */
 i[data-lucide] { display: inline-block; width: 16px; height: 16px; vertical-align: middle; }
 
+/* ── Anti-flash de carregamento ──────────────────────────────────────────────
+   Durante o carregamento inicial (classe preload no body), todas as transições
+   e animações são zeradas. Isso evita que cards, sidebar e botões "piscam"
+   ao disparar suas transitions no primeiro render.
+   A classe é removida pelo JS após lucide.createIcons() terminar. */
+body.preload *,
+body.preload *::before,
+body.preload *::after {
+  transition-duration: 0s !important;
+  animation-duration:  0s !important;
+}
+
+
 :root {
   --bg-primary:    #0e1117;
   --bg-secondary:  #1a1d23;
@@ -993,6 +1006,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 }
 
 .tabela-dados tbody tr:hover { background-color: var(--bg-card); }
+
+/* Linha de total travada no fundo */
+.tabela-dados tfoot {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+}
+.tabela-dados tfoot td {
+  background: var(--bg-card);
+  border-top: 2px solid var(--border) !important;
+  border-bottom: none !important;
+  box-shadow: 0 -1px 0 var(--border);
+}
+body.light-theme .tabela-dados tfoot td { background: #ffffff; }
 
 /* Rodapé da tabela */
 .tabela-rodape {

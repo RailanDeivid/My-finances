@@ -312,6 +312,8 @@ class Entrada(models.Model):
         "Responsavel", on_delete=models.SET_NULL, null=True, blank=True, related_name="entradas"
     )
     auto_gerada = models.BooleanField(default=False)
+    recorrente = models.BooleanField(default=False)
+    grupo_recorrente = models.UUIDField(null=True, blank=True, db_index=True)
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, related_name="entradas_proprias",
     )
@@ -330,6 +332,7 @@ class Gasto(models.Model):
     TIPO_PAGAMENTO_CHOICES = [
         ("credito_avista",    "Crédito à Vista"),
         ("credito_parcelado", "Crédito Parcelado"),
+        ("recorrente",        "Compra Recorrente"),
         ("pix",               "Pix / Transferência"),
         ("debito",            "Débito"),
         ("emprestimo",        "Empréstimo"),
@@ -373,6 +376,10 @@ class Gasto(models.Model):
         "Conta", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="gastos_debito",
         help_text="Conta debitada (obrigatória para tipo Débito).",
+    )
+    cartao_adicional = models.BooleanField(
+        default=False,
+        help_text="Indica se o gasto foi realizado em um cartão adicional.",
     )
     user = models.ForeignKey(
         User, on_delete=models.CASCADE, null=True, related_name="gastos_proprios",
@@ -558,7 +565,7 @@ class InvestimentoHistorico(models.Model):
 
 
 class PagamentoFeito(models.Model):
-    TIPO_CHOICES = [("pix", "Pix"), ("emprestimo", "Empréstimo")]
+    TIPO_CHOICES = [("pix", "Pix"), ("emprestimo", "Empréstimo"), ("acerto", "Acerto")]
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
     responsavel = models.ForeignKey(
         Responsavel, on_delete=models.CASCADE, related_name="pagamentos_feitos"

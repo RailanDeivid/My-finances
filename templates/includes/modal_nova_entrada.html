@@ -40,8 +40,26 @@
                  step="0.01" placeholder="0,00" required>
         </div>
         <div class="form-group">
-          <label class="form-label" for="me_data">Data *</label>
+          <label class="form-label" for="me_data" id="me_data_label">Data *</label>
           <input type="date" name="data" id="me_data" class="form-control" required>
+        </div>
+      </div>
+
+      <!-- Recorrente -->
+      <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;
+                  padding:12px 16px;margin-bottom:16px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;margin:0;">
+          <input type="checkbox" name="recorrente" id="me_recorrente"
+                 style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent);flex-shrink:0;"
+                 onchange="meToggleRecorrente(this.checked)">
+          <span style="font-size:13px;font-weight:600;color:var(--text);">
+            <i data-lucide="repeat" style="width:14px;height:14px;vertical-align:-2px;stroke:var(--accent);margin-right:4px;"></i>
+            Repetir todo mês (recorrente)
+          </span>
+        </label>
+        <div id="me_recorrente_hint" style="display:none;margin-top:8px;font-size:12px;color:var(--text-muted);line-height:1.5;">
+          <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;"></i>
+          A <strong>data</strong> define o <strong>mês inicial</strong>. O sistema vai gerar automaticamente uma entrada para cada mês seguinte até dez/2050.
         </div>
       </div>
 

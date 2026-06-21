@@ -6,14 +6,14 @@
   <title>{% block title %}MyFinances{% endblock %}</title>
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=20">
-  <script defer src="{% static 'js/lucide.min.js' %}?v=20"></script>
-  <script defer src="{% static 'js/app.js' %}?v=20"></script>
-  <script defer src="{% static 'js/gastos.js' %}?v=20"></script>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=38">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=38">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=38"></script>
+  <script defer src="{% static 'js/app.js' %}?v=38"></script>
+  <script defer src="{% static 'js/gastos.js' %}?v=38"></script>
   {% block extra_head %}{% endblock %}
 </head>
-<body class="{% if request.COOKIES.theme == 'light' %}light-theme{% else %}dark-theme{% endif %}{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %}">
+<body class="{% if request.COOKIES.theme == 'light' %}light-theme{% else %}dark-theme{% endif %}{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %} preload">
 
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar" style="display:flex;flex-direction:column;">

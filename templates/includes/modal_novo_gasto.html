@@ -4,10 +4,14 @@
             align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;"
      onclick="if(event.target===this)event.stopPropagation()">
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
-              width:100%;max-width:540px;margin:auto;box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+              width:100%;max-width:540px;margin:auto;box-shadow:0 24px 48px rgba(0,0,0,0.4);
+              display:flex;flex-direction:column;max-height:calc(100vh - 48px);">
 
+    <!-- Cabeçalho fixo -->
     <div style="display:flex;align-items:center;justify-content:space-between;
-                padding:18px 24px;border-bottom:1px solid var(--border);">
+                padding:18px 24px;border-bottom:1px solid var(--border);
+                position:sticky;top:0;background:var(--bg-card);z-index:1;
+                border-radius:16px 16px 0 0;flex-shrink:0;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="width:36px;height:36px;border-radius:8px;background:#ef444420;
                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -20,7 +24,9 @@
                      font-size:24px;line-height:1;padding:0 4px;">&times;</button>
     </div>
 
-    <form method="post" action="{% url 'gasto-create' %}" style="padding:20px 24px;">
+    <!-- Corpo com scroll -->
+    <form method="post" action="{% url 'gasto-create' %}" autocomplete="off"
+          style="padding:20px 24px;overflow-y:auto;flex:1;min-height:0;">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.path }}">
 
@@ -44,7 +50,7 @@
         </select>
       </div>
 
-      <div class="form-group" id="mg-cartao-row" style="display:none;">
+      <div class="form-group" id="mg-cartao-row">
         <label class="form-label" for="mg_cartao">Cartão *</label>
         <select name="cartao" id="mg_cartao" class="form-control">
           <option value="">— Sem cartão —</option>
@@ -54,9 +60,20 @@
         </select>
       </div>
 
+      <div id="mg-cartao-adicional-row" style="margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+          <input type="checkbox" name="cartao_adicional" id="mg_cartao_adicional"
+                 style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;">
+          <span style="font-size:13px;color:var(--text);">
+            <i data-lucide="credit-card" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
+            Cartão Adicional
+          </span>
+        </label>
+      </div>
+
       <div class="form-group" id="mg-conta-origem-row" style="display:none;">
         <label class="form-label" for="mg_conta_origem">Conta de Débito *</label>
-        <select name="conta_origem" id="mg_conta_origem" class="form-control">
+        <select name="conta_origem" id="mg_conta_origem" class="form-control" disabled>
           <option value="">— Selecione a conta —</option>
           {% for c in modal_gasto_form.conta_origem.field.queryset %}
           <option value="{{ c.pk }}">{{ c.nome }}</option>
@@ -70,7 +87,7 @@
                placeholder="Ex: Mercado, Farmácia..." required>
       </div>
 
-      <!-- Grid: Valor + Parcelas + Data (posicionamento explícito por JS) -->
+      <!-- Grid: Valor + Parcelas + Data -->
       <div id="mg-grid-valores" class="form-grid-2">
         <div class="form-group" style="grid-column:1;grid-row:1;">
           <label class="form-label" for="mg_valor_total" id="mg_label_valor">Valor Total (R$) *</label>
@@ -80,7 +97,7 @@
         <div class="form-group" id="mg-parcelas-row" style="grid-column:2;grid-row:1;display:none;">
           <label class="form-label" for="mg_total_parcelas">Nº de Parcelas *</label>
           <input type="number" name="total_parcelas" id="mg_total_parcelas" class="form-control"
-                 min="2" max="60">
+                 min="2" max="60" disabled>
         </div>
         <div class="form-group" id="mg-data-row" style="grid-column:2;grid-row:1;">
           <label class="form-label" for="mg_data_compra">Data da Compra *</label>
@@ -99,7 +116,7 @@
           <div class="form-grid-2">
             <div>
               <label class="form-label" for="mg_mes_inicio">Mês da 1ª Parcela</label>
-              <select name="mes_inicio" id="mg_mes_inicio" class="form-control" onchange="mgAtualizarPreview()">
+              <select name="mes_inicio" id="mg_mes_inicio" class="form-control" onchange="mgAtualizarPreview()" disabled>
                 {% for val, label in modal_gasto_form.mes_inicio.field.choices %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
@@ -107,7 +124,7 @@
             </div>
             <div>
               <label class="form-label" for="mg_ano_inicio">Ano</label>
-              <select name="ano_inicio" id="mg_ano_inicio" class="form-control" onchange="mgAtualizarPreview()">
+              <select name="ano_inicio" id="mg_ano_inicio" class="form-control" onchange="mgAtualizarPreview()" disabled>
                 {% for val, label in modal_gasto_form.ano_inicio.field.choices %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
@@ -123,25 +140,122 @@
         </div>
       </div>
 
+      <!-- Categoria + botão nova categoria -->
       <div class="form-group">
         <label class="form-label" for="mg_categoria">Categoria</label>
-        <select name="categoria" id="mg_categoria" class="form-control">
-          <option value="">— Sem categoria —</option>
-          {% for c in modal_gasto_form.categoria.field.queryset %}
-          <option value="{{ c.pk }}">{{ c.nome }}</option>
-          {% endfor %}
-        </select>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="categoria" id="mg_categoria" class="form-control" style="flex:1;">
+            <option value="">— Sem categoria —</option>
+            {% for c in modal_gasto_form.categoria.field.queryset %}
+            <option value="{{ c.pk }}">{{ c.nome }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" onclick="mgAbrirNovaCategoria()"
+                  title="Criar nova categoria"
+                  style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;
+                         background:var(--bg-secondary);cursor:pointer;color:var(--accent);
+                         display:flex;align-items:center;flex-shrink:0;">
+            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+          </button>
+        </div>
+
+        <!-- ── Mini-form de nova categoria ── -->
+        <div id="mg-nova-cat-form" style="display:none;margin-top:10px;background:var(--bg-secondary);
+             border:1px solid var(--accent)44;border-radius:10px;padding:14px;">
+
+          <!-- Preview ao vivo -->
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+                      background:var(--bg-card);border:1px solid var(--border);margin-bottom:12px;">
+            <div id="mg-cat-preview-wrap" style="width:36px;height:36px;border-radius:8px;background:#888888;
+                 display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <i data-lucide="tag" style="width:18px;height:18px;stroke:#fff;"></i>
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:13px;" id="mg-cat-preview-nome">Nome da categoria</div>
+              <div style="font-size:11px;color:var(--text-muted);">Prévia</div>
+            </div>
+          </div>
+
+          <!-- Preset rápido -->
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:12px;">Preset rápido</label>
+            <select id="mg-cat-preset" class="form-control" style="font-size:13px;"
+                    onchange="mgCatAplicarPreset(this)">
+              <option value="">— Selecione ou preencha abaixo —</option>
+              {% for nome, icone, cor in cat_presets %}
+              <option value="{{ nome }}" data-icone="{{ icone }}" data-cor="{{ cor }}">{{ nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Nome -->
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:12px;">Nome *</label>
+            <input type="text" id="mg_nova_cat_nome" class="form-control" style="font-size:13px;"
+                   placeholder="Nome da categoria..."
+                   oninput="mgCatAtualizarPreviewNome(this.value)"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();mgSalvarNovaCategoria();}">
+          </div>
+
+          <!-- Ícone -->
+          <div class="form-group" style="margin-bottom:8px;">
+            <label class="form-label" style="font-size:12px;">Ícone</label>
+            <div id="mg-cat-icone-grid"
+                 style="display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));
+                        gap:5px;max-height:180px;overflow-y:auto;padding-right:2px;margin-top:6px;">
+              {% for valor, nome in cat_icones %}
+              <button type="button" class="mg-cat-icone-btn"
+                      data-valor="{{ valor }}" title="{{ nome }}"
+                      onclick="mgCatSelecionarIcone(this)">
+                <i data-lucide="{{ valor }}"></i>
+                <span class="mg-icone-label">{{ nome|truncatechars:10 }}</span>
+              </button>
+              {% endfor %}
+            </div>
+            <input type="hidden" id="mg_nova_cat_icone" value="">
+          </div>
+
+          <!-- Cor -->
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-size:12px;">Cor</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center;">
+              {% for hex, nome in cat_cores %}
+              <div class="mg-cat-cor-swatch {% if hex == '#888888' %}mg-selecionada{% endif %}"
+                   style="background:{{ hex }};" title="{{ nome }}" data-hex="{{ hex }}"
+                   onclick="mgCatSelecionarCor(this)"></div>
+              {% endfor %}
+              <!-- Cor personalizada -->
+              <div id="mg-cat-cor-picker-btn" title="Cor personalizada"
+                   style="width:26px;height:26px;border-radius:6px;border:2px dashed var(--border);
+                          cursor:pointer;display:flex;align-items:center;justify-content:center;
+                          background:var(--bg-card);position:relative;overflow:hidden;flex-shrink:0;">
+                <i data-lucide="pipette" style="width:13px;height:13px;stroke:var(--text-muted);pointer-events:none;"></i>
+                <input type="color" id="mg_nova_cat_cor" value="#888888"
+                       style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;"
+                       oninput="mgCatCorPersonalizada(this.value)">
+              </div>
+            </div>
+            <input type="hidden" id="mg_nova_cat_cor_val" value="#888888">
+          </div>
+
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="mg-btn-salvar-cat" onclick="mgSalvarNovaCategoria()"
+                    class="btn btn-primary" style="flex:1;font-size:13px;padding:7px 12px;">
+              <i data-lucide="check" style="width:14px;height:14px;"></i> Criar Categoria
+            </button>
+            <button type="button" onclick="mgFecharNovaCategoria()"
+                    class="btn" style="padding:7px 14px;font-size:13px;">
+              Cancelar
+            </button>
+          </div>
+          <div id="mg-nova-cat-erro" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;"></div>
+        </div>
       </div>
 
       <!-- Compra Recorrente -->
-      <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0;">
-          <input type="checkbox" name="recorrente" id="mg_recorrente" onchange="mgToggleRecorrente(this.checked)"
-                 style="width:16px;height:16px;accent-color:#8b5cf6;cursor:pointer;">
-          <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Compra Recorrente</span>
-          <span style="font-size:11px;color:var(--text-muted);margin-left:2px;">assinatura, mensalidade...</span>
-        </label>
-        <div id="mg-recorrente-opcoes" style="display:none;margin-top:12px;">
+      <div id="mg-recorrente-wrapper" style="display:none;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+        <input type="checkbox" name="recorrente" id="mg_recorrente" style="display:none;">
+        <div id="mg-recorrente-opcoes">
           <div class="form-group" style="margin-bottom:8px;">
             <label class="form-label" style="font-size:12px;">Repetir por</label>
             <select name="recorrente_meses" id="mg_recorrente_meses" class="form-control" onchange="mgAtualizarRecorrenteInfo()">
@@ -195,7 +309,7 @@
             <div id="mg_barra_pct" style="height:100%;background:var(--accent);transition:width .2s;width:50%;"></div>
           </div>
 
-          <div id="mg-divisao-preview" style="display:none;display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;">
+          <div id="mg-divisao-preview" style="display:none;grid-template-columns:1fr 1fr;gap:10px;text-align:center;">
             <div style="background:var(--accent)11;border-radius:8px;padding:8px 10px;">
               <div style="font-size:11px;color:var(--text-muted);" id="mg_label_preview_meu">Você</div>
               <div style="font-size:16px;font-weight:800;color:var(--accent);" id="mg_valor_preview_meu">R$ —</div>

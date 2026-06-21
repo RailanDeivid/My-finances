@@ -658,3 +658,36 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   margin-right: 6px;
   flex-shrink: 0;
 }
+
+/* ========================== SELETOR CATEGORIA (mini-form no modal) ========================== */
+.mg-cat-icone-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 2px 5px;
+  border-radius: 7px;
+  border: 2px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  gap: 3px;
+  transition: border-color .15s, background .15s;
+}
+.mg-cat-icone-btn svg { width: 16px; height: 16px; stroke: var(--text-muted); transition: stroke .15s; }
+.mg-cat-icone-btn:hover { border-color: var(--accent); }
+.mg-cat-icone-btn:hover svg { stroke: var(--accent); }
+.mg-cat-icone-btn.mg-selecionado { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.mg-cat-icone-btn.mg-selecionado svg { stroke: var(--accent); }
+.mg-cat-icone-btn .mg-icone-label { font-size: 9px; color: var(--text-muted); text-align: center; line-height: 1.2; pointer-events: none; }
+
+.mg-cat-cor-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 3px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .15s, transform .1s;
+}
+.mg-cat-cor-swatch:hover { transform: scale(1.15); }
+.mg-cat-cor-swatch.mg-selecionada { border-color: var(--text-primary); transform: scale(1.15); }

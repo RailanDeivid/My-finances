@@ -266,6 +266,9 @@
         <div>
           <div class="cc-fatura-label">Fatura {{ mes }}/{{ ano }}</div>
           <div class="cc-fatura-valor">R$ {{ cartao.fatura_mes|brl }}</div>
+          {% if cartao.adicional_mes %}
+          <div style="font-size:10px;opacity:.7;margin-top:3px;">Adicional: R$ {{ cartao.adicional_mes|brl }}</div>
+          {% endif %}
         </div>
         <div class="cc-meta">
           {% if cartao.limite %}

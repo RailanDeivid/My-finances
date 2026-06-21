@@ -17,13 +17,14 @@ def criar_categorias_padrao(user):
 
 @receiver(post_save, sender=User)
 def setup_novo_usuario(sender, instance, created, **kwargs):
-    if not created:
-        return
     from .models import Responsavel
     nome = instance.get_full_name().strip() or instance.username
-    Responsavel.objects.get_or_create(
-        user=instance,
-        is_principal=True,
-        defaults={"nome": nome, "ativo": True},
-    )
-    criar_categorias_padrao(instance)
+    if created:
+        Responsavel.objects.get_or_create(
+            user=instance,
+            is_principal=True,
+            defaults={"nome": nome, "ativo": True, "usuario_vinculado": instance},
+        )
+        criar_categorias_padrao(instance)
+    else:
+        Responsavel.objects.filter(user=instance, is_principal=True).exclude(nome=nome).update(nome=nome)

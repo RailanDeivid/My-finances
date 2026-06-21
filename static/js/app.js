@@ -123,6 +123,7 @@
     });
 
     if (typeof lucide !== "undefined") lucide.createIcons();
+    document.body.classList.remove("preload");
 
     // Modal de exclusão em massa
     var modal = document.getElementById("modal-delete-all");
@@ -141,6 +142,29 @@
     var sidebarTip = document.createElement("div");
     sidebarTip.id = "sidebar-tooltip";
     document.body.appendChild(sidebarTip);
+
+    // Navegação da sidebar: AJAX se disponível, senão fade + navigate
+    document.querySelectorAll(".sidebar-item[href]").forEach(function (item) {
+      item.addEventListener("click", function (e) {
+        var href = item.getAttribute("href");
+        if (!href || href === "#" || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        if (typeof window.ajaxNavigate === "function") {
+          window.ajaxNavigate(href);
+        } else {
+          window.location.href = href;
+        }
+      });
+    });
+
+    // Botão voltar/avançar do browser
+    window.addEventListener("popstate", function () {
+      if (typeof window.ajaxNavigate === "function") {
+        window.ajaxNavigate(window.location.href);
+      } else {
+        window.location.reload();
+      }
+    });
 
     document.querySelectorAll(".sidebar-item").forEach(function (item) {
       var textEl = item.querySelector(".sidebar-text");
@@ -175,10 +199,21 @@
     });
   });
 
-  window.openFormModal = function (id) {
+  window.openFormModal = function (id, opts) {
     var modal = document.getElementById(id);
     if (!modal) return;
     modal.style.display = "flex";
+    // Atualiza campo 'next' com a URL atual do browser (AJAX altera a URL sem recarregar)
+    var nextInput = modal.querySelector('input[name="next"]');
+    if (nextInput) nextInput.value = window.location.pathname + window.location.search;
+    if (id === "modal-novo-gasto" && typeof window.mgFecharNovaCategoria === "function") {
+      window.mgFecharNovaCategoria();
+    }
+    if (id === "modal-nova-entrada") {
+      var chkRec = modal.querySelector('#me_recorrente');
+      if (chkRec) { chkRec.checked = false; }
+      if (typeof window.meToggleRecorrente === "function") window.meToggleRecorrente(false);
+    }
     if (typeof lucide !== "undefined") lucide.createIcons();
 
     var now = new Date();
@@ -194,12 +229,25 @@
     if (selMes) selMes.value = now.getMonth() + 1;
     if (selAno) selAno.value = now.getFullYear();
 
-    // Sync tipo toggle on open
-    var mgTipo = modal.querySelector("#mg_tipo_pagamento");
-    if (mgTipo && typeof window.mgGastoTipoToggle === "function") {
-      window.mgGastoTipoToggle(mgTipo.value);
-    } else if (mgTipo) {
-      mgTipo.dispatchEvent(new Event("change"));
+    if (id === "modal-novo-gasto") {
+      var mgTipo = modal.querySelector("#mg_tipo_pagamento");
+      // Pré-seleção opcional via opts (ex: botão Novo Gasto dentro de detalhe do cartão)
+      if (opts && opts.cartao) {
+        var selCartao = modal.querySelector("#mg_cartao");
+        if (selCartao) selCartao.value = opts.cartao;
+      }
+      if (opts && opts.tipo && mgTipo) {
+        mgTipo.value = opts.tipo;
+      }
+      // Sincroniza layout com o tipo atual — mostra/oculta bloco de mês e parcelas
+      if (mgTipo && typeof window.mgGastoTipoToggle === "function") {
+        window.mgGastoTipoToggle(mgTipo.value);
+      }
+      // Garante "Dividir gastos" fechado ao abrir
+      var chkDiv = modal.querySelector("#mg_dividir_gasto");
+      var divOpc = modal.querySelector("#mg-dividir-opcoes");
+      if (chkDiv) chkDiv.checked = false;
+      if (divOpc) divOpc.style.display = "none";
     }
   };
 
@@ -241,17 +289,17 @@
   };
 
   // ── Ordenação de colunas (client-side) ───────────────────────────────────
-  // Ativa ao clicar em <th> dentro de .tabela-dados. Não afeta tabelas com min-width:max-content (scrolláveis horizontais grandes).
+  // Ativa ao clicar em <th> dentro de .tabela-dados. Suporta bidirecional (↑/↓).
   (function () {
     function cellVal(td) {
-      // Tenta valor numérico (R$ X.XXX,XX) primeiro
       var txt = td.textContent.trim();
+      // Data dd/mm/yyyy — verificada antes de numeric para evitar parseFloat("12/...") = 12
+      var dm = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (dm) return parseInt(dm[3] + dm[2] + dm[1]); // YYYYMMDD
+      // Numérico BRL: "R$ 1.234,56" → 1234.56
       var brl = txt.replace(/R\$\s*/g, "").replace(/\./g, "").replace(",", ".");
       var n = parseFloat(brl);
       if (!isNaN(n)) return n;
-      // Data dd/mm/yyyy
-      var dm = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-      if (dm) return parseInt(dm[3] + dm[2] + dm[1]);
       return txt.toLowerCase();
     }
 
@@ -268,9 +316,16 @@
       if (!rows.length) return;
 
       var asc = th.dataset.sortDir !== "asc";
-      ths.forEach(function (t) { t.dataset.sortDir = ""; t.classList.remove("sort-asc","sort-desc"); });
+      ths.forEach(function (t) {
+        t.dataset.sortDir = "";
+        t.classList.remove("sort-asc", "sort-desc");
+        var si = t.querySelector(".sort-icon");
+        if (si) { si.textContent = "⇅"; si.classList.remove("sort-ativo"); }
+      });
       th.dataset.sortDir = asc ? "asc" : "desc";
       th.classList.add(asc ? "sort-asc" : "sort-desc");
+      var ico = th.querySelector(".sort-icon");
+      if (ico) { ico.textContent = asc ? "↑" : "↓"; ico.classList.add("sort-ativo"); }
 
       rows.sort(function (a, b) {
         var tds = a.querySelectorAll("td");
@@ -290,11 +345,8 @@
       if (!th) return;
       var table = th.closest("table.tabela-dados");
       if (!table) return;
-      // Ignora colunas de ação (último th vazio) e tabelas com scroll horizontal gigante
-      var wrapper = table.closest(".tabela-wrapper");
-      if (wrapper && wrapper.style && wrapper.style.minWidth === "max-content") return;
-      // Não sorteia colunas sem texto (botões de ação)
-      if (!th.textContent.trim()) return;
+      // Não sorteia colunas sem texto real (botões de ação)
+      if (!th.textContent.replace(/[⇅↑↓]/g, "").trim()) return;
       sortTable(th);
     });
   }());

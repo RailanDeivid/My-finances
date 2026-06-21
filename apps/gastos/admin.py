@@ -43,6 +43,9 @@ class CustomUserAdmin(ModelAdmin, BaseUserAdmin):
     )
     add_fieldsets = BaseUserAdmin.add_fieldsets
 
+    class Media:
+        js = ('js/admin_password.js',)
+
     def password_change_link(self, obj):
         if obj and obj.pk:
             return format_html(

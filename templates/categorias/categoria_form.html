@@ -88,6 +88,7 @@
 
   <form method="post" novalidate>
     {% csrf_token %}
+    {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
     {{ form.icone }}
     {{ form.cor }}
 
@@ -162,7 +163,7 @@
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Salvar</button>
-      <a href="{% url 'categoria-list' %}" class="btn btn-danger">Cancelar</a>
+      <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'categoria-list' %}{% endif %}" class="btn btn-danger">Cancelar</a>
     </div>
   </form>
 </div>

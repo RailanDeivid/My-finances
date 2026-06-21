@@ -2,17 +2,15 @@ services:
   db:
     image: postgres:15
     container_name: my-finances-db
-    restart: unless-stopped
+    restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-myfinancesDB}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-myfinancesDB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -20,12 +18,10 @@ services:
   redis:
     image: redis:7-alpine
     container_name: my-finances-redis
-    restart: unless-stopped
+    restart: always
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    ports:
-      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -35,20 +31,17 @@ services:
   evolution-api:
     image: evoapicloud/evolution-api:latest
     container_name: my-finances-evolution
-    restart: unless-stopped
-    ports:
-      - "8081:8080"
+    restart: always
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    env_file:
-      - .env
+    env_file: .env
     environment:
       DATABASE_ENABLED: "true"
       DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/evolutionDB
+      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/evolutionDB
       DATABASE_CONNECTION_CLIENT_NAME: evolution_api
       CACHE_REDIS_ENABLED: "true"
       CACHE_REDIS_URI: redis://redis:6379/1
@@ -65,21 +58,41 @@ services:
   web:
     build: .
     container_name: my-finances-web
-    command: python manage.py runserver 0.0.0.0:8000
+    restart: always
+    env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
     volumes:
-      - .:/app
-    ports:
-      - "8001:8000"
+      - static_volume:/app/staticfiles
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      DJANGO_SETTINGS_MODULE: config.settings.development
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --worker-class gthread --workers 2 --threads 4 --timeout 120 --keep-alive 5"
 
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: my-finances-nginx
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static_volume:/app/staticfiles:ro
+    depends_on:
+      - web
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: my-finances-tunnel
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - nginx
 
 volumes:
   postgres_data:
@@ -87,3 +100,4 @@ volumes:
     external: true
   redis_data:
     name: my-finances-redis-data
+  static_volume:

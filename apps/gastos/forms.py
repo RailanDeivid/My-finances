@@ -42,6 +42,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         fields = [
             "descricao", "valor_total", "data_compra", "tipo_pagamento",
             "total_parcelas", "cartao", "conta_origem", "responsavel", "categoria", "observacao",
+            "cartao_adicional",
         ]
         widgets = {
             "descricao":      forms.TextInput(attrs={"placeholder": "Ex: Mercado, Farmácia..."}),
@@ -118,24 +119,26 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         tipo = cleaned.get("tipo_pagamento")
         parcelas = cleaned.get("total_parcelas")
         from .models import Gasto as _Gasto
-        if tipo in _Gasto.TIPOS_CARTAO and not cleaned.get("cartao"):
+        # "recorrente" é tratado como credito_avista para fins de validação
+        tipo_val = "credito_avista" if tipo == "recorrente" else tipo
+        if tipo_val in _Gasto.TIPOS_CARTAO and not cleaned.get("cartao"):
             self.add_error("cartao", "Selecione um cartão para este tipo de pagamento.")
-        if tipo not in _Gasto.TIPOS_CARTAO:
+        if tipo_val not in _Gasto.TIPOS_CARTAO:
             cleaned["cartao"] = None
             cleaned["total_parcelas"] = None
             cleaned["mes_inicio"] = None
             cleaned["ano_inicio"] = None
-        if tipo == "credito_parcelado" and not parcelas:
+        if tipo_val == "credito_parcelado" and not parcelas:
             self.add_error("total_parcelas", "Informe o número de parcelas para compra parcelada.")
         # Débito: exige conta_origem
-        if tipo == "debito":
+        if tipo_val == "debito":
             if not cleaned.get("conta_origem"):
                 self.add_error("conta_origem", "Selecione a conta de débito.")
         else:
             cleaned["conta_origem"] = None
-        if tipo != "credito_parcelado":
+        if tipo_val != "credito_parcelado":
             cleaned["total_parcelas"] = None
-        if tipo not in ("credito_parcelado", "credito_avista"):
+        if tipo_val not in ("credito_parcelado", "credito_avista"):
             cleaned["mes_inicio"] = None
             cleaned["ano_inicio"] = None
         return cleaned
@@ -194,6 +197,8 @@ class CategoriaForm(FormControlMixin, forms.ModelForm):
 
 
 class EntradaForm(FormControlMixin, forms.ModelForm):
+    recorrente = forms.BooleanField(required=False, label="Repetir todo mês")
+
     class Meta:
         model = Entrada
         fields = ["tipo", "descricao", "valor", "data", "conta"]

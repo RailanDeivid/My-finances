@@ -12,8 +12,9 @@
 </div>
 <form method="post">
   {% csrf_token %}
+  {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
   <div class="dialog-actions">
-    <a href="{% url 'entrada-list' %}" class="btn btn-danger">Cancelar</a>
+    <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'entrada-list' %}{% endif %}" class="btn btn-danger">Cancelar</a>
     <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
   </div>
 </form>

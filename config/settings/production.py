@@ -10,7 +10,12 @@ if not _sk or "insecure" in _sk:
     )
 SECRET_KEY = _sk
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()]
+_hosts = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()]
+# "web" é o hostname interno do Docker usado pelo evolution-api para webhook
+ALLOWED_HOSTS = _hosts + ["web"]
+
+# Sem manifest — o app já usa ?v=N para cache bust; evita exigir collectstatic a cada deploy
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 # HTTPS / cookies seguros
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

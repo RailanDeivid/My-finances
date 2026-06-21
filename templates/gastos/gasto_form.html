@@ -16,6 +16,7 @@
 
   <form method="post" novalidate>
     {% csrf_token %}
+    {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
 
     {% if parcelado_edit %}
     {# ── Modo parcelado: apenas valor e nº de parcelas editáveis ── #}
@@ -77,6 +78,17 @@
       </div>
     </div>
 
+    <!-- Cartão Adicional (parcelado sempre é cartão) -->
+    <div style="margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        {{ form.cartao_adicional }}
+        <span style="font-size:13px;font-weight:600;color:var(--text);">
+          <i data-lucide="credit-card" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
+          Cartão Adicional
+        </span>
+      </label>
+    </div>
+
     {% else %}
     {# ── Modo normal: todos os campos ── #}
 
@@ -101,6 +113,17 @@
         <option value="">— Sem cartão —</option>
       </select>
       {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
+    </div>
+
+    <!-- 3c. Cartão Adicional (condicional com cartão) -->
+    <div id="cartao-adicional-row" style="display:none;margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        {{ form.cartao_adicional }}
+        <span style="font-size:13px;font-weight:600;color:var(--text);">
+          <i data-lucide="credit-card" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
+          Cartão Adicional
+        </span>
+      </label>
     </div>
 
     <!-- 3b. Conta de Débito (condicional) -->
@@ -140,13 +163,13 @@
     <!-- Total calculado (parcelado) -->
     <div id="total-calculado" style="display:none;margin:-8px 0 16px;padding:8px 14px;background:var(--accent)15;border:1px solid var(--accent)33;border-radius:8px;font-size:13px;font-weight:600;color:var(--accent);"></div>
 
-    <!-- 6. Mês/Ano início das parcelas -->
+    <!-- 6. Mês/Ano da fatura / início das parcelas -->
     <div id="inicio-parcelas-row" style="display:none;margin-bottom:16px;">
       <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:14px 16px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">Mês de início das parcelas</div>
+        <div id="inicio-parcelas-titulo" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px;">Mês da Fatura</div>
         <div class="form-grid-2" style="align-items:end;">
           <div>
-            <label class="form-label" for="id_mes_inicio">Mês da 1ª Parcela *</label>
+            <label class="form-label" id="mes-inicio-label" for="id_mes_inicio">Mês da Fatura *</label>
             {{ form.mes_inicio }}
           </div>
           <div>
@@ -154,7 +177,7 @@
             {{ form.ano_inicio }}
           </div>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">
+        <div id="inicio-parcelas-dica" style="margin-top:8px;font-size:11px;color:var(--text-muted);">
           <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;stroke:var(--text-muted);"></i>
           Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.
         </div>
@@ -231,7 +254,7 @@
       <button type="submit" class="btn btn-primary">
         <i data-lucide="save"></i> Salvar
       </button>
-      <a href="{% url 'gasto-list' %}" class="btn btn-danger">Cancelar</a>
+      <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'gasto-list' %}{% endif %}" class="btn btn-danger">Cancelar</a>
     </div>
   </form>
 
@@ -390,26 +413,41 @@ function pgCancelarEdit(pk) {
     if (!tipoSelect) return;
     var tipo = tipoSelect.value;
     var isParcelado = tipo === 'credito_parcelado';
+    var isAvista    = tipo === 'credito_avista';
     var isCartao    = TIPOS_CARTAO.indexOf(tipo) !== -1;
     var isDebito    = tipo === 'debito';
 
     if (cartaoRow) cartaoRow.style.display = isCartao ? 'block' : 'none';
+    var adicionalRow = document.getElementById('cartao-adicional-row');
+    if (adicionalRow) adicionalRow.style.display = isCartao ? 'block' : 'none';
     var contaRow = document.getElementById('conta-origem-row');
     if (contaRow) contaRow.style.display = isDebito ? 'block' : 'none';
 
-    if (isParcelado) {
-      parcelasRow.style.display    = 'block';
-      inicioRow.style.display      = 'block';
-      labelValor.textContent       = 'Valor da Parcela (R$) *';
-      // Data fica sozinha na linha de baixo, largura total
-      dataRow.style.gridColumn     = '1 / -1';
-      dataRow.style.gridRow        = '2';
+    // Mostrar bloco mês/ano para crédito à vista E parcelado
+    var titulo  = document.getElementById('inicio-parcelas-titulo');
+    var mesLabel = document.getElementById('mes-inicio-label');
+    var dica    = document.getElementById('inicio-parcelas-dica');
+
+    if (isParcelado || isAvista) {
+      inicioRow.style.display = 'block';
+      var isP_label = isParcelado ? 'Mês de início das parcelas' : 'Mês da Fatura';
+      var isM_label = isParcelado ? 'Mês da 1ª Parcela *'        : 'Mês da Fatura *';
+      if (titulo)   titulo.textContent   = isP_label;
+      if (mesLabel) mesLabel.textContent = isM_label;
+      if (dica)     dica.style.display   = isAvista ? 'block' : 'block';
       if (!inicioDirty) sincronizarInicio();
     } else {
+      inicioRow.style.display = 'none';
+    }
+
+    if (isParcelado) {
+      parcelasRow.style.display    = 'block';
+      labelValor.textContent       = 'Valor da Parcela (R$) *';
+      dataRow.style.gridColumn     = '1 / -1';
+      dataRow.style.gridRow        = '2';
+    } else {
       parcelasRow.style.display    = 'none';
-      inicioRow.style.display      = 'none';
       labelValor.textContent       = 'Valor Total (R$) *';
-      // Data fica ao lado do valor (col 2, linha 1)
       dataRow.style.gridColumn     = '2';
       dataRow.style.gridRow        = '1';
     }

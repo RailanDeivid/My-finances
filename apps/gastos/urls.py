@@ -52,6 +52,7 @@ urlpatterns = [
 
     # API interna
     path("api/cartoes-por-responsavel/<int:responsavel_id>/", views.cartoes_por_responsavel, name="api-cartoes"),
+    path("api/categoria/criar/", views.categoria_criar_ajax, name="api-categoria-criar"),
 
     # Fatura paga toggle
     path("cartoes/<int:cartao_id>/fatura-toggle/", views.fatura_toggle_pago, name="fatura-toggle-pago"),

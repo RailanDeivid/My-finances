@@ -14,7 +14,7 @@
   Este responsável possui gastos atribuídos por outro usuário. <strong>Não é possível excluí-lo.</strong>
 </div>
 <div style="display:flex;justify-content:center;margin-top:16px;">
-  <a href="{% url 'responsavel-list' %}" class="btn btn-primary">Voltar</a>
+  <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'responsavel-list' %}{% endif %}" class="btn btn-primary">Voltar</a>
 </div>
 {% else %}
   {% if gastos_proprios_count %}
@@ -25,8 +25,9 @@
   {% endif %}
   <form method="post">
     {% csrf_token %}
+    {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
     <div class="dialog-actions">
-      <a href="{% url 'responsavel-list' %}" class="btn btn-danger">Cancelar</a>
+      <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'responsavel-list' %}{% endif %}" class="btn btn-danger">Cancelar</a>
       <button type="submit" class="btn btn-primary"><i data-lucide="trash-2"></i> Confirmar</button>
     </div>
   </form>

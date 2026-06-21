@@ -1105,7 +1105,7 @@
   if (ctxPeriodo) {
     var pLabels = {{ periodo_labels|safe }};
     var pVals   = {{ periodo_valores|safe }};
-    var bgC = pVals.map(function(_,i){ return i===pVals.length-1?accent:accent+'55'; });
+    var bgC = pVals.map(function(){ return accent+'99'; });
     new Chart(ctxPeriodo, {
       type: 'bar',
       data: { labels:pLabels, datasets:[{ data:pVals, backgroundColor:bgC, borderColor:accent, borderWidth:0, borderRadius:6, borderSkipped:false }] },

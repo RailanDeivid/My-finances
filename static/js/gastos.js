@@ -81,11 +81,147 @@
     }
   }
 
-  // ── Filtro de mês/ano: submete ao mudar ──────────────────────────────────
+  // ── AJAX: troca conteúdo sem recarregar a página ─────────────────────────
+  function _execScripts(container) {
+    container.querySelectorAll("script").forEach(function (s) {
+      var ns = document.createElement("script");
+      ns.textContent = s.textContent;
+      document.head.appendChild(ns);
+      document.head.removeChild(ns);
+    });
+  }
+
+  function _destroyCharts(container) {
+    if (typeof Chart === "undefined" || !Chart.getChart) return;
+    container.querySelectorAll("canvas").forEach(function (canvas) {
+      var c = Chart.getChart(canvas);
+      if (c) c.destroy();
+    });
+  }
+
+  function _injectPageAssets(doc) {
+    // ── Estilos do <head> ({% block extra_head %}) ────────────────────────
+    // Remove os estilos injetados pela navegação anterior
+    document.querySelectorAll("style[data-ajax-page]").forEach(function (el) { el.remove(); });
+    // Injeta os novos estilos de página
+    doc.querySelectorAll("head style").forEach(function (style) {
+      var s = document.createElement("style");
+      s.textContent = style.textContent;
+      s.setAttribute("data-ajax-page", "1");
+      document.head.appendChild(s);
+    });
+
+    // ── Scripts do body fora do main-content ({% block extra_js %}) ───────
+    // São filhos diretos de <body> — ex: inicialização de gráficos Chart.js
+    doc.querySelectorAll("body > script").forEach(function (script) {
+      var ns = document.createElement("script");
+      if (script.src) {
+        ns.src = script.src;
+      } else {
+        ns.textContent = script.textContent;
+      }
+      document.head.appendChild(ns);
+      document.head.removeChild(ns);
+    });
+  }
+
+  function ajaxNavigate(url) {
+    var mc = document.querySelector(".main-content");
+    if (!mc) { window.location.href = url; return; }
+
+    // Dimina levemente sem esconder — conteúdo fica visível durante o carregamento
+    mc.style.opacity = "0.55";
+    mc.style.pointerEvents = "none";
+
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var newMc = doc.querySelector(".main-content");
+        if (!newMc) { window.location.href = url; return; }
+
+        _destroyCharts(mc);
+        mc.innerHTML = newMc.innerHTML;
+        history.pushState(null, "", url);
+
+        // Injeta estilos e scripts específicos da nova página
+        _injectPageAssets(doc);
+
+        // Scripts dentro do main-content
+        _execScripts(mc);
+
+        // Atualiza título na topbar e na aba do browser
+        var newTopbar = doc.querySelector(".topbar-title");
+        var curTopbar = document.querySelector(".topbar-title");
+        if (newTopbar && curTopbar) curTopbar.innerHTML = newTopbar.innerHTML;
+        var newTitle = doc.querySelector("title");
+        if (newTitle) document.title = newTitle.textContent;
+
+        // Atualiza item ativo na sidebar
+        var activeHrefs = new Set();
+        doc.querySelectorAll(".sidebar-item.active").forEach(function (el) {
+          var h = el.getAttribute("href");
+          if (h) activeHrefs.add(h);
+        });
+        document.querySelectorAll(".sidebar-item").forEach(function (el) {
+          el.classList.toggle("active", activeHrefs.has(el.getAttribute("href") || ""));
+        });
+
+        // Re-init ícones e handlers do novo conteúdo
+        if (typeof lucide !== "undefined") lucide.createIcons();
+        initMesFiltro();
+        initTableSort();
+        initGastoForm();
+        initCartaoForm();
+        _injectNextParam();
+
+        // Restaura opacidade instantaneamente — sem transição para evitar "piscar"
+        mc.style.opacity = "";
+        mc.style.pointerEvents = "";
+      })
+      .catch(function () { window.location.href = url; });
+  }
+
+  window.ajaxNavigate = ajaxNavigate;
+
+  // ── Filtros: AJAX sem recarregar a página ─────────────────────────────────
   function initMesFiltro() {
+    // Selects com auto-submit
     document.querySelectorAll(".auto-submit").forEach(function (el) {
       el.addEventListener("change", function () {
-        el.closest("form").submit();
+        var form = el.closest("form");
+        if (!form) return;
+        var params = new URLSearchParams(new FormData(form));
+        var action = form.getAttribute("action") || window.location.pathname;
+        ajaxNavigate(action + "?" + params.toString());
+      });
+    });
+
+    // Formulários GET com submit button (busca por texto, etc.)
+    document.querySelectorAll('form[method="get"], form:not([method])').forEach(function (form) {
+      if (form.dataset.ajaxBound) return;
+      form.dataset.ajaxBound = "1";
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var params = new URLSearchParams(new FormData(form));
+        var action = form.getAttribute("action") || window.location.pathname;
+        ajaxNavigate(action + "?" + params.toString());
+      });
+    });
+
+    // Links "Limpar" dentro de formulários
+    document.querySelectorAll("form a[href]").forEach(function (link) {
+      var href = link.getAttribute("href");
+      if (!href || /^(https?:\/\/|\/\/)/.test(href) || href.startsWith("#")) return;
+      if (link.dataset.ajaxBound) return;
+      link.dataset.ajaxBound = "1";
+      link.addEventListener("click", function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        ajaxNavigate(href);
       });
     });
   }
@@ -93,24 +229,44 @@
   // ── Modal Novo Gasto ─────────────────────────────────────────────────────
   var _mgMeses = window.MESES || ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+  function _mgSetDisabled(id, disabled) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  }
+
   window.mgGastoTipoToggle = function (tipo) {
     var TIPOS_C = TIPOS_CARTAO;
-    var isC = TIPOS_C.indexOf(tipo) !== -1;
+    var isRec = tipo === 'recorrente';
+    var isC = TIPOS_C.indexOf(tipo) !== -1 || isRec;
     var isP = tipo === 'credito_parcelado';
     var isA = tipo === 'credito_avista';
     var isD = tipo === 'debito';
     var el;
-    el = document.getElementById('mg-cartao-row');       if (el) el.style.display = isC ? 'block' : 'none';
-    el = document.getElementById('mg-conta-origem-row'); if (el) el.style.display = isD ? 'block' : 'none';
+    el = document.getElementById('mg-cartao-row');            if (el) el.style.display = isC ? 'block' : 'none';
+    el = document.getElementById('mg-cartao-adicional-row');  if (el) el.style.display = isC ? 'block' : 'none';
+    el = document.getElementById('mg-conta-origem-row');      if (el) el.style.display = isD ? 'block' : 'none';
     el = document.getElementById('mg-parcelas-row');     if (el) el.style.display = isP ? 'block' : 'none';
     el = document.getElementById('mg-inicio-row');       if (el) el.style.display = (isP || isA) ? 'block' : 'none';
     el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : 'Mês de início das parcelas';
     el = document.getElementById('mg_label_valor');      if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
+
+    // Desabilita campos ocultos para evitar validação HTML5 em campos escondidos
+    _mgSetDisabled('mg_cartao',        !isC);
+    _mgSetDisabled('mg_conta_origem',  !isD);
+    _mgSetDisabled('mg_total_parcelas',!isP);
+    _mgSetDisabled('mg_mes_inicio',    !(isP || isA));
+    _mgSetDisabled('mg_ano_inicio',    !(isP || isA));
+
     var dataRow = document.getElementById('mg-data-row');
     if (dataRow) {
       dataRow.style.gridColumn = isP ? '1 / -1' : '2';
       dataRow.style.gridRow    = isP ? '2'       : '1';
     }
+    var recWrapper = document.getElementById('mg-recorrente-wrapper');
+    var chkR = document.getElementById('mg_recorrente');
+    if (recWrapper) recWrapper.style.display = isRec ? 'block' : 'none';
+    if (chkR) chkR.checked = isRec;
+    if (isRec) mgAtualizarRecorrenteInfo();
     mgAtualizarTotal();
     mgAtualizarPreview();
   };
@@ -218,11 +374,186 @@
     }
   };
 
+  // ── Nova Categoria inline ────────────────────────────────────────────────
+  function _getCsrf() {
+    var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  var _mgCatIconeSel = '';
+  var _mgCatCorSel   = '#888888';
+
+  window.mgCatSelecionarIcone = function (btn) {
+    document.querySelectorAll('.mg-cat-icone-btn').forEach(function (b) {
+      b.classList.remove('mg-selecionado');
+    });
+    btn.classList.add('mg-selecionado');
+    _mgCatIconeSel = btn.dataset.valor;
+    var hiddenIcone = document.getElementById('mg_nova_cat_icone');
+    if (hiddenIcone) hiddenIcone.value = _mgCatIconeSel;
+    var wrap = document.getElementById('mg-cat-preview-wrap');
+    if (wrap) {
+      wrap.innerHTML = '<i data-lucide="' + _mgCatIconeSel + '" style="width:18px;height:18px;stroke:#fff;"></i>';
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+  };
+
+  window.mgCatSelecionarCor = function (el) {
+    document.querySelectorAll('.mg-cat-cor-swatch').forEach(function (s) {
+      s.classList.remove('mg-selecionada');
+    });
+    var pickerBtn = document.getElementById('mg-cat-cor-picker-btn');
+    if (pickerBtn) pickerBtn.style.borderStyle = 'dashed';
+    el.classList.add('mg-selecionada');
+    _mgCatCorSel = el.dataset.hex;
+    var hiddenCor = document.getElementById('mg_nova_cat_cor_val');
+    if (hiddenCor) hiddenCor.value = _mgCatCorSel;
+    var picker = document.getElementById('mg_nova_cat_cor');
+    if (picker) picker.value = _mgCatCorSel;
+    var wrap = document.getElementById('mg-cat-preview-wrap');
+    if (wrap) wrap.style.background = _mgCatCorSel;
+  };
+
+  window.mgCatCorPersonalizada = function (hex) {
+    _mgCatCorSel = hex;
+    var hiddenCor = document.getElementById('mg_nova_cat_cor_val');
+    if (hiddenCor) hiddenCor.value = hex;
+    var wrap = document.getElementById('mg-cat-preview-wrap');
+    if (wrap) wrap.style.background = hex;
+    document.querySelectorAll('.mg-cat-cor-swatch').forEach(function (s) {
+      s.classList.remove('mg-selecionada');
+    });
+    var pickerBtn = document.getElementById('mg-cat-cor-picker-btn');
+    if (pickerBtn) { pickerBtn.style.borderStyle = 'solid'; pickerBtn.style.borderColor = hex; }
+  };
+
+  window.mgCatAtualizarPreviewNome = function (nome) {
+    var el = document.getElementById('mg-cat-preview-nome');
+    if (el) el.textContent = nome || 'Nome da categoria';
+    var preset = document.getElementById('mg-cat-preset');
+    if (preset) preset.value = '';
+  };
+
+  window.mgCatAplicarPreset = function (sel) {
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    var nome  = opt.value;
+    var icone = opt.dataset.icone;
+    var cor   = opt.dataset.cor;
+    var nomeInput = document.getElementById('mg_nova_cat_nome');
+    if (nomeInput) { nomeInput.value = nome; }
+    var previewNome = document.getElementById('mg-cat-preview-nome');
+    if (previewNome) previewNome.textContent = nome;
+    if (icone) {
+      var btnIcone = document.querySelector('.mg-cat-icone-btn[data-valor="' + icone + '"]');
+      if (btnIcone) mgCatSelecionarIcone(btnIcone);
+    }
+    if (cor) {
+      var swatch = document.querySelector('.mg-cat-cor-swatch[data-hex="' + cor + '"]');
+      if (swatch) { mgCatSelecionarCor(swatch); }
+      else { mgCatCorPersonalizada(cor); }
+    }
+  };
+
+  window.mgAbrirNovaCategoria = function () {
+    var form = document.getElementById('mg-nova-cat-form');
+    var inp  = document.getElementById('mg_nova_cat_nome');
+    var err  = document.getElementById('mg-nova-cat-erro');
+    if (form) form.style.display = 'block';
+    if (err)  { err.style.display = 'none'; err.textContent = ''; }
+    if (inp)  { inp.value = ''; }
+    // Reset preset
+    var preset = document.getElementById('mg-cat-preset');
+    if (preset) preset.value = '';
+    // Reset preview
+    var previewNome = document.getElementById('mg-cat-preview-nome');
+    if (previewNome) previewNome.textContent = 'Nome da categoria';
+    var previewWrap = document.getElementById('mg-cat-preview-wrap');
+    if (previewWrap) {
+      previewWrap.style.background = '#888888';
+      previewWrap.innerHTML = '<i data-lucide="tag" style="width:18px;height:18px;stroke:#fff;"></i>';
+    }
+    // Reset ícone
+    document.querySelectorAll('.mg-cat-icone-btn').forEach(function (b) { b.classList.remove('mg-selecionado'); });
+    _mgCatIconeSel = '';
+    var hiddenIcone = document.getElementById('mg_nova_cat_icone');
+    if (hiddenIcone) hiddenIcone.value = '';
+    // Reset cor (seleciona cinza padrão)
+    _mgCatCorSel = '#888888';
+    var hiddenCor = document.getElementById('mg_nova_cat_cor_val');
+    if (hiddenCor) hiddenCor.value = '#888888';
+    var picker = document.getElementById('mg_nova_cat_cor');
+    if (picker) picker.value = '#888888';
+    var pickerBtn = document.getElementById('mg-cat-cor-picker-btn');
+    if (pickerBtn) pickerBtn.style.borderStyle = 'dashed';
+    document.querySelectorAll('.mg-cat-cor-swatch').forEach(function (s) { s.classList.remove('mg-selecionada'); });
+    var grayDefault = document.querySelector('.mg-cat-cor-swatch[data-hex="#888888"]');
+    if (grayDefault) grayDefault.classList.add('mg-selecionada');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (inp) inp.focus();
+  };
+
+  window.mgFecharNovaCategoria = function () {
+    var form = document.getElementById('mg-nova-cat-form');
+    if (form) form.style.display = 'none';
+  };
+
+  window.mgSalvarNovaCategoria = function () {
+    var nome  = ((document.getElementById('mg_nova_cat_nome')    || {}).value || '').trim();
+    var cor   = (document.getElementById('mg_nova_cat_cor_val')  || {}).value || '#888888';
+    var icone = (document.getElementById('mg_nova_cat_icone')    || {}).value || '';
+    var err   = document.getElementById('mg-nova-cat-erro');
+    if (!nome) {
+      if (err) { err.textContent = 'Digite o nome da categoria.'; err.style.display = 'block'; }
+      return;
+    }
+    var btn = document.getElementById('mg-btn-salvar-cat');
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando...'; }
+    if (err) err.style.display = 'none';
+    fetch('/api/categoria/criar/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrf() },
+      body: JSON.stringify({ nome: nome, cor: cor, icone: icone }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (data.ok) {
+        var sel = document.getElementById('mg_categoria');
+        if (sel) {
+          Array.from(sel.options).forEach(function (o) {
+            if (String(o.value) === String(data.id)) sel.removeChild(o);
+          });
+          var opt = document.createElement('option');
+          opt.value = data.id;
+          opt.textContent = data.nome;
+          opt.selected = true;
+          sel.appendChild(opt);
+        }
+        mgFecharNovaCategoria();
+      } else {
+        if (err) { err.textContent = data.error || 'Erro ao criar categoria.'; err.style.display = 'block'; }
+      }
+    })
+    .catch(function () {
+      if (err) { err.textContent = 'Erro de conexão. Tente novamente.'; err.style.display = 'block'; }
+    })
+    .finally(function () {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="check" style="width:14px;height:14px;"></i> Criar Categoria';
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
+    });
+  };
+
   function initGastoModal() {
     var mgTipo = document.getElementById("mg_tipo_pagamento");
     if (mgTipo) mgGastoTipoToggle(mgTipo.value);
+    // wrapper começa oculto — mgGastoTipoToggle já cuida disso, mas garante o reset
+    var recWrapper = document.getElementById('mg-recorrente-wrapper');
     var chkR = document.getElementById('mg_recorrente');
-    if (chkR) { chkR.checked = false; mgToggleRecorrente(false); }
+    if (recWrapper && (!mgTipo || mgTipo.value !== 'recorrente')) recWrapper.style.display = 'none';
+    if (chkR && (!mgTipo || mgTipo.value !== 'recorrente')) chkR.checked = false;
 
     var inp  = document.getElementById('mg_valor_total');
     var parc = document.getElementById('mg_total_parcelas');
@@ -241,61 +572,37 @@
 
   function initTableSort() {
     document.querySelectorAll(".tabela-dados").forEach(function (table) {
-      var headers = Array.from(table.querySelectorAll("thead th"));
-      headers.forEach(function (th, colIdx) {
+      if (table.dataset.sortBound) return;
+      table.dataset.sortBound = "1";
+      Array.from(table.querySelectorAll("thead th")).forEach(function (th) {
         if (!th.textContent.trim()) return;
         var icon = document.createElement("i");
         icon.className = "sort-icon";
         icon.textContent = "⇅";
         th.appendChild(icon);
-        th.dataset.sortDir = "";
-
-        th.addEventListener("click", function () {
-          var asc = th.dataset.sortDir !== "asc";
-          headers.forEach(function (h) {
-            h.dataset.sortDir = "";
-            var si = h.querySelector(".sort-icon");
-            if (si) { si.textContent = "⇅"; si.classList.remove("sort-ativo"); }
-          });
-          th.dataset.sortDir = asc ? "asc" : "desc";
-          icon.textContent = asc ? "↑" : "↓";
-          icon.classList.add("sort-ativo");
-
-          var tbody = table.querySelector("tbody");
-          if (!tbody) return;
-          var rows = Array.from(tbody.querySelectorAll("tr")).filter(function (r) {
-            return r.querySelectorAll("td").length > 1;
-          });
-          rows.sort(function (a, b) {
-            var aCell = a.querySelectorAll("td")[colIdx];
-            var bCell = b.querySelectorAll("td")[colIdx];
-            if (!aCell || !bCell) return 0;
-            var aText = aCell.textContent.replace(/\s+/g, " ").trim();
-            var bText = bCell.textContent.replace(/\s+/g, " ").trim();
-
-            var dateRe = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-            var aDate = aText.match(dateRe);
-            var bDate = bText.match(dateRe);
-            if (aDate && bDate) {
-              var av = +new Date(aDate[3], aDate[2] - 1, aDate[1]);
-              var bv = +new Date(bDate[3], bDate[2] - 1, bDate[1]);
-              return asc ? av - bv : bv - av;
-            }
-
-            var cleanNum = function (s) {
-              return parseFloat(s.replace(/[^\d,]/g, "").replace(",", "."));
-            };
-            var aNum = cleanNum(aText);
-            var bNum = cleanNum(bText);
-            if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
-
-            return asc
-              ? aText.localeCompare(bText, "pt-BR")
-              : bText.localeCompare(aText, "pt-BR");
-          });
-          rows.forEach(function (r) { tbody.appendChild(r); });
-        });
+        th.style.cursor = "pointer";
       });
+    });
+  }
+
+  window.meToggleRecorrente = function (checked) {
+    var hint  = document.getElementById('me_recorrente_hint');
+    var label = document.getElementById('me_data_label');
+    if (hint)  hint.style.display  = checked ? 'block' : 'none';
+    if (label) label.textContent   = checked ? 'Mês inicial *' : 'Data *';
+  };
+
+  function _injectNextParam() {
+    var mc = document.querySelector(".main-content");
+    if (!mc) return;
+    var current = window.location.pathname + window.location.search;
+    var pattern = /\/(editar|excluir|novo|nova|atualizar-saldo|liquidar)(\/|$|\?)/;
+    mc.querySelectorAll("a[href]").forEach(function (a) {
+      var href = a.getAttribute("href");
+      if (!href || href.charAt(0) !== "/") return;
+      if (!pattern.test(href)) return;
+      if (href.indexOf("next=") !== -1) return;
+      a.href = href + (href.indexOf("?") !== -1 ? "&" : "?") + "next=" + encodeURIComponent(current);
     });
   }
 
@@ -305,5 +612,6 @@
     initMesFiltro();
     initGastoModal();
     initTableSort();
+    _injectNextParam();
   });
 })();

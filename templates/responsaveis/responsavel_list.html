@@ -2,7 +2,72 @@
 {% block title %}Responsáveis — MyFinances{% endblock %}
 {% block page_title %}Responsáveis{% endblock %}
 
+{% block extra_head %}
+<style>
+/* Limita a tabela de cadastro a 5 linhas com scroll */
+.resp-cadastro-wrapper {
+  max-width: 600px;
+  max-height: 318px; /* thead ~54px + 5 linhas ~48px cada */
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* Seção de tabelas de gastos por responsável */
+.resp-gastos-bloco { margin-bottom: 32px; }
+
+.resp-gastos-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.resp-gastos-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--accent, #22c55e)22;
+  color: var(--accent, #22c55e);
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.resp-gastos-titulo h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+.resp-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent, #22c55e);
+}
+.resp-vazia {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Botão pago */
+.btn-pago-ativo {
+  background: rgba(34,197,94,.18) !important;
+  border-color: #22c55e !important;
+  color: #22c55e !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
+{% load gastos_tags %}
+
 <div class="page-header">
   <h1>Responsáveis</h1>
   <a href="{% url 'responsavel-create' %}" class="btn btn-primary">
@@ -10,12 +75,13 @@
   </a>
 </div>
 
-<div class="tabela-wrapper" style="max-width:600px;">
+{# Tabela de cadastro com scroll após 5 linhas #}
+<div class="resp-cadastro-wrapper">
   <table class="tabela-dados">
     <thead>
       <tr>
-        <th>Nome</th>
-        <th style="text-align:center;">Status</th>
+        <th style="text-align:left;">Nome</th>
+        <th>Status</th>
         <th>Cadastrado em</th>
         <th></th>
       </tr>
@@ -23,19 +89,19 @@
     <tbody>
       {% for r in responsaveis %}
       <tr>
-        <td style="font-weight:500;">
+        <td>
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:var(--accent)22;color:var(--accent);font-weight:700;font-size:13px;flex-shrink:0;">
               {{ r.nome|first|upper }}
             </span>
-            {{ r.nome }}
+            <span style="font-weight:500;">{{ r.nome }}</span>
           </div>
         </td>
         <td style="text-align:center;">
           {% if r.ativo %}<span class="badge badge-success">Ativo</span>{% else %}<span class="badge badge-danger">Inativo</span>{% endif %}
         </td>
-        <td style="text-align:right;color:var(--text-muted);font-size:12px;">{{ r.criado_em|date:"d/m/Y" }}</td>
-        <td style="white-space:nowrap;">
+        <td style="text-align:center;color:var(--text-muted);font-size:12px;">{{ r.criado_em|date:"d/m/Y" }}</td>
+        <td style="white-space:nowrap;text-align:right;">
           <a href="{% url 'responsavel-update' r.pk %}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
@@ -57,4 +123,153 @@
     </tbody>
   </table>
 </div>
+
+{% if responsaveis %}
+
+{# Filtros #}
+<form method="get" class="mes-filtro" style="margin-top:24px;flex-wrap:wrap;gap:12px;">
+  <label>Mês:</label>
+  <select name="mes" class="auto-submit">
+    {% include 'includes/mes_options.html' with mes_sel=mes_atual %}
+  </select>
+
+  <label>Ano:</label>
+  <select name="ano" class="auto-submit">
+    {% for y in anos_lista %}
+    <option value="{{ y }}" {% if ano_atual == y %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Responsável:</label>
+  <select name="responsavel" class="auto-submit">
+    <option value="">Todos</option>
+    {% for r in responsaveis %}
+    <option value="{{ r.pk }}" {% if filtro_responsavel == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.nome }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Cartão:</label>
+  <select name="cartao" class="auto-submit">
+    <option value="">Todos</option>
+    {% for c in cartoes_lista %}
+    <option value="{{ c.pk }}" {% if filtro_cartao == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+{# Uma tabela por responsável #}
+<div style="margin-top:8px;">
+  {% for r in responsaveis %}
+  {% with gastos=gastos_por_resp_tabela|get_item:r.pk total=totais_por_resp|get_item:r.pk %}
+  <div class="resp-gastos-bloco">
+
+    <div class="resp-gastos-titulo">
+      <span class="resp-gastos-avatar">{{ r.nome|first|upper }}</span>
+      <h3>{{ r.nome }}</h3>
+      {% if total %}
+        <span class="resp-total">R$ {{ total|brl }}</span>
+      {% endif %}
+
+      {# Toggle "Pago" — marca acerto do mês para este responsável #}
+      {% with pago=r.pk|stringformat:"s" %}
+      {% if r.pk in acertos_ids %}
+      <form method="post" action="{% url 'pagamento-toggle' 'acerto' r.pk %}" style="margin-left:auto;">
+        {% csrf_token %}
+        <input type="hidden" name="mes" value="{{ mes_atual }}">
+        <input type="hidden" name="ano" value="{{ ano_atual }}">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn btn-sm btn-pago-ativo" title="Clique para desmarcar">
+          <i data-lucide="check-circle"></i> Pago
+        </button>
+      </form>
+      {% else %}
+      <form method="post" action="{% url 'pagamento-toggle' 'acerto' r.pk %}" style="margin-left:auto;">
+        {% csrf_token %}
+        <input type="hidden" name="mes" value="{{ mes_atual }}">
+        <input type="hidden" name="ano" value="{{ ano_atual }}">
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" class="btn btn-sm btn-outline" title="Marcar como pago">
+          <i data-lucide="circle"></i> Marcar Pago
+        </button>
+      </form>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    {% if gastos %}
+    <div class="tabela-wrapper">
+      <table class="tabela-dados">
+        <thead>
+          <tr>
+            <th style="text-align:left;">Gasto</th>
+            <th>Tipo</th>
+            <th>Parcela</th>
+            <th style="text-align:left;">Cartão</th>
+            <th style="text-align:right;">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in gastos %}
+          <tr>
+            <td style="text-align:left;font-weight:500;white-space:normal;">{{ g.descricao }}</td>
+            <td style="text-align:center;">
+              {% if g.tipo_pagamento == 'credito_parcelado' %}
+                <span class="badge badge-parcelado">Parcelado</span>
+              {% elif g.tipo_pagamento == 'credito_avista' %}
+                <span class="badge badge-avista">À Vista</span>
+              {% elif g.tipo_pagamento == 'pix' %}
+                <span class="badge badge-pix">Pix</span>
+              {% elif g.tipo_pagamento == 'debito' %}
+                <span class="badge badge-debito">Débito</span>
+              {% elif g.tipo_pagamento == 'emprestimo' %}
+                <span class="badge badge-emprestimo">Empréstimo</span>
+              {% else %}
+                <span class="badge badge-outro">{{ g.tipo_label }}</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;font-size:13px;">
+              {% if g.parcela_num %}
+                {{ g.parcela_num }}/{{ g.parcela_total }}
+              {% elif g.tipo_pagamento == 'credito_avista' %}
+                À vista
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td style="text-align:left;">
+              {% if g.cartao %}
+                <span style="display:inline-flex;align-items:center;gap:6px;">
+                  <span style="width:8px;height:8px;border-radius:50%;background:{{ g.cartao.cor }};flex-shrink:0;display:inline-block;"></span>
+                  {{ g.cartao.nome }}
+                </span>
+              {% else %}
+                <span style="color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
+            <td style="text-align:right;font-weight:600;">R$ {{ g.valor_total|brl }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" style="text-align:right;font-weight:700;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Total</td>
+            <td style="text-align:right;font-weight:800;color:var(--accent,#22c55e);">
+              R$ {{ total|default:"0"|brl }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <div class="resp-vazia">
+      Nenhum gasto em {{ mes_atual }}/{{ ano_atual }}{% if filtro_responsavel or filtro_cartao %} com os filtros selecionados{% endif %}.
+    </div>
+    {% endif %}
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+
+{% endif %}
+
 {% endblock %}
