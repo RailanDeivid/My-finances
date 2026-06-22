@@ -104,7 +104,6 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         self.fields["cartao"].empty_label = "— Sem cartão —"
         self.fields["conta_origem"].required = False
         self.fields["conta_origem"].empty_label = "— Selecione a conta —"
-        from .models import Conta as _Conta
         kw = {"ativo": True}
         if user is not None:
             kw["user"] = user
@@ -112,18 +111,17 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         self.fields["responsavel"].queryset  = Responsavel.objects.filter(**kw)
         self.fields["categoria"].queryset    = Categoria.objects.filter(**kw)
         self.fields["dividir_com"].queryset  = Responsavel.objects.filter(**kw)
-        self.fields["conta_origem"].queryset = _Conta.objects.filter(**kw)
+        self.fields["conta_origem"].queryset = Conta.objects.filter(**kw)
 
     def clean(self):
         cleaned = super().clean()
         tipo = cleaned.get("tipo_pagamento")
         parcelas = cleaned.get("total_parcelas")
-        from .models import Gasto as _Gasto
         # "recorrente" é tratado como credito_avista para fins de validação
         tipo_val = "credito_avista" if tipo == "recorrente" else tipo
-        if tipo_val in _Gasto.TIPOS_CARTAO and not cleaned.get("cartao"):
+        if tipo_val in Gasto.TIPOS_CARTAO and not cleaned.get("cartao"):
             self.add_error("cartao", "Selecione um cartão para este tipo de pagamento.")
-        if tipo_val not in _Gasto.TIPOS_CARTAO:
+        if tipo_val not in Gasto.TIPOS_CARTAO:
             cleaned["cartao"] = None
             cleaned["total_parcelas"] = None
             cleaned["mes_inicio"] = None

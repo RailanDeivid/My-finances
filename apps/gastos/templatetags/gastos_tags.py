@@ -1,6 +1,28 @@
 from django import template
+from django.utils.html import mark_safe
 
 register = template.Library()
+
+_BADGE_TIPO_MAP = {
+    "credito_avista":    ("badge-avista",      "À Vista"),
+    "credito_parcelado": ("badge-parcelado",   "Parcelado"),
+    "pix":               ("badge-pix",         "Pix"),
+    "debito":            ("badge-debito",       "Débito"),
+    "emprestimo":        ("badge-emprestimo",  "Empréstimo"),
+    "recorrente":        ("badge-recorrente",  "Recorrente"),
+}
+
+
+@register.simple_tag
+def badge_tipo(tipo_pag, fallback_label=""):
+    """Renderiza o badge colorido de tipo de pagamento.
+    Para tipos conhecidos usa o label curto do mapa; fallback_label é usado só em tipos desconhecidos.
+    """
+    if tipo_pag in _BADGE_TIPO_MAP:
+        cls, texto = _BADGE_TIPO_MAP[tipo_pag]
+        return mark_safe(f'<span class="badge {cls}">{texto}</span>')
+    texto = fallback_label if fallback_label else (tipo_pag or "—")
+    return mark_safe(f'<span class="badge badge-outro">{texto}</span>')
 
 
 @register.filter(name="brl")

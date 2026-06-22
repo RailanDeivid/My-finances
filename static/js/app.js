@@ -111,16 +111,6 @@
 
     setupUserMenu();
 
-    // Confirmações declarativas: <a data-confirm="texto"> ou <button data-confirm="...">
-    document.body.addEventListener("click", function (e) {
-      var el = e.target.closest("[data-confirm]");
-      if (!el) return;
-      var msg = el.getAttribute("data-confirm");
-      if (msg && !window.confirm(msg)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    });
 
     if (typeof lucide !== "undefined") lucide.createIcons();
     document.body.classList.remove("preload");
@@ -223,11 +213,14 @@
       if (!inp.value) inp.value = today;
     });
 
-    // Mês e ano de início das parcelas: sempre inicia com mês/ano atual ao abrir
+    // Mês de início das parcelas: próximo mês em relação à data da compra
     var selMes = modal.querySelector("#mg_mes_inicio");
     var selAno = modal.querySelector("#mg_ano_inicio");
-    if (selMes) selMes.value = now.getMonth() + 1;
-    if (selAno) selAno.value = now.getFullYear();
+    var inpDataModal = modal.querySelector("#mg_data_compra");
+    var baseDate = (inpDataModal && inpDataModal.value) ? new Date(inpDataModal.value + 'T00:00:00') : now;
+    var proxMes = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+    if (selMes) selMes.value = proxMes.getMonth() + 1;
+    if (selAno) selAno.value = proxMes.getFullYear();
 
     if (id === "modal-novo-gasto") {
       var mgTipo = modal.querySelector("#mg_tipo_pagamento");
@@ -261,6 +254,8 @@
     if (!modal) return;
     document.getElementById("modal-delete-msg").textContent = msg;
     document.getElementById("modal-delete-form").action = action;
+    var nextInput = document.getElementById("modal-delete-next");
+    if (nextInput) nextInput.value = window.location.pathname + window.location.search;
     var titleEl = document.getElementById("modal-delete-title");
     if (titleEl) titleEl.textContent = titulo || "Excluir tudo?";
     var confirmBtn = document.getElementById("modal-delete-confirm-btn");
@@ -276,6 +271,29 @@
 
   window.closeDeleteModal = function () {
     var modal = document.getElementById("modal-delete-all");
+    if (modal) modal.style.display = "none";
+  };
+
+  window.openDeleteRecorrenteModal = function (action, descricao) {
+    var modal = document.getElementById("modal-delete-recorrente");
+    if (!modal) return;
+    var desc = document.getElementById("modal-rec-desc");
+    if (desc) desc.textContent = 'Deseja excluir "' + descricao + '"?';
+    var next = window.location.pathname + window.location.search;
+    ["modal-rec-form-este", "modal-rec-form-proximos"].forEach(function (id) {
+      var f = document.getElementById(id);
+      if (f) f.action = action;
+    });
+    var n1 = document.getElementById("modal-rec-next");
+    var n2 = document.getElementById("modal-rec-next2");
+    if (n1) n1.value = next;
+    if (n2) n2.value = next;
+    modal.style.display = "flex";
+    if (typeof lucide !== "undefined") lucide.createIcons({ root: modal });
+  };
+
+  window.closeDeleteRecorrenteModal = function () {
+    var modal = document.getElementById("modal-delete-recorrente");
     if (modal) modal.style.display = "none";
   };
 
@@ -357,19 +375,10 @@
     'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'
   ];
 
-  window.MESES_ABREV = [
-    'Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'
-  ];
-
   window.formatBRL = function (value) {
     return 'R$ ' + Number(value).toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
-  };
-
-  window.parseDateBR = function (txt) {
-    var dm = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    return dm ? parseInt(dm[3] + dm[2] + dm[1]) : null;
   };
 })();

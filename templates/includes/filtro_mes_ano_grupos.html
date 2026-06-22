@@ -1,0 +1,15 @@
+<div class="filtro-group">
+  <label class="filtro-label">Mês</label>
+  <select name="mes" class="auto-submit">
+    {% include 'includes/mes_options.html' with mes_sel=mes_sel show_all=True %}
+  </select>
+</div>
+<div class="filtro-group">
+  <label class="filtro-label">Ano</label>
+  <select name="ano" class="auto-submit">
+    <option value="">— Todos —</option>
+    {% for y in anos_lista %}
+    <option value="{{ y }}" {% if ano_sel == y|stringformat:"s" or ano_sel == y %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+</div>

@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var TIPOS_CARTAO = ["credito_avista", "credito_parcelado"];
+  var TIPOS_CARTAO = ["credito_avista", "credito_parcelado", "recorrente"];
 
   // ── Formulário de Gasto: parcelas dinâmicas + filtro de cartões ──────────
   function initGastoForm() {
@@ -101,9 +101,7 @@
 
   function _injectPageAssets(doc) {
     // ── Estilos do <head> ({% block extra_head %}) ────────────────────────
-    // Remove os estilos injetados pela navegação anterior
     document.querySelectorAll("style[data-ajax-page]").forEach(function (el) { el.remove(); });
-    // Injeta os novos estilos de página
     doc.querySelectorAll("head style").forEach(function (style) {
       var s = document.createElement("style");
       s.textContent = style.textContent;
@@ -112,26 +110,42 @@
     });
 
     // ── Scripts do body fora do main-content ({% block extra_js %}) ───────
-    // São filhos diretos de <body> — ex: inicialização de gráficos Chart.js
-    doc.querySelectorAll("body > script").forEach(function (script) {
+    // Processa em sequência: scripts externos aguardam onload antes do próximo,
+    // evitando que scripts inline executem antes de bibliotecas externas (Chart.js).
+    var scripts = Array.from(doc.querySelectorAll("body > script"));
+
+    function runNext(i) {
+      if (i >= scripts.length) return;
+      var script = scripts[i];
       var ns = document.createElement("script");
       if (script.src) {
+        var existing = document.querySelector('script[data-ajax-src="' + script.src + '"]');
+        if (existing) { runNext(i + 1); return; }
+        ns.setAttribute("data-ajax-src", script.src);
         ns.src = script.src;
+        ns.onload  = function () { runNext(i + 1); };
+        ns.onerror = function () { runNext(i + 1); };
+        document.head.appendChild(ns);
       } else {
         ns.textContent = script.textContent;
+        document.head.appendChild(ns);
+        document.head.removeChild(ns);
+        runNext(i + 1);
       }
-      document.head.appendChild(ns);
-      document.head.removeChild(ns);
-    });
+    }
+
+    runNext(0);
   }
 
   function ajaxNavigate(url) {
     var mc = document.querySelector(".main-content");
     if (!mc) { window.location.href = url; return; }
 
-    // Dimina levemente sem esconder — conteúdo fica visível durante o carregamento
-    mc.style.opacity = "0.55";
-    mc.style.pointerEvents = "none";
+    // Só aplica dim se a requisição demorar >250ms — evita piscar em respostas rápidas
+    var dimTimer = setTimeout(function () {
+      mc.style.opacity = "0.88";
+      mc.style.pointerEvents = "none";
+    }, 250);
 
     fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
       .then(function (r) {
@@ -139,6 +153,7 @@
         return r.text();
       })
       .then(function (html) {
+        clearTimeout(dimTimer);
         var doc = new DOMParser().parseFromString(html, "text/html");
         var newMc = doc.querySelector(".main-content");
         if (!newMc) { window.location.href = url; return; }
@@ -178,11 +193,13 @@
         initCartaoForm();
         _injectNextParam();
 
-        // Restaura opacidade instantaneamente — sem transição para evitar "piscar"
         mc.style.opacity = "";
         mc.style.pointerEvents = "";
       })
-      .catch(function () { window.location.href = url; });
+      .catch(function () {
+        clearTimeout(dimTimer);
+        window.location.href = url;
+      });
   }
 
   window.ajaxNavigate = ajaxNavigate;
@@ -246,16 +263,16 @@
     el = document.getElementById('mg-cartao-adicional-row');  if (el) el.style.display = isC ? 'block' : 'none';
     el = document.getElementById('mg-conta-origem-row');      if (el) el.style.display = isD ? 'block' : 'none';
     el = document.getElementById('mg-parcelas-row');     if (el) el.style.display = isP ? 'block' : 'none';
-    el = document.getElementById('mg-inicio-row');       if (el) el.style.display = (isP || isA) ? 'block' : 'none';
-    el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : 'Mês de início das parcelas';
+    el = document.getElementById('mg-inicio-row');       if (el) el.style.display = (isP || isA || isRec) ? 'block' : 'none';
+    el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : (isRec ? 'Mês de início' : 'Mês de início das parcelas');
     el = document.getElementById('mg_label_valor');      if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
 
     // Desabilita campos ocultos para evitar validação HTML5 em campos escondidos
     _mgSetDisabled('mg_cartao',        !isC);
     _mgSetDisabled('mg_conta_origem',  !isD);
     _mgSetDisabled('mg_total_parcelas',!isP);
-    _mgSetDisabled('mg_mes_inicio',    !(isP || isA));
-    _mgSetDisabled('mg_ano_inicio',    !(isP || isA));
+    _mgSetDisabled('mg_mes_inicio',    !(isP || isA || isRec));
+    _mgSetDisabled('mg_ano_inicio',    !(isP || isA || isRec));
 
     var dataRow = document.getElementById('mg-data-row');
     if (dataRow) {
@@ -563,11 +580,22 @@
     if (parc) parc.addEventListener('input', function() { mgAtualizarTotal(); mgAtualizarPreview(); });
     if (selR) selR.addEventListener('change',function() { if (chkD && chkD.checked) mgAtualizarDivisao(); });
 
-    var now  = new Date();
     var selM = document.getElementById('mg_mes_inicio');
     var selA = document.getElementById('mg_ano_inicio');
-    if (selM) selM.value = now.getMonth() + 1;
-    if (selA) selA.value = now.getFullYear();
+    var inpD = document.getElementById('mg_data_compra');
+
+    function mgSincronizarInicioParc(dataVal) {
+      var d = dataVal ? new Date(dataVal + 'T00:00:00') : new Date();
+      var proximo = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+      if (selM) selM.value = proximo.getMonth() + 1;
+      if (selA) selA.value = proximo.getFullYear();
+      if (typeof mgAtualizarPreview === 'function') mgAtualizarPreview();
+    }
+
+    if (inpD) {
+      inpD.addEventListener('change', function() { mgSincronizarInicioParc(inpD.value); });
+    }
+    mgSincronizarInicioParc(inpD ? inpD.value : '');
   }
 
   function initTableSort() {

@@ -7,7 +7,8 @@ from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
-from django.db.models import Count, Sum, Q, F
+from django.db.models import Count, Sum, Q, F, Case, When, ExpressionWrapper, Value
+from django.db.models import DecimalField as DjDecimalField
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
@@ -77,14 +78,39 @@ def _impacto_q(user):
     return Q(responsavel__usuario_vinculado=user)
 
 
+def _agg_sum(qs, field="valor_total"):
+    """Atalho para .aggregate(Sum(field))["t"] or Decimal("0")."""
+    return qs.aggregate(_t=Sum(field))["_t"] or Decimal("0")
+
+
+def _agg_sum_compra(qs):
+    """Soma valor_compra_total: para divididos usa valor_total*100/pct_divisao, senão valor_total."""
+    return qs.aggregate(
+        _t=Sum(
+            Case(
+                When(
+                    grupo_divisao__isnull=False,
+                    pct_divisao__gt=0,
+                    then=ExpressionWrapper(
+                        F('valor_total') * Value(Decimal('100')) / F('pct_divisao'),
+                        output_field=DjDecimalField(max_digits=12, decimal_places=2)
+                    )
+                ),
+                default=F('valor_total'),
+                output_field=DjDecimalField(max_digits=12, decimal_places=2)
+            )
+        )
+    )['_t'] or Decimal('0')
+
+
 def _calcular_saldo_mes(mes, ano, user=None):
     qs_gasto = Gasto.objects.filter(data_compra__month=mes, data_compra__year=ano)
     qs_entrada = Entrada.objects.filter(data__month=mes, data__year=ano)
     if user is not None:
         qs_gasto = qs_gasto.filter(_impacto_q(user))
         qs_entrada = qs_entrada.filter(user=user)
-    total_gastos = qs_gasto.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-    total_entradas = qs_entrada.aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    total_gastos = _agg_sum(qs_gasto)
+    total_entradas = _agg_sum(qs_entrada, "valor")
     return total_entradas, total_gastos, total_entradas - total_gastos
 
 
@@ -251,17 +277,7 @@ class SimpleUpdateMixin:
         return super().form_valid(form)
 
 
-class SimpleDeleteMixin:
-    """form_valid genérico: exibe mensagem de sucesso e delega ao pai."""
-    success_message = ""
-
-    def get_success_url(self):
-        return _safe_next_url(self.request, str(self.success_url))
-
-    def form_valid(self, form):
-        if self.success_message:
-            messages.success(self.request, self.success_message)
-        return super().form_valid(form)
+SimpleDeleteMixin = SimpleUpdateMixin
 
 
 def _mes_vizinhos(mes, ano):
@@ -340,26 +356,19 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         ).filter(filtros_q)
 
         _TIPOS_GASTO = ["credito_avista", "credito_parcelado", "debito", "pix"]
-        total_gasto = (
-            gastos_mes_proprios.filter(tipo_pagamento__in=_TIPOS_GASTO)
-            .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        )
+        total_gasto = _agg_sum(gastos_mes_proprios.filter(tipo_pagamento__in=_TIPOS_GASTO))
 
         contas = Conta.objects.filter(user=user, ativo=True)
-        total_contas = contas.aggregate(t=Sum("saldo_atual"))["t"] or Decimal("0")
+        total_contas = _agg_sum(contas, "saldo_atual")
         # Saldo sem filtros (filtros não afetam o saldo real)
-        total_gasto_real = (
+        total_gasto_real = _agg_sum(
             Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(tipo_pagamento__in=_TIPOS_GASTO)
-            .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
         )
         saldo = total_contas - total_gasto_real
 
         # Total para os rodapés das tabelas Gastos e Entradas e Saídas (tudo que aparece nas linhas)
-        total_gastos_tabela = (
-            (gastos_mes.aggregate(t=Sum("valor_total"))["t"] or Decimal("0"))
-            + (gastos_atribuidos.aggregate(t=Sum("valor_total"))["t"] or Decimal("0"))
-        )
+        total_gastos_tabela = _agg_sum(gastos_mes) + _agg_sum(gastos_atribuidos)
 
         ctx["total_gasto"] = total_gasto
         ctx["total_gastos_tabela"] = total_gastos_tabela
@@ -370,33 +379,25 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         mes_ant, ano_ant, _, _ = _mes_vizinhos(mes, ano)
 
         gastos_mes_ant_qs = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes_ant, data_compra__year=ano_ant)
-        ctx["total_gasto_ant"]  = gastos_mes_ant_qs.filter(tipo_pagamento__in=_TIPOS_GASTO).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_cartao_ant"] = gastos_mes_ant_qs.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_debito_ant"] = gastos_mes_ant_qs.filter(tipo_pagamento="debito").aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_pix_ant"]    = gastos_mes_ant_qs.filter(tipo_pagamento="pix").aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_gasto_ant"]  = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=_TIPOS_GASTO))
+        ctx["total_cartao_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]))
+        ctx["total_debito_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="debito"))
+        ctx["total_pix_ant"]    = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="pix"))
 
         # Gastos do mês do próprio usuário, atribuídos ao seu responsável (base para cards e tabelas)
         gastos_mes_base = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes, data_compra__year=ano).filter(filtros_q)
 
-        ctx["total_cartao"] = gastos_mes_base.filter(
-            tipo_pagamento__in=["credito_avista", "credito_parcelado"]
-        ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_cartao_todos"] = (
+        ctx["total_cartao"] = _agg_sum(gastos_mes_base.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]))
+        ctx["total_cartao_todos"] = _agg_sum(
             Gasto.objects.filter(
                 user=user,
                 data_compra__month=mes,
                 data_compra__year=ano,
                 tipo_pagamento__in=["credito_avista", "credito_parcelado"],
-            )
-            .filter(filtros_q)
-            .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+            ).filter(filtros_q)
         )
-        ctx["total_debito"] = gastos_mes_base.filter(
-            tipo_pagamento="debito"
-        ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_pix"] = gastos_mes_base.filter(
-            tipo_pagamento="pix"
-        ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_debito"] = _agg_sum(gastos_mes_base.filter(tipo_pagamento="debito"))
+        ctx["total_pix"]    = _agg_sum(gastos_mes_base.filter(tipo_pagamento="pix"))
         ctx["tabela_por_responsavel"] = (
             Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(filtros_q)
@@ -517,11 +518,11 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         ctx["dash_rosca_labels"] = _safe_json(list(tipo_dash.keys()))
         ctx["dash_rosca_dados"]  = _safe_json([round(v, 2) for v in tipo_dash.values()])
 
-        # Por categoria (gráfico pizza) — ano completo, respeita filtros ativos
+        # Por categoria (gráfico pizza) — mês/ano selecionado, apenas gastos do próprio user
         gastos_cat_qs = Gasto.objects.filter(
-            _impacto_q(user),
+            user=user,
             data_compra__year=ano,
-            data_compra__month__gte=_mes_ini_display,
+            data_compra__month=mes,
         ).filter(filtros_q)
         por_categoria = (
             gastos_cat_qs.values("categoria__nome", "categoria__cor")
@@ -536,10 +537,10 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             c["categoria__cor"] or "#888888" for c in por_categoria
         ])
 
-        # Gráfico de período — ano selecionado, a partir do mês de início
+        # Gráfico de período — ano selecionado, apenas gastos do próprio user
         meses_nomes = _MESES_ABREV
         periodo_qs = Gasto.objects.filter(
-            _impacto_q(user),
+            user=user,
             data_compra__year=ano,
             data_compra__month__gte=_mes_ini_display,
         ).filter(filtros_q).values("data_compra__month", "data_compra__year")
@@ -567,8 +568,8 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             transacoes.append({
                 "data": g.data_compra,
                 "tipo": "gasto",
-                "tipo_pag": g.tipo_pagamento,
-                "tipo_label": g.get_tipo_pagamento_display(),
+                "tipo_pag": "recorrente" if g.grupo_recorrente else g.tipo_pagamento,
+                "tipo_label": "Recorrente" if g.grupo_recorrente else g.get_tipo_pagamento_display(),
                 "descricao": g.descricao,
                 "categoria": g.categoria,
                 "responsavel": str(g.responsavel),
@@ -607,8 +608,8 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             transacoes.append({
                 "data": g.data_compra,
                 "tipo": "gasto",
-                "tipo_pag": g.tipo_pagamento,
-                "tipo_label": g.get_tipo_pagamento_display(),
+                "tipo_pag": "recorrente" if g.grupo_recorrente else g.tipo_pagamento,
+                "tipo_label": "Recorrente" if g.grupo_recorrente else g.get_tipo_pagamento_display(),
                 "descricao": g.descricao,
                 "categoria": g.categoria,
                 "responsavel": str(g.responsavel),
@@ -625,6 +626,8 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
 
         transacoes.sort(key=lambda x: x["data"], reverse=True)
         ctx["transacoes_mes"] = transacoes
+        ctx["entradas_mes_lista"] = entradas_lista
+        ctx["total_entradas_tabela"] = sum(float(e.valor) for e in entradas_lista)
 
         # Tabela: Gastos vs Entradas — Visão Mensal
         entradas_qs = (
@@ -649,8 +652,6 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
                 tipo_pagamento__in=["credito_avista", "credito_parcelado"],
             ).values("data_compra__year", "data_compra__month").annotate(t=Sum("valor_total"))
         }
-
-
 
         # Derivar saldo de 1º de Janeiro a partir do saldo atual das contas.
         # total_contas = balance_jan1 + próprias_entradas_ytd − próprios_débitos_ytd
@@ -716,16 +717,9 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
                 ctx["saldo"] = Decimal(str(col["saldo_atual"]))
                 break
 
-        # Gráfico ⑥ "Gastos vs Receitas" — inclui atribuídos, segue filtros ativos
-        gastos_filtrado_qs = Gasto.objects.filter(_impacto_q(user)).filter(filtros_q)
-
-        gastos_filtrado_map = {
-            (r["data_compra__year"], r["data_compra__month"]): float(r["t"] or 0)
-            for r in gastos_filtrado_qs.values("data_compra__year", "data_compra__month").annotate(t=Sum("valor_total"))
-        }
-
+        # Gráficos "Gastos vs Receitas" e "Receitas ao Longo do Tempo" — dados totais do user, sem filtro de responsável
         ctx["comp_labels"]   = json.dumps([c["label"] for c in tabela_mensal_display])
-        ctx["comp_gastos"]   = json.dumps([gastos_filtrado_map.get(k, 0.0) for k in todos_meses_display])
+        ctx["comp_gastos"]   = json.dumps([gastos_map.get(k, 0.0) for k in todos_meses_display])
         ctx["comp_entradas"] = json.dumps([c["entradas"] + c["saldo_ant"] for c in tabela_mensal_display])
         ctx["comp_saldo"]    = json.dumps([c["saldo_atual"] for c in tabela_mensal_display])
         ctx["comp_receitas"] = json.dumps([c["entradas"] for c in tabela_mensal_display])
@@ -955,7 +949,12 @@ class GastoListView(MesAnoMixin, UserOwnedMixin, ListView):
         if categoria:
             qs = qs.filter(categoria_id=categoria)
         if tipo:
-            qs = qs.filter(tipo_pagamento=tipo)
+            if tipo == "recorrente":
+                qs = qs.filter(grupo_recorrente__isnull=False)
+            elif tipo == "credito_avista":
+                qs = qs.filter(tipo_pagamento="credito_avista", grupo_recorrente__isnull=True)
+            else:
+                qs = qs.filter(tipo_pagamento=tipo)
         if busca:
             qs = qs.filter(descricao__icontains=busca)
         return qs
@@ -967,7 +966,7 @@ class GastoListView(MesAnoMixin, UserOwnedMixin, ListView):
         ctx["categorias"] = Categoria.objects.filter(ativo=True, user=self.request.user)
         ctx["tipos"] = Gasto.TIPO_PAGAMENTO_CHOICES
         ctx["filtros"] = self.request.GET
-        ctx["total_filtrado"] = self.object_list.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_filtrado"] = _agg_sum(self.object_list)
         return ctx
 
 
@@ -1130,13 +1129,42 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
     template_name = "gastos/gasto_form.html"
     success_url = reverse_lazy("gasto-list")
 
+    def _is_divisao_main(self, obj):
+        """Retorna True se este gasto é o lado 'próprio' de um split (responsável vinculado ao user logado)."""
+        if not obj or not obj.grupo_divisao:
+            return False
+        vinculado = obj.responsavel.usuario_vinculado
+        return vinculado is None or vinculado == self.request.user
+
     def get_initial(self):
         initial = super().get_initial()
         obj = self.object or self.get_object()
         if obj and obj.data_compra:
             initial["mes_inicio"] = obj.data_compra.month
             initial["ano_inicio"] = obj.data_compra.year
+        if obj and obj.tipo_pagamento == "credito_parcelado":
+            m = _PARCELA_GROUP_RE.match(obj.descricao)
+            if m:
+                initial["descricao"] = m.group(1).strip()
+        if obj and obj.grupo_divisao:
+            # Parceiro = outro responsável (diferente do atual) no mesmo grupo
+            parceiro = (
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=obj.grupo_divisao,
+                ).exclude(pk=obj.pk).exclude(responsavel=obj.responsavel).first()
+            )
+            initial["dividir_gasto"] = True
+            if parceiro:
+                initial["dividir_com"] = parceiro.responsavel_id
+            initial["pct_responsavel"] = str(obj.pct_divisao or 50)
         return initial
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        if self.object and self.object.grupo_recorrente:
+            form.initial["tipo_pagamento"] = "recorrente"
+        return form
 
     def form_valid(self, form):
         old = self.object
@@ -1144,11 +1172,21 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         old_tipo = old.tipo_pagamento
         old_conta_id = old.conta_origem_id
         old_valor = old.valor_total
+        # Captura ANTES de form.save pois old is gasto (mesmo objeto Python)
+        old_descricao = old.descricao
+        old_grupo_parcelado = (
+            _encontrar_grupo_parcelado(old, self.request.user)
+            if old.tipo_pagamento == "credito_parcelado" else []
+        )
 
         # Reverte débito anterior antes de salvar
         _reverter_debito(old_tipo, old_conta_id, old_valor)
 
         gasto = form.save(commit=False)
+
+        # "recorrente" é alias de UI: converte para credito_avista
+        if gasto.tipo_pagamento == "recorrente":
+            gasto.tipo_pagamento = "credito_avista"
 
         # Aplica mes_inicio/ano_inicio como data_compra para crédito à vista
         if gasto.tipo_pagamento == "credito_avista":
@@ -1160,14 +1198,58 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                 except (ValueError, TypeError):
                     pass
 
+        # Atualiza pct_divisao se o formulário enviou pct_responsavel (edição do lado principal)
+        pct_responsavel_raw = form.cleaned_data.get("pct_responsavel")
+        if pct_responsavel_raw and gasto.grupo_divisao:
+            new_pct = int(pct_responsavel_raw)
+            if gasto.pct_divisao != new_pct:
+                gasto.pct_divisao = new_pct
+
+        # Propaga descrição para todo o grupo parcelado
+        if old.tipo_pagamento == "credito_parcelado":
+            m_old = _PARCELA_GROUP_RE.match(old_descricao)
+            if m_old:
+                old_base = m_old.group(1).strip()
+                new_base = gasto.descricao.strip()
+                # Restaura o sufixo "(X/N)" na parcela que está sendo salva
+                gasto.descricao = f"{new_base} ({m_old.group(2)}/{m_old.group(3)})"
+                if new_base != old_base:
+                    # Atualiza todas as outras parcelas do mesmo responsável
+                    for p in old_grupo_parcelado:
+                        if p.pk == gasto.pk:
+                            continue
+                        m_p = _PARCELA_GROUP_RE.match(p.descricao)
+                        if m_p:
+                            p.descricao = f"{new_base} ({m_p.group(2)}/{m_p.group(3)})"
+                            p.save(update_fields=["descricao"])
+                    # Se dividido: propaga para o outro lado (todas as parcelas)
+                    if old.grupo_divisao:
+                        for p in Gasto.objects.filter(
+                            user=self.request.user,
+                            grupo_divisao=old.grupo_divisao,
+                        ).exclude(responsavel=old.responsavel):
+                            m_p = _PARCELA_GROUP_RE.match(p.descricao)
+                            if m_p:
+                                p.descricao = f"{new_base} ({m_p.group(2)}/{m_p.group(3)})"
+                                p.save(update_fields=["descricao"])
+
         gasto.save()
+
+        # Propaga descrição para recorrentes futuros (mesmo grupo_recorrente)
+        if gasto.grupo_recorrente and gasto.descricao != old_descricao:
+            Gasto.objects.filter(
+                user=self.request.user,
+                grupo_recorrente=gasto.grupo_recorrente,
+                data_compra__gte=gasto.data_compra,
+            ).exclude(pk=gasto.pk).update(descricao=gasto.descricao)
 
         # Aplica novo débito
         _debitar_conta(gasto)
 
         usuario_atribuido = gasto.responsavel.usuario_vinculado
 
-        # Sincroniza com o outro lado do split (se existir)
+        # Sincroniza com o outro lado do split (se existir) — exclui o próprio responsável para
+        # não pegar outra parcela do mesmo responsável em grupos de parcelado+dividido
         if gasto.grupo_divisao:
             parceiro = (
                 Gasto.objects.filter(
@@ -1177,6 +1259,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                     data_compra__year=data_antiga.year,
                 )
                 .exclude(pk=gasto.pk)
+                .exclude(responsavel=gasto.responsavel)
                 .first()
             )
             if parceiro:
@@ -1195,6 +1278,39 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                     "total_parcelas", "categoria", "valor_total", "pct_divisao",
                 ])
 
+        # Propaga valor para os próximos meses (recorrente ou dividido)
+        aplicar_escopo = self.request.POST.get("aplicar_escopo", "apenas_este")
+        if aplicar_escopo == "este_e_proximos":
+            novo_valor = gasto.valor_total
+            pct_meu = Decimal(gasto.pct_divisao or 50)
+            if gasto.grupo_recorrente:
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_recorrente=gasto.grupo_recorrente,
+                    responsavel=gasto.responsavel,
+                    data_compra__gt=gasto.data_compra,
+                ).update(valor_total=novo_valor)
+                if gasto.grupo_divisao:
+                    valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
+                    Gasto.objects.filter(
+                        user=self.request.user,
+                        grupo_recorrente=gasto.grupo_recorrente,
+                        data_compra__gt=gasto.data_compra,
+                    ).exclude(responsavel=gasto.responsavel).update(valor_total=valor_parceiro)
+            elif gasto.grupo_divisao:
+                valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=gasto.grupo_divisao,
+                    responsavel=gasto.responsavel,
+                    data_compra__gt=gasto.data_compra,
+                ).update(valor_total=novo_valor)
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=gasto.grupo_divisao,
+                    data_compra__gt=gasto.data_compra,
+                ).exclude(responsavel=gasto.responsavel).update(valor_total=valor_parceiro)
+
         _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
         if gasto.data_compra != data_antiga:
             _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, self.request.user)
@@ -1202,13 +1318,25 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
             _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, usuario_atribuido)
             if gasto.data_compra != data_antiga:
                 _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, usuario_atribuido)
-        messages.success(self.request, "Gasto atualizado com sucesso.")
+        if aplicar_escopo == "este_e_proximos" and (gasto.grupo_recorrente or gasto.grupo_divisao):
+            messages.success(self.request, "Gasto atualizado e alterações aplicadas aos próximos meses.")
+        else:
+            messages.success(self.request, "Gasto atualizado com sucesso.")
         return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["titulo"] = "Editar Gasto"
+        ctx["is_edit"] = True
         gasto = self.object
+        ctx["is_divisao_main"] = self._is_divisao_main(gasto)
+        if gasto.grupo_divisao:
+            ctx["parceiro_divisao"] = (
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_divisao=gasto.grupo_divisao,
+                ).exclude(responsavel=gasto.responsavel).first()
+            )
         if gasto.tipo_pagamento == "credito_parcelado":
             grupo = _encontrar_grupo_parcelado(gasto, self.request.user)
             if len(grupo) > 1:
@@ -1361,6 +1489,20 @@ class GastoDeleteView(UserOwnedMixin, DeleteView):
             if parceiro:
                 parceiro_resp_pk = parceiro.responsavel_id
 
+        # Exclusão de recorrentes: "apenas_este" ou "este_e_proximos"
+        delete_mode = self.request.POST.get("delete_mode", "apenas_este")
+        if gasto.grupo_recorrente and delete_mode == "este_e_proximos":
+            proximos = list(
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_recorrente=gasto.grupo_recorrente,
+                    data_compra__gte=gasto.data_compra,
+                ).exclude(pk=gasto.pk)
+            )
+            for p in proximos:
+                _reverter_debito(p.tipo_pagamento, p.conta_origem_id, p.valor_total)
+                p.delete()
+
         response = super().form_valid(form)  # deleta o gasto principal
 
         if parceiro:
@@ -1386,8 +1528,9 @@ class GastoDeleteView(UserOwnedMixin, DeleteView):
         _recalcular_saldos_a_partir(mes, ano, self.request.user)
         if usuario_atribuido and usuario_atribuido != self.request.user:
             _recalcular_saldos_a_partir(mes, ano, usuario_atribuido)
-        messages.success(self.request, "Gasto excluído com sucesso.")
-        return response
+        msg = "Gasto recorrente excluído (este e os próximos)." if (gasto.grupo_recorrente and delete_mode == "este_e_proximos") else "Gasto excluído com sucesso."
+        messages.success(self.request, msg)
+        return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
 
 # ── Cartões ─────────────────────────────────────────────────────────────
@@ -1456,8 +1599,8 @@ class CartaoDetailView(MesAnoMixin, UserOwnedMixin, DetailView):
             qs = qs.filter(responsavel_id=responsavel_id)
 
         ctx["gastos"] = qs
-        ctx["total_fatura"] = qs.aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        ctx["total_adicional"] = qs.filter(cartao_adicional=True).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        ctx["total_fatura"]    = _agg_sum(qs)
+        ctx["total_adicional"] = _agg_sum(qs.filter(cartao_adicional=True))
         ctx["mes_ant"], ctx["ano_ant"], ctx["mes_prox"], ctx["ano_prox"] = _mes_vizinhos(mes, ano)
         ctx["responsaveis"] = Responsavel.objects.filter(user=request.user, ativo=True).order_by("nome")
         ctx["filtro_tipo_cartao"] = tipo_cartao
@@ -1729,10 +1872,10 @@ class EntradaListView(MesAnoMixin, UserOwnedMixin, ListView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx["filtros"] = self.request.GET
-        ctx["total_filtrado"] = self.get_queryset().aggregate(t=Sum("valor"))["t"] or Decimal("0")
+        ctx["total_filtrado"] = _agg_sum(self.get_queryset(), "valor")
         ctx["tipos_entrada"] = Entrada.TIPO_CHOICES
         por_tipo = {
-            t: self.get_queryset().filter(tipo=t).aggregate(s=Sum("valor"))["s"] or Decimal("0")
+            t: _agg_sum(self.get_queryset().filter(tipo=t), "valor")
             for t, _ in Entrada.TIPO_CHOICES
             if t != "saldo_anterior"
         }

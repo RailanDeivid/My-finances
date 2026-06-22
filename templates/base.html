@@ -6,11 +6,11 @@
   <title>{% block title %}MyFinances{% endblock %}</title>
   {% load static %}
   <link rel="icon" type="image/svg+xml" href="{% static 'img/piggy-bank.svg' %}">
-  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=38">
-  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=38">
-  <script defer src="{% static 'js/lucide.min.js' %}?v=38"></script>
-  <script defer src="{% static 'js/app.js' %}?v=38"></script>
-  <script defer src="{% static 'js/gastos.js' %}?v=38"></script>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}?v=40">
+  <link rel="stylesheet" href="{% static 'css/app-extra.css' %}?v=40">
+  <script defer src="{% static 'js/lucide.min.js' %}?v=40"></script>
+  <script defer src="{% static 'js/app.js' %}?v=40"></script>
+  <script defer src="{% static 'js/gastos.js' %}?v=43"></script>
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% if request.COOKIES.theme == 'light' %}light-theme{% else %}dark-theme{% endif %}{% if request.COOKIES.sidebar_collapsed == 'true' %} sidebar-collapsed{% endif %} preload">
@@ -156,10 +156,49 @@
         </button>
         <form id="modal-delete-form" method="post" style="display:contents;">
           {% csrf_token %}
+          <input type="hidden" name="next" id="modal-delete-next" value="">
           <button id="modal-delete-confirm-btn" type="submit" class="btn btn-primary" style="min-width:160px;font-size:14px;">
             <i data-lucide="trash-2"></i> Confirmar exclusão
           </button>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal exclusão de compra recorrente -->
+  <div id="modal-delete-recorrente"
+       style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
+              align-items:center;justify-content:center;padding:24px;">
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
+                padding:36px 32px;max-width:440px;width:100%;text-align:center;
+                box-shadow:0 24px 48px rgba(0,0,0,0.4);">
+      <div style="width:64px;height:64px;border-radius:50%;background:#ef444420;
+                  display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+        <i data-lucide="repeat" style="width:30px;height:30px;color:#a855f7;"></i>
+      </div>
+      <h3 style="margin:0 0 8px;font-size:19px;font-weight:700;color:var(--text);">Excluir compra recorrente</h3>
+      <p id="modal-rec-desc" style="margin:0 0 24px;color:var(--text-muted);font-size:14px;line-height:1.65;"></p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <form id="modal-rec-form-este" method="post" style="display:contents;">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="modal-rec-next" value="">
+          <input type="hidden" name="delete_mode" value="apenas_este">
+          <button type="submit" class="btn btn-primary" style="font-size:14px;width:100%;">
+            <i data-lucide="calendar-x"></i> Excluir apenas este mês
+          </button>
+        </form>
+        <form id="modal-rec-form-proximos" method="post" style="display:contents;">
+          {% csrf_token %}
+          <input type="hidden" name="next" id="modal-rec-next2" value="">
+          <input type="hidden" name="delete_mode" value="este_e_proximos">
+          <button type="submit" class="btn btn-danger" style="font-size:14px;width:100%;">
+            <i data-lucide="calendar-off"></i> Excluir este e os próximos
+          </button>
+        </form>
+        <button type="button" onclick="closeDeleteRecorrenteModal()"
+                class="btn" style="font-size:13px;width:100%;color:var(--text-muted);">
+          Cancelar
+        </button>
       </div>
     </div>
   </div>

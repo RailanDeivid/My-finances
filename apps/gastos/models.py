@@ -392,6 +392,14 @@ class Gasto(models.Model):
         verbose_name_plural = "Gastos"
         ordering = ["-data_compra", "-criado_em"]
 
+    @property
+    def valor_compra_total(self):
+        """Valor total da compra antes da divisão. Para gastos não-divididos, igual a valor_total."""
+        from decimal import Decimal
+        if self.grupo_divisao and self.pct_divisao:
+            return (self.valor_total * Decimal("100") / Decimal(self.pct_divisao)).quantize(Decimal("0.01"))
+        return self.valor_total
+
     def __str__(self):
         return f"{self.descricao} — R$ {self.valor_total} ({self.data_compra})"
 

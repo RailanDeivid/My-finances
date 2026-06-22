@@ -23,7 +23,6 @@
     <input type="hidden" name="responsavel"    value="{{ object.responsavel_id }}">
     <input type="hidden" name="tipo_pagamento" value="{{ object.tipo_pagamento }}">
     <input type="hidden" name="cartao"         value="{{ object.cartao_id|default:'' }}">
-    <input type="hidden" name="descricao"      value="{{ object.descricao }}">
     <input type="hidden" name="data_compra"    value="{{ object.data_compra|date:'Y-m-d' }}">
     <input type="hidden" name="mes_inicio"     value="{{ object.data_compra.month }}">
     <input type="hidden" name="ano_inicio"     value="{{ object.data_compra.year }}">
@@ -47,8 +46,9 @@
         <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.get_tipo_pagamento_display }}</div>
       </div>
       <div class="form-group" style="margin:0;">
-        <label class="form-label">Descrição</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.descricao }}</div>
+        <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição *</label>
+        {{ form.descricao }}
+        {% if form.descricao.errors %}<div class="field-error">{{ form.descricao.errors.0 }}</div>{% endif %}
       </div>
       <div class="form-group" style="margin:0;">
         <label class="form-label">Cartão</label>
@@ -115,6 +115,19 @@
       {% if form.cartao.errors %}<div class="field-error">{{ form.cartao.errors.0 }}</div>{% endif %}
     </div>
 
+    <!-- 3b-rec. Opções de Compra Recorrente -->
+    <div id="recorrente-row" style="display:none;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;">
+      <input type="checkbox" name="recorrente" id="id_recorrente" style="display:none;">
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label" style="font-size:12px;">Repetir por</label>
+        {{ form.recorrente_meses }}
+      </div>
+      <div style="padding:8px 10px;background:#8b5cf611;border-radius:6px;font-size:12px;color:#a78bfa;">
+        <i data-lucide="info" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
+        <span id="rec-info-txt">Um gasto será gerado para cada um dos próximos 12 meses.</span>
+      </div>
+    </div>
+
     <!-- 3c. Cartão Adicional (condicional com cartão) -->
     <div id="cartao-adicional-row" style="display:none;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
@@ -155,8 +168,16 @@
       </div>
       <div class="form-group" id="data-row" style="grid-column:2;grid-row:1;">
         <label class="form-label">Data da Compra *</label>
-        {{ form.data_compra }}
-        {% if form.data_compra.errors %}<div class="field-error">{{ form.data_compra.errors.0 }}</div>{% endif %}
+        {% if is_edit %}
+          <div class="form-control" style="opacity:.75;cursor:not-allowed;pointer-events:none;background:var(--bg-secondary);display:flex;align-items:center;gap:6px;">
+            <i data-lucide="lock" style="width:13px;height:13px;flex-shrink:0;opacity:.6;"></i>
+            {{ object.data_compra|date:"d/m/Y" }}
+          </div>
+          <input type="hidden" name="data_compra" value="{{ object.data_compra|date:'Y-m-d' }}">
+        {% else %}
+          {{ form.data_compra }}
+          {% if form.data_compra.errors %}<div class="field-error">{{ form.data_compra.errors.0 }}</div>{% endif %}
+        {% endif %}
       </div>
     </div>
 
@@ -179,7 +200,7 @@
         </div>
         <div id="inicio-parcelas-dica" style="margin-top:8px;font-size:11px;color:var(--text-muted);">
           <i data-lucide="info" style="width:11px;height:11px;vertical-align:middle;stroke:var(--text-muted);"></i>
-          Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.
+          <span id="inicio-dica-txt">Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.</span>
         </div>
         <div id="preview-parcelas" style="margin-top:10px;display:none;">
           <span id="pp-primeira" style="font-size:12px;font-weight:600;color:var(--accent);"></span>
@@ -197,7 +218,15 @@
       {% if form.categoria.errors %}<div class="field-error">{{ form.categoria.errors.0 }}</div>{% endif %}
     </div>
 
-    <!-- 8. Divisão de gasto -->
+    <!-- 9. Observação -->
+    <div class="form-group">
+      <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
+      {{ form.observacao }}
+    </div>
+
+    {% endif %}{# fim parcelado_edit #}
+
+    <!-- Divisão de gasto (aparece em ambos os modos) -->
     <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;margin:0;">
         <input type="checkbox" id="id_dividir_gasto" name="dividir_gasto"{% if form.dividir_gasto.value %} checked{% endif %}
@@ -242,13 +271,26 @@
       </div>
     </div>
 
-    <!-- 9. Observação -->
-    <div class="form-group">
-      <label class="form-label" for="{{ form.observacao.id_for_label }}">Observação</label>
-      {{ form.observacao }}
+    {% if is_edit and object.grupo_recorrente or is_edit and object.grupo_divisao %}
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:10px;">
+        <i data-lucide="calendar-range" style="width:12px;height:12px;vertical-align:-1px;"></i>
+        Aplicar alterações em:
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;">
+          <input type="radio" name="aplicar_escopo" value="apenas_este" checked
+                 style="width:15px;height:15px;accent-color:var(--accent);">
+          <span>Apenas este mês</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;">
+          <input type="radio" name="aplicar_escopo" value="este_e_proximos"
+                 style="width:15px;height:15px;accent-color:var(--accent);">
+          <span>Este e os próximos</span>
+        </label>
+      </div>
     </div>
-
-    {% endif %}{# fim parcelado_edit #}
+    {% endif %}
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">
@@ -384,15 +426,22 @@ function pgCancelarEdit(pk) {
 
   var mesesNomes = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+  var IS_EDIT = {% if is_edit %}true{% else %}false{% endif %};
+
   (function() {
-    var now = new Date();
-    var mesAtual = now.getMonth() + 1;
-    var anoAtual = now.getFullYear();
-    if (selMes && parseInt(selMes.value, 10) === 1 && mesAtual !== 1) selMes.value = mesAtual;
-    if (selAno) selAno.value = anoAtual;
+    // Em modo edição, mes_inicio já vem preenchido pelo servidor — não sobrescrever
+    if (IS_EDIT) return;
+    if (inputData && inputData.value) {
+      sincronizarInicio();
+    } else {
+      var now = new Date();
+      var proximo = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      if (selMes) selMes.value = proximo.getMonth() + 1;
+      if (selAno) selAno.value = proximo.getFullYear();
+    }
   })();
 
-  var inicioDirty = false;
+  var inicioDirty = IS_EDIT;
   if (selMes) selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
   if (selAno) selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
   if (inputData) inputData.addEventListener('change', function() {
@@ -403,10 +452,10 @@ function pgCancelarEdit(pk) {
   function sincronizarInicio() {
     var val = inputData ? inputData.value : '';
     if (!val) return;
-    var partes = val.split('-');
-    if (partes.length < 2) return;
-    if (selMes) selMes.value = parseInt(partes[1], 10);
-    if (selAno) selAno.value = parseInt(partes[0], 10);
+    var d = new Date(val + 'T00:00:00');
+    var proximo = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    if (selMes) selMes.value = proximo.getMonth() + 1;
+    if (selAno) selAno.value = proximo.getFullYear();
   }
 
   function atualizarLayout() {
@@ -414,27 +463,37 @@ function pgCancelarEdit(pk) {
     var tipo = tipoSelect.value;
     var isParcelado = tipo === 'credito_parcelado';
     var isAvista    = tipo === 'credito_avista';
-    var isCartao    = TIPOS_CARTAO.indexOf(tipo) !== -1;
+    var isCartao    = TIPOS_CARTAO.indexOf(tipo) !== -1 || tipo === 'recorrente';
     var isDebito    = tipo === 'debito';
+
+    var isRecorrente = tipo === 'recorrente';
 
     if (cartaoRow) cartaoRow.style.display = isCartao ? 'block' : 'none';
     var adicionalRow = document.getElementById('cartao-adicional-row');
     if (adicionalRow) adicionalRow.style.display = isCartao ? 'block' : 'none';
     var contaRow = document.getElementById('conta-origem-row');
     if (contaRow) contaRow.style.display = isDebito ? 'block' : 'none';
+    var recRow = document.getElementById('recorrente-row');
+    if (recRow) recRow.style.display = isRecorrente ? 'block' : 'none';
+    var chkRec = document.getElementById('id_recorrente');
+    if (chkRec) chkRec.checked = isRecorrente;
 
     // Mostrar bloco mês/ano para crédito à vista E parcelado
     var titulo  = document.getElementById('inicio-parcelas-titulo');
     var mesLabel = document.getElementById('mes-inicio-label');
     var dica    = document.getElementById('inicio-parcelas-dica');
 
-    if (isParcelado || isAvista) {
+    if (isParcelado || isAvista || isRecorrente) {
       inicioRow.style.display = 'block';
-      var isP_label = isParcelado ? 'Mês de início das parcelas' : 'Mês da Fatura';
-      var isM_label = isParcelado ? 'Mês da 1ª Parcela *'        : 'Mês da Fatura *';
+      var isP_label = isParcelado ? 'Mês de início das parcelas' : (isRecorrente ? 'Mês de início' : 'Mês da Fatura');
+      var isM_label = isParcelado ? 'Mês da 1ª Parcela *'        : (isRecorrente ? 'Primeiro mês *' : 'Mês da Fatura *');
       if (titulo)   titulo.textContent   = isP_label;
       if (mesLabel) mesLabel.textContent = isM_label;
-      if (dica)     dica.style.display   = isAvista ? 'block' : 'block';
+      if (dica)     dica.style.display   = 'block';
+      var dicaTxt = document.getElementById('inicio-dica-txt');
+      if (dicaTxt) dicaTxt.textContent = isRecorrente
+        ? 'A recorrência será gerada a partir deste mês.'
+        : 'Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.';
       if (!inicioDirty) sincronizarInicio();
     } else {
       inicioRow.style.display = 'none';
@@ -506,9 +565,23 @@ function pgCancelarEdit(pk) {
     previewParc.style.gap = '6px';
   }
 
-  inputValor.addEventListener('input', function(){ atualizarTotal(); atualizar(); });
-  inputParcelas.addEventListener('input', function(){ atualizarTotal(); atualizarPreview(); });
-  tipoSelect.addEventListener('change', atualizarLayout);
+  // Atualiza texto informativo de recorrente
+  var selRecMeses = document.getElementById('id_recorrente_meses');
+  function atualizarRecInfo() {
+    var txt = document.getElementById('rec-info-txt');
+    if (!txt || !selRecMeses) return;
+    var v = selRecMeses.value;
+    if (v === 'sempre') {
+      txt.textContent = 'Um gasto será gerado todo mês até dezembro/2050.';
+    } else {
+      txt.textContent = 'Um gasto será gerado para cada um dos próximos ' + v + ' meses.';
+    }
+  }
+  if (selRecMeses) selRecMeses.addEventListener('change', atualizarRecInfo);
+
+  if (inputValor)    inputValor.addEventListener('input', function(){ atualizarTotal(); atualizar(); });
+  if (inputParcelas) inputParcelas.addEventListener('input', function(){ atualizarTotal(); atualizarPreview(); });
+  if (tipoSelect)    tipoSelect.addEventListener('change', atualizarLayout);
 
   atualizarLayout();
 })();

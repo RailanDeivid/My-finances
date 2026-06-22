@@ -1,6 +1,6 @@
 {
   "intents": {
-    "gasto":   ["gastei","comprei","paguei","compras","despesa","saída","saida","débito","debito"],
+    "gasto":   ["gastei","comprei","paguei","compras","despesa","saída","saida","débito","debito","compra"],
     "entrada": ["recebi","salário","salario","entrada","renda","ganho","receita","depósito","deposito"],
     "cartao":  ["novo cartão","novo cartao","cadastrar cartão","cadastrar cartao","adicionar cartão"],
     "resumo":  ["resumo","extrato","saldo","quanto gastei","quanto tenho","balanço","balanco","relatório"],
@@ -8,14 +8,63 @@
     "cancelar":["cancelar","sair","parar","stop"]
   },
   "tipo_pagamento": {
-    "pix":               ["pix","transferência","transferencia","ted","doc","transf"],
-    "credito_avista":    ["à vista","avista","a vista","crédito à vista","credito a vista"],
-    "credito_parcelado": ["parcelado","parcelas","prestações","prestacoes"],
-    "emprestimo":        ["empréstimo","emprestimo"]
+    "pix":               ["pix","transferência","transferencia","ted","doc","transf","via pix","pelo pix"],
+    "credito_avista":    ["à vista","avista","a vista","crédito à vista","credito a vista","no crédito","no credito","cartão crédito","cartao credito"],
+    "credito_parcelado": ["parcelado","parcelas","prestações","prestacoes","em vezes","x de"],
+    "emprestimo":        ["empréstimo","emprestimo"],
+    "debito":            ["débito","debito","no débito","no debito","cartão débito","cartao debito","debit"]
   },
   "tipo_entrada": {
-    "salario": ["salário","salario","sal","pagamento","holerite"],
-    "bonus":   ["bônus","bonus","gratificação","premiação","extra"],
-    "outros":  ["outros","outro","misc","freelance","freela"]
+    "salario": ["salário","salario","sal","pagamento","holerite","contra-cheque","contracheque"],
+    "bonus":   ["bônus","bonus","gratificação","premiação","extra","comissão","comissao"],
+    "outros":  ["outros","outro","misc","freelance","freela","renda extra","aluguel"]
+  },
+  "divisao": {
+    "meio_a_meio":   ["meio a meio","metade cada","50/50","50 50","dividido igual","igual","metade"],
+    "sim":           ["dividido","rachar","racha","divisão","divisao","dividir","split","dividiram","dividido entre","dividi com","divide com"],
+    "parcelas_pct":  ["60/40","60 e 40","40/60","40 e 60","70/30","30/70","75/25","25/75","80/20","20/80","60 40","40 60","70 30"]
+  },
+  "datas": {
+    "hoje":       ["hoje","agora","neste momento","este momento"],
+    "ontem":      ["ontem"],
+    "anteontem":  ["anteontem","antes de ontem"],
+    "meses": {
+      "1":  ["janeiro","jan"],
+      "2":  ["fevereiro","fev"],
+      "3":  ["março","marco","mar"],
+      "4":  ["abril","abr"],
+      "5":  ["maio","mai"],
+      "6":  ["junho","jun"],
+      "7":  ["julho","jul"],
+      "8":  ["agosto","ago"],
+      "9":  ["setembro","set"],
+      "10": ["outubro","out"],
+      "11": ["novembro","nov"],
+      "12": ["dezembro","dez"]
+    }
+  },
+  "categorias_hint": {
+    "Supermercado":  ["supermercado","mercado","atacadão","atacado","sacolão","feira","hortifruti","pão de açúcar","carrefour","extra","atacadista"],
+    "Alimentação":   ["restaurante","almoço","almoco","jantar","refeição","refeicao","comida","lanchonete","prato","cantina"],
+    "Café":          ["café","cafe","cafeteria","expresso","capuccino","starbucks"],
+    "Bar / Bebida":  ["bar","pub","cerveja","chopp","bebida","dose","drink","boteco","happy hour"],
+    "Pizza":         ["pizza","pizzaria","dominos","domino's"],
+    "Lanche":        ["lanche","hamburguer","burger","mcdonalds","mcdonald","subway","bob's","bobs","giraffas","kfc","batata frita","pastel","hot dog","cachorro quente"],
+    "Combustível":   ["gasolina","combustível","combustivel","etanol","diesel","alcool","abastecimento","posto","shell","ipiranga","petrobras"],
+    "Uber / Taxi":   ["uber","99","táxi","taxi","cabify","bolt","corrida","aplicativo"],
+    "Farmácia":      ["farmácia","farmacia","remédio","remedio","medicamento","drogaria","droga"],
+    "Saúde":         ["médico","medico","consulta","hospital","clínica","clinica","dentista","exame","plano de saúde"],
+    "Academia":      ["academia","gym","musculação","musculacao","crossfit","pilates","natação","natacao"],
+    "Vestuário":     ["roupa","camiseta","camisa","calça","calca","tênis","tenis","sapato","sandália","vestido","bermuda","casaco","jaqueta","moda"],
+    "Educação":      ["escola","faculdade","curso","aula","mensalidade","material escolar","livro","apostila"],
+    "Assinaturas":   ["netflix","spotify","amazon","disney","hbo","globoplay","youtube","prime","streaming","assinatura","mensalidade"],
+    "Celular":       ["celular","smartphone","iphone","samsung","xiaomi","aparelho"],
+    "Tecnologia":    ["notebook","computador","laptop","tablet","hd","ssd","memória","placa","fone","headset","monitor"],
+    "Energia":       ["energia","luz","conta de luz","enel","elektro","celpe","cemig","copel","coelce"],
+    "Água":          ["água","agua","conta de água","sabesp","caema","cagece"],
+    "Pet":           ["ração","racao","pet shop","veterinário","veterinario","animais","petshop","dog","gato","cachorro"],
+    "Empréstimo":    ["empréstimo","emprestimo","parcela do empréstimo","financiamento","crédito pessoal"],
+    "Viagem":        ["hotel","hospedagem","passagem","voo","avião","aviao","latam","gol","azul","airbnb","viagem","turismo","aeroporto","mala"],
+    "Lazer":         ["cinema","show","teatro","parque","museu","evento","passeio","ingresso"]
   }
 }

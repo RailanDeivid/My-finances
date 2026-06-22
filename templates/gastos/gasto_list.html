@@ -8,21 +8,7 @@
 <!-- Filtros -->
 <form method="get" class="filtros-form" style="margin-bottom:18px;">
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-    <div class="filtro-group">
-      <label class="filtro-label">Mês</label>
-      <select name="mes" class="auto-submit">
-        {% include 'includes/mes_options.html' with mes_sel=filtros.mes show_all=True %}
-      </select>
-    </div>
-    <div class="filtro-group">
-      <label class="filtro-label">Ano</label>
-      <select name="ano" class="auto-submit">
-        <option value="">— Todos —</option>
-        {% for y in anos_lista %}
-        <option value="{{ y }}" {% if filtros.ano == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {% include 'includes/filtro_mes_ano_grupos.html' with mes_sel=mes ano_sel=ano %}
     <div class="filtro-group">
       <label class="filtro-label">Responsável</label>
       <select name="responsavel" class="auto-submit">
@@ -101,10 +87,12 @@
         <th>Descrição</th>
         <th>Categoria</th>
         <th>Responsável</th>
+        <th style="text-align:center;">Dividido</th>
         <th>Cartão</th>
         <th>Tipo</th>
         <th>Parcelas</th>
-        <th>Valor</th>
+        <th>Valor Gasto</th>
+        <th>Valor Total</th>
         <th></th>
       </tr>
     </thead>
@@ -123,41 +111,53 @@
           {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td>{{ g.responsavel }}</td>
+        <td style="text-align:center;">
+          {% if g.grupo_divisao %}
+            <i data-lucide="check-circle-2" style="width:16px;height:16px;stroke:#22c55e;"></i>
+          {% else %}
+            <span style="color:var(--text-muted);font-size:12px;">—</span>
+          {% endif %}
+        </td>
         <td>
           {% if g.cartao %}
             <span class="badge badge-cartao" style="background:{{ g.cartao.cor }}22;color:{{ g.cartao.cor }};">{{ g.cartao.nome }}</span>
           {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td>
-          {% if g.tipo_pagamento == "credito_avista" %}<span class="badge badge-avista">À Vista</span>
-          {% elif g.tipo_pagamento == "credito_parcelado" %}<span class="badge badge-parcelado">Parcelado</span>
-          {% elif g.tipo_pagamento == "pix" %}<span class="badge badge-pix">Pix</span>
-          {% elif g.tipo_pagamento == "debito" %}<span class="badge badge-debito">Débito</span>
-          {% elif g.tipo_pagamento == "emprestimo" %}<span class="badge badge-emprestimo">Empréstimo</span>
-          {% else %}<span class="badge badge-outro">{{ g.get_tipo_pagamento_display }}</span>{% endif %}
+          {% if g.grupo_recorrente %}{% badge_tipo "recorrente" "Recorrente" %}{% else %}{% badge_tipo g.tipo_pagamento g.get_tipo_pagamento_display %}{% endif %}
         </td>
         <td style="text-align:center;">
-          {% if g.tipo_pagamento == "credito_parcelado" %}
-            {{ g.total_parcelas }}x
-            {% if g.grupo_divisao %}<br><span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>{% endif %}
-          {% elif g.grupo_divisao %}
-            <span class="badge" style="font-size:9px;background:rgba(99,102,241,.15);color:#818cf8;">÷ dividido</span>
-          {% else %}—{% endif %}
+          {% if g.tipo_pagamento == "credito_parcelado" %}{{ g.total_parcelas }}x{% else %}—{% endif %}
         </td>
         <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|brl }}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          {% if g.grupo_divisao %}
+            <span style="font-weight:600;color:var(--text);">R$ {{ g.valor_compra_total|brl }}</span>
+            <span style="font-size:10px;color:var(--text-muted);display:block;">{{ g.pct_divisao }}% seu</span>
+          {% else %}
+            <span style="font-weight:600;">R$ {{ g.valor_total|brl }}</span>
+          {% endif %}
+        </td>
         <td style="white-space:nowrap;">
-          <a href="{% url 'gasto-update' g.pk %}" class="btn btn-sm" title="Editar">
+          <a href="{% url 'gasto-update' g.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
+          {% if g.grupo_recorrente %}
+          <button type="button" class="btn btn-sm btn-danger" title="Excluir"
+                  onclick="openDeleteRecorrenteModal('{% url 'gasto-delete' g.pk %}', '{{ g.descricao|escapejs }}')">
+            <i data-lucide="trash-2"></i>
+          </button>
+          {% else %}
           <button type="button" class="btn btn-sm btn-danger" title="Excluir"
                   onclick="openDeleteModal('{% url 'gasto-delete' g.pk %}', 'Excluir \'{{ g.descricao|escapejs }}\'? Esta ação não pode ser desfeita.')">
             <i data-lucide="trash-2"></i>
           </button>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="9">
+        <td colspan="11">
           {% url 'gasto-create' as create_url %}
           {% with es_icon="receipt" es_title="Nenhum gasto encontrado" es_description="Nenhum gasto corresponde aos filtros aplicados, ou ainda não há gastos registrados." es_url=create_url es_button="Registrar gasto" %}
             {% include "includes/empty_state.html" %}
@@ -169,9 +169,9 @@
     {% if gastos %}
     <tfoot>
       <tr style="border-top:2px solid var(--border);">
-        <td colspan="7" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total filtrado</td>
+        <td colspan="8" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total filtrado</td>
         <td style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">R$ {{ total_filtrado|brl }}</td>
-        <td></td>
+        <td colspan="2"></td>
       </tr>
     </tfoot>
     {% endif %}

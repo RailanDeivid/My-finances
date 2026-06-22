@@ -20,6 +20,8 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 # HTTPS / cookies seguros
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
+# Webhook chamado internamente via HTTP pelo evolution-api — não redireciona
+SECURE_REDIRECT_EXEMPT = [r"^webhook/"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000

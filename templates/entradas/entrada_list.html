@@ -8,21 +8,7 @@
 <!-- Filtros -->
 <form method="get" class="filtros-form" style="margin-bottom:18px;">
   <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
-    <div class="filtro-group">
-      <label class="filtro-label">Mês</label>
-      <select name="mes" class="auto-submit">
-        {% include 'includes/mes_options.html' with mes_sel=filtros.mes show_all=True %}
-      </select>
-    </div>
-    <div class="filtro-group">
-      <label class="filtro-label">Ano</label>
-      <select name="ano" class="auto-submit">
-        <option value="">— Todos —</option>
-        {% for y in anos_lista %}
-        <option value="{{ y }}" {% if filtros.ano == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    {% include 'includes/filtro_mes_ano_grupos.html' with mes_sel=mes ano_sel=ano %}
     <div class="filtro-group">
       <label class="filtro-label">Tipo</label>
       <select name="tipo" class="auto-submit">
@@ -103,8 +89,10 @@
         <td style="white-space:nowrap;">
           {% if not e.auto_gerada %}
           <a href="{% url 'entrada-update' e.pk %}" class="btn btn-sm"><i data-lucide="pencil"></i></a>
-          <a href="{% url 'entrada-delete' e.pk %}" class="btn btn-sm btn-danger"
-             data-confirm="Excluir esta entrada?"><i data-lucide="trash-2"></i></a>
+          <button type="button" class="btn btn-sm btn-danger"
+                  onclick="openDeleteModal('{% url 'entrada-delete' e.pk %}', 'Excluir esta entrada? Esta ação não pode ser desfeita.')">
+            <i data-lucide="trash-2"></i>
+          </button>
           {% else %}
           <span style="font-size:10px;color:var(--text-muted);">Auto</span>
           {% endif %}
