@@ -12,7 +12,6 @@ _MESES = [
     (5,"Maio"),(6,"Junho"),(7,"Julho"),(8,"Agosto"),
     (9,"Setembro"),(10,"Outubro"),(11,"Novembro"),(12,"Dezembro"),
 ]
-_ANO_ATUAL = _dt.date.today().year
 _ANOS = [(y, y) for y in range(2026, 2051)]
 
 

@@ -251,6 +251,11 @@
     if (el) el.disabled = disabled;
   }
 
+  function _show(id, visible) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = visible ? 'block' : 'none';
+  }
+
   window.mgGastoTipoToggle = function (tipo) {
     var TIPOS_C = TIPOS_CARTAO;
     var isRec = tipo === 'recorrente';
@@ -259,11 +264,11 @@
     var isA = tipo === 'credito_avista';
     var isD = tipo === 'debito';
     var el;
-    el = document.getElementById('mg-cartao-row');            if (el) el.style.display = isC ? 'block' : 'none';
-    el = document.getElementById('mg-cartao-adicional-row');  if (el) el.style.display = isC ? 'block' : 'none';
-    el = document.getElementById('mg-conta-origem-row');      if (el) el.style.display = isD ? 'block' : 'none';
-    el = document.getElementById('mg-parcelas-row');     if (el) el.style.display = isP ? 'block' : 'none';
-    el = document.getElementById('mg-inicio-row');       if (el) el.style.display = (isP || isA || isRec) ? 'block' : 'none';
+    _show('mg-cartao-row',           isC);
+    _show('mg-cartao-adicional-row', isC);
+    _show('mg-conta-origem-row',     isD);
+    _show('mg-parcelas-row',         isP);
+    _show('mg-inicio-row',           isP || isA || isRec);
     el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : (isRec ? 'Mês de início' : 'Mês de início das parcelas');
     el = document.getElementById('mg_label_valor');      if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
 

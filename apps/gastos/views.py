@@ -7,8 +7,7 @@ from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
-from django.db.models import Count, Sum, Q, F, Case, When, ExpressionWrapper, Value
-from django.db.models import DecimalField as DjDecimalField
+from django.db.models import Sum, Q, F
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
@@ -82,25 +81,6 @@ def _agg_sum(qs, field="valor_total"):
     """Atalho para .aggregate(Sum(field))["t"] or Decimal("0")."""
     return qs.aggregate(_t=Sum(field))["_t"] or Decimal("0")
 
-
-def _agg_sum_compra(qs):
-    """Soma valor_compra_total: para divididos usa valor_total*100/pct_divisao, senão valor_total."""
-    return qs.aggregate(
-        _t=Sum(
-            Case(
-                When(
-                    grupo_divisao__isnull=False,
-                    pct_divisao__gt=0,
-                    then=ExpressionWrapper(
-                        F('valor_total') * Value(Decimal('100')) / F('pct_divisao'),
-                        output_field=DjDecimalField(max_digits=12, decimal_places=2)
-                    )
-                ),
-                default=F('valor_total'),
-                output_field=DjDecimalField(max_digits=12, decimal_places=2)
-            )
-        )
-    )['_t'] or Decimal('0')
 
 
 def _calcular_saldo_mes(mes, ano, user=None):
@@ -185,6 +165,18 @@ def _recalcular_saldos_a_partir(mes, ano, user=None):
         entrada.save(update_fields=["valor", "descricao"])
 
         prox += relativedelta(months=1)
+
+
+def _recalcular_para_datas(data_antiga, data_nova, user):
+    """Recalcula saldos na data antiga e, se mudou, também na nova."""
+    _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, user)
+    if data_nova != data_antiga:
+        _recalcular_saldos_a_partir(data_nova.month, data_nova.year, user)
+
+
+def _get_primary_responsavel(user):
+    """Retorna o responsável vinculado ao próprio usuário, se existir."""
+    return Responsavel.objects.filter(user=user, usuario_vinculado=user).first()
 
 
 _MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
@@ -278,6 +270,16 @@ class SimpleUpdateMixin:
 
 
 SimpleDeleteMixin = SimpleUpdateMixin
+
+
+class TituloContextMixin:
+    """Injeta ctx['titulo'] a partir do atributo de classe ``titulo``."""
+    titulo = ""
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["titulo"] = self.titulo
+        return ctx
 
 
 def _mes_vizinhos(mes, ano):
@@ -979,7 +981,7 @@ class GastoCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
     def get_initial(self):
         hoje = date.today()
         initial = {"mes_inicio": hoje.month, "ano_inicio": hoje.year}
-        resp = Responsavel.objects.filter(user=self.request.user, usuario_vinculado=self.request.user).first()
+        resp = _get_primary_responsavel(self.request.user)
         if resp:
             initial["responsavel"] = resp.pk
         return initial
@@ -1311,13 +1313,9 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                     data_compra__gt=gasto.data_compra,
                 ).exclude(responsavel=gasto.responsavel).update(valor_total=valor_parceiro)
 
-        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
-        if gasto.data_compra != data_antiga:
-            _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, self.request.user)
+        _recalcular_para_datas(data_antiga, gasto.data_compra, self.request.user)
         if usuario_atribuido and usuario_atribuido != self.request.user:
-            _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, usuario_atribuido)
-            if gasto.data_compra != data_antiga:
-                _recalcular_saldos_a_partir(gasto.data_compra.month, gasto.data_compra.year, usuario_atribuido)
+            _recalcular_para_datas(data_antiga, gasto.data_compra, usuario_atribuido)
         if aplicar_escopo == "este_e_proximos" and (gasto.grupo_recorrente or gasto.grupo_divisao):
             messages.success(self.request, "Gasto atualizado e alterações aplicadas aos próximos meses.")
         else:
@@ -1608,30 +1606,22 @@ class CartaoDetailView(MesAnoMixin, UserOwnedMixin, DetailView):
         return ctx
 
 
-class CartaoCreateView(SimpleCreateMixin, UserOwnedMixin, CreateView):
+class CartaoCreateView(TituloContextMixin, SimpleCreateMixin, UserOwnedMixin, CreateView):
     model = Cartao
     form_class = CartaoForm
     template_name = "cartoes/cartao_form.html"
     success_url = reverse_lazy("cartao-list")
     success_message = "Cartão criado com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Novo Cartão"
-        return ctx
+    titulo = "Novo Cartão"
 
 
-class CartaoUpdateView(SimpleUpdateMixin, UserOwnedMixin, UpdateView):
+class CartaoUpdateView(TituloContextMixin, SimpleUpdateMixin, UserOwnedMixin, UpdateView):
     model = Cartao
     form_class = CartaoForm
     template_name = "cartoes/cartao_form.html"
     success_url = reverse_lazy("cartao-list")
     success_message = "Cartão atualizado com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Editar Cartão"
-        return ctx
+    titulo = "Editar Cartão"
 
 
 class CartaoDeleteView(UserOwnedMixin, DeleteView):
@@ -1747,30 +1737,22 @@ class ResponsavelListView(MesAnoMixin, UserOwnedMixin, ListView):
         return ctx
 
 
-class ResponsavelCreateView(SimpleCreateMixin, UserOwnedMixin, CreateView):
+class ResponsavelCreateView(TituloContextMixin, SimpleCreateMixin, UserOwnedMixin, CreateView):
     model = Responsavel
     form_class = ResponsavelForm
     template_name = "responsaveis/responsavel_form.html"
     success_url = reverse_lazy("responsavel-list")
     success_message = "Responsável criado com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Novo Responsável"
-        return ctx
+    titulo = "Novo Responsável"
 
 
-class ResponsavelUpdateView(SimpleUpdateMixin, UserOwnedMixin, UpdateView):
+class ResponsavelUpdateView(TituloContextMixin, SimpleUpdateMixin, UserOwnedMixin, UpdateView):
     model = Responsavel
     form_class = ResponsavelForm
     template_name = "responsaveis/responsavel_form.html"
     success_url = reverse_lazy("responsavel-list")
     success_message = "Responsável atualizado com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Editar Responsável"
-        return ctx
+    titulo = "Editar Responsável"
 
 
 class ResponsavelDeleteView(UserOwnedMixin, DeleteView):
@@ -1819,30 +1801,22 @@ class CategoriaListView(UserOwnedMixin, ListView):
     context_object_name = "categorias"
 
 
-class CategoriaCreateView(SimpleCreateMixin, CategoriaFormMixin, UserOwnedMixin, CreateView):
+class CategoriaCreateView(TituloContextMixin, SimpleCreateMixin, CategoriaFormMixin, UserOwnedMixin, CreateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
     success_url = reverse_lazy("categoria-list")
     success_message = "Categoria criada com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Nova Categoria"
-        return ctx
+    titulo = "Nova Categoria"
 
 
-class CategoriaUpdateView(SimpleUpdateMixin, CategoriaFormMixin, UserOwnedMixin, UpdateView):
+class CategoriaUpdateView(TituloContextMixin, SimpleUpdateMixin, CategoriaFormMixin, UserOwnedMixin, UpdateView):
     model = Categoria
     form_class = CategoriaForm
     template_name = "categorias/categoria_form.html"
     success_url = reverse_lazy("categoria-list")
     success_message = "Categoria atualizada com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Editar Categoria"
-        return ctx
+    titulo = "Editar Categoria"
 
 
 class CategoriaDeleteView(SimpleDeleteMixin, UserOwnedMixin, DeleteView):
@@ -1883,15 +1857,16 @@ class EntradaListView(MesAnoMixin, UserOwnedMixin, ListView):
         return ctx
 
 
-class EntradaCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
+class EntradaCreateView(TituloContextMixin, UserFormKwargsMixin, UserOwnedMixin, CreateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
+    titulo = "Nova Entrada"
 
     def get_initial(self):
         initial = super().get_initial()
-        resp = Responsavel.objects.filter(user=self.request.user, usuario_vinculado=self.request.user).first()
+        resp = _get_primary_responsavel(self.request.user)
         if resp:
             initial["responsavel"] = resp.pk
         return initial
@@ -1939,17 +1914,13 @@ class EntradaCreateView(UserFormKwargsMixin, UserOwnedMixin, CreateView):
 
         return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
 
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Nova Entrada"
-        return ctx
 
-
-class EntradaUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
+class EntradaUpdateView(TituloContextMixin, UserFormKwargsMixin, UserOwnedMixin, UpdateView):
     model = Entrada
     form_class = EntradaForm
     template_name = "entradas/entrada_form.html"
     success_url = reverse_lazy("entrada-list")
+    titulo = "Editar Entrada"
 
     def form_valid(self, form):
         old_tipo      = self.object.tipo
@@ -1960,16 +1931,9 @@ class EntradaUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         entrada = form.save()
         _estornar_credito(old_tipo, old_conta_id, old_valor, old_auto)
         _creditar_conta(entrada)
-        _recalcular_saldos_a_partir(data_antiga.month, data_antiga.year, self.request.user)
-        if entrada.data != data_antiga:
-            _recalcular_saldos_a_partir(entrada.data.month, entrada.data.year, self.request.user)
+        _recalcular_para_datas(data_antiga, entrada.data, self.request.user)
         messages.success(self.request, "Entrada atualizada com sucesso.")
         return HttpResponseRedirect(_safe_next_url(self.request, self.success_url))
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Editar Entrada"
-        return ctx
 
 
 class EntradaDeleteView(UserOwnedMixin, DeleteView):
@@ -2144,30 +2108,22 @@ class ContaListView(UserOwnedMixin, ListView):
         return super().get_queryset().filter(ativo=True)
 
 
-class ContaCreateView(SimpleCreateMixin, UserOwnedMixin, CreateView):
+class ContaCreateView(TituloContextMixin, SimpleCreateMixin, UserOwnedMixin, CreateView):
     model = Conta
     form_class = ContaForm
     template_name = "contas/conta_form.html"
     success_url = reverse_lazy("conta-list")
     success_message = "Conta criada com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Nova Conta"
-        return ctx
+    titulo = "Nova Conta"
 
 
-class ContaUpdateView(SimpleUpdateMixin, UserOwnedMixin, UpdateView):
+class ContaUpdateView(TituloContextMixin, SimpleUpdateMixin, UserOwnedMixin, UpdateView):
     model = Conta
     form_class = ContaForm
     template_name = "contas/conta_form.html"
     success_url = reverse_lazy("conta-list")
     success_message = "Conta atualizada com sucesso."
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx["titulo"] = "Editar Conta"
-        return ctx
+    titulo = "Editar Conta"
 
 
 class ContaDeleteView(SimpleDeleteMixin, UserOwnedMixin, DeleteView):
