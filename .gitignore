@@ -9,4 +9,5 @@ staticfiles/
 .DS_Store
 logs/
 .claude
+.vscode/
 
