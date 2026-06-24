@@ -41,7 +41,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         fields = [
             "descricao", "valor_total", "data_compra", "tipo_pagamento",
             "total_parcelas", "cartao", "conta_origem", "responsavel", "categoria", "observacao",
-            "cartao_adicional",
+            "cartao_adicional", "ajuste_tipo",
         ]
         widgets = {
             "descricao":      forms.TextInput(attrs={"placeholder": "Ex: Mercado, Farmácia..."}),
@@ -54,6 +54,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             "responsavel":    forms.Select(attrs={"id": "id_responsavel"}),
             "categoria":      forms.Select(),
             "observacao":     forms.Textarea(attrs={"rows": 3}),
+            "ajuste_tipo":    forms.Select(attrs={"id": "id_ajuste_tipo"}),
         }
 
     _PCT_CHOICES = [(p, f"{p}%") for p in range(10, 100, 10)]
@@ -96,6 +97,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
+        self.user = user
         super().__init__(*args, **kwargs)
         self.fields["categoria"].empty_label = "— Sem categoria —"
         self.fields["total_parcelas"].required = False
@@ -103,6 +105,8 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         self.fields["cartao"].empty_label = "— Sem cartão —"
         self.fields["conta_origem"].required = False
         self.fields["conta_origem"].empty_label = "— Selecione a conta —"
+        self.fields["ajuste_tipo"].required = False
+        self.fields["responsavel"].required = False
         kw = {"ativo": True}
         if user is not None:
             kw["user"] = user
@@ -118,9 +122,12 @@ class GastoForm(FormControlMixin, forms.ModelForm):
         parcelas = cleaned.get("total_parcelas")
         # "recorrente" é tratado como credito_avista para fins de validação
         tipo_val = "credito_avista" if tipo == "recorrente" else tipo
-        if tipo_val in Gasto.TIPOS_CARTAO and not cleaned.get("cartao"):
+
+        TIPOS_COM_CARTAO = Gasto.TIPOS_CARTAO | {"ajuste_fatura"}
+
+        if tipo_val in TIPOS_COM_CARTAO and not cleaned.get("cartao"):
             self.add_error("cartao", "Selecione um cartão para este tipo de pagamento.")
-        if tipo_val not in Gasto.TIPOS_CARTAO:
+        if tipo_val not in TIPOS_COM_CARTAO:
             cleaned["cartao"] = None
             cleaned["total_parcelas"] = None
             cleaned["mes_inicio"] = None
@@ -135,9 +142,28 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             cleaned["conta_origem"] = None
         if tipo_val != "credito_parcelado":
             cleaned["total_parcelas"] = None
-        if tipo_val not in ("credito_parcelado", "credito_avista"):
+        if tipo_val not in ("credito_parcelado", "credito_avista", "ajuste_fatura", "pix", "emprestimo"):
             cleaned["mes_inicio"] = None
             cleaned["ano_inicio"] = None
+        # Responsável: obrigatório para todos exceto ajuste_fatura (auto-atribuído)
+        if not cleaned.get("responsavel"):
+            if tipo_val == "ajuste_fatura":
+                primary = Responsavel.objects.filter(
+                    user=self.user, usuario_vinculado=self.user
+                ).first() if self.user else None
+                if primary:
+                    cleaned["responsavel"] = primary
+                else:
+                    self.add_error("responsavel", "Selecione um responsável.")
+            else:
+                self.add_error("responsavel", "Selecione um responsável.")
+
+        # Ajuste de fatura: exige ajuste_tipo; limpa campos irrelevantes
+        if tipo_val == "ajuste_fatura":
+            if not cleaned.get("ajuste_tipo"):
+                self.add_error("ajuste_tipo", "Selecione se é desconto ou adição.")
+        else:
+            cleaned["ajuste_tipo"] = None
         return cleaned
 
 

@@ -30,9 +30,9 @@
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.path }}">
 
-      <div class="form-group">
+      <div class="form-group" id="mg-responsavel-row">
         <label class="form-label" for="mg_responsavel">Responsável *</label>
-        <select name="responsavel" id="mg_responsavel" class="form-control" required>
+        <select name="responsavel" id="mg_responsavel" class="form-control">
           <option value="">— Selecione —</option>
           {% for r in modal_gasto_form.responsavel.field.queryset %}
           <option value="{{ r.pk }}" {% if r.pk == responsavel_principal.pk %}selected{% endif %}>{{ r }}</option>
@@ -69,6 +69,15 @@
             Cartão Adicional
           </span>
         </label>
+      </div>
+
+      <div class="form-group" id="mg-ajuste-tipo-row" style="display:none;">
+        <label class="form-label" for="mg_ajuste_tipo">Tipo do Ajuste *</label>
+        <select name="ajuste_tipo" id="mg_ajuste_tipo" class="form-control" disabled>
+          <option value="">— Selecione —</option>
+          <option value="desconto">− Desconto (subtrai da fatura)</option>
+          <option value="adicao">+ Adição (soma à fatura)</option>
+        </select>
       </div>
 
       <div class="form-group" id="mg-conta-origem-row" style="display:none;">
@@ -116,7 +125,7 @@
           <div class="form-grid-2">
             <div>
               <label class="form-label" for="mg_mes_inicio">Mês da 1ª Parcela</label>
-              <select name="mes_inicio" id="mg_mes_inicio" class="form-control" onchange="mgAtualizarPreview()" disabled>
+              <select name="mes_inicio" id="mg_mes_inicio" class="form-control" onchange="mgAtualizarPreview();mgSyncDataFromFatura();" disabled>
                 {% for val, label in modal_gasto_form.mes_inicio.field.choices %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
@@ -124,7 +133,7 @@
             </div>
             <div>
               <label class="form-label" for="mg_ano_inicio">Ano</label>
-              <select name="ano_inicio" id="mg_ano_inicio" class="form-control" onchange="mgAtualizarPreview()" disabled>
+              <select name="ano_inicio" id="mg_ano_inicio" class="form-control" onchange="mgAtualizarPreview();mgSyncDataFromFatura();" disabled>
                 {% for val, label in modal_gasto_form.ano_inicio.field.choices %}
                 <option value="{{ val }}">{{ label }}</option>
                 {% endfor %}
@@ -250,6 +259,19 @@
           </div>
           <div id="mg-nova-cat-erro" style="display:none;color:#ef4444;font-size:12px;margin-top:6px;"></div>
         </div>
+      </div>
+
+      <!-- Toggle Recorrente para PIX / Empréstimo -->
+      <div id="mg-pix-emp-rec-wrapper" style="display:none;margin-bottom:12px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+          <input type="checkbox" id="mg_pix_emp_rec_chk"
+                 style="width:15px;height:15px;accent-color:var(--accent);"
+                 onchange="mgTogglePixEmpRec(this.checked)">
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary);">
+            <i data-lucide="repeat" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
+            Recorrente?
+          </span>
+        </label>
       </div>
 
       <!-- Compra Recorrente -->

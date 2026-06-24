@@ -14,8 +14,7 @@ _hosts = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h
 # "web" é o hostname interno do Docker usado pelo evolution-api para webhook
 ALLOWED_HOSTS = _hosts + ["web"]
 
-# Sem manifest — o app já usa ?v=N para cache bust; evita exigir collectstatic a cada deploy
-STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # HTTPS / cookies seguros
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -336,6 +336,12 @@ class Gasto(models.Model):
         ("pix",               "Pix / Transferência"),
         ("debito",            "Débito"),
         ("emprestimo",        "Empréstimo"),
+        ("ajuste_fatura",     "Ajuste de Fatura"),
+    ]
+
+    AJUSTE_TIPO_CHOICES = [
+        ("desconto", "Desconto"),
+        ("adicao",   "Adição"),
     ]
 
     TIPOS_CARTAO = {"credito_avista", "credito_parcelado"}
@@ -371,6 +377,11 @@ class Gasto(models.Model):
     pct_divisao = models.PositiveSmallIntegerField(
         null=True, blank=True,
         help_text="Percentual desta parte no gasto dividido (ex: 60 = 60%).",
+    )
+    ajuste_tipo = models.CharField(
+        max_length=10, choices=AJUSTE_TIPO_CHOICES,
+        null=True, blank=True,
+        help_text="Apenas para tipo 'Ajuste de Fatura': desconto ou adição.",
     )
     conta_origem = models.ForeignKey(
         "Conta", on_delete=models.SET_NULL, null=True, blank=True,

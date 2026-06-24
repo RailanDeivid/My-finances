@@ -46,6 +46,14 @@
       </select>
     </div>
     <div class="filtro-group">
+      <label class="filtro-label">Atribuição</label>
+      <select name="atribuido" class="auto-submit">
+        <option value="" {% if not atribuido_filtro %}selected{% endif %}>— Todos —</option>
+        <option value="nao" {% if atribuido_filtro == "nao" %}selected{% endif %}>Apenas meus</option>
+        <option value="sim" {% if atribuido_filtro == "sim" %}selected{% endif %}>Atribuídos a mim</option>
+      </select>
+    </div>
+    <div class="filtro-group">
       <label class="filtro-label">Buscar descrição</label>
       <input type="text" name="busca" value="{{ filtros.busca|default:'' }}"
              placeholder="Ex: Uber, Mercado..." class="form-control"
@@ -98,9 +106,50 @@
     </thead>
     <tbody>
       {% for g in gastos %}
+      {% if g.tipo_pagamento == "ajuste_fatura" %}
+      <tr style="background:{% if g.ajuste_tipo == 'desconto' %}rgba(34,197,94,.04){% else %}rgba(99,102,241,.04){% endif %};">
+        <td style="white-space:nowrap;color:var(--text-muted);">{{ g.data_compra|date:"m/Y" }}</td>
+        <td style="font-weight:500;">
+          {{ g.descricao }}
+          {% if g.ajuste_tipo == "desconto" %}
+            <span style="font-size:10px;font-weight:600;background:rgba(34,197,94,.15);color:#22c55e;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;">− Desconto</span>
+          {% else %}
+            <span style="font-size:10px;font-weight:600;background:rgba(99,102,241,.15);color:#818cf8;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;">+ Adição</span>
+          {% endif %}
+        </td>
+        <td><span style="color:var(--text-muted);">—</span></td>
+        <td><span style="color:var(--text-muted);">—</span></td>
+        <td style="text-align:center;"><span style="color:var(--text-muted);font-size:12px;">—</span></td>
+        <td>
+          {% if g.cartao %}
+            <span class="badge badge-cartao" style="background:{{ g.cartao.cor }}22;color:{{ g.cartao.cor }};">{{ g.cartao.nome }}</span>
+          {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+        </td>
+        <td><span class="badge badge-ajuste">Ajuste</span></td>
+        <td style="text-align:center;"><span style="color:var(--text-muted);">—</span></td>
+        <td style="text-align:right;color:var(--text-muted);">—</td>
+        <td style="text-align:right;font-weight:700;white-space:nowrap;color:{% if g.ajuste_tipo == 'desconto' %}#22c55e{% else %}#818cf8{% endif %};">
+          {% if g.ajuste_tipo == "desconto" %}−{% else %}+{% endif %} R$ {{ g.valor_total|brl }}
+        </td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn btn-sm btn-danger" title="Excluir"
+                  onclick="openDeleteModal('{% url 'gasto-delete' g.pk %}', 'Excluir ajuste \'{{ g.descricao|escapejs }}\'? Esta ação não pode ser desfeita.')">
+            <i data-lucide="trash-2"></i>
+          </button>
+        </td>
+      </tr>
+      {% else %}
       <tr>
         <td style="white-space:nowrap;">{{ g.data_compra|date:"d/m/Y" }}</td>
-        <td style="font-weight:500;">{{ g.descricao }}</td>
+        <td style="font-weight:500;">
+          {{ g.descricao }}
+          {% if g.user != request.user %}
+            <span style="font-size:10px;font-weight:600;background:rgba(99,102,241,.12);color:#818cf8;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;white-space:nowrap;">
+              <i data-lucide="user-check" style="width:9px;height:9px;vertical-align:middle;"></i>
+              atribuído por {{ g.user.get_full_name|default:g.user.username }}
+            </span>
+          {% endif %}
+        </td>
         <td>
           {% if g.categoria %}
             <span style="display:inline-flex;align-items:center;gap:6px;">
@@ -139,6 +188,7 @@
           {% endif %}
         </td>
         <td style="white-space:nowrap;">
+          {% if g.user == request.user %}
           <a href="{% url 'gasto-update' g.pk %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm" title="Editar">
             <i data-lucide="pencil"></i>
           </a>
@@ -153,8 +203,14 @@
             <i data-lucide="trash-2"></i>
           </button>
           {% endif %}
+          {% else %}
+          <span title="Gasto de outro usuário" style="color:var(--text-muted);font-size:11px;padding:0 4px;">
+            <i data-lucide="lock" style="width:14px;height:14px;vertical-align:middle;"></i>
+          </span>
+          {% endif %}
         </td>
       </tr>
+      {% endif %}
       {% empty %}
       <tr>
         <td colspan="11">

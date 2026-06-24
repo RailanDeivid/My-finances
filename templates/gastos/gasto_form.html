@@ -18,82 +18,8 @@
     {% csrf_token %}
     {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
 
-    {% if parcelado_edit %}
-    {# ── Modo parcelado: apenas valor e nº de parcelas editáveis ── #}
-    <input type="hidden" name="responsavel"    value="{{ object.responsavel_id }}">
-    <input type="hidden" name="tipo_pagamento" value="{{ object.tipo_pagamento }}">
-    <input type="hidden" name="cartao"         value="{{ object.cartao_id|default:'' }}">
-    <input type="hidden" name="data_compra"    value="{{ object.data_compra|date:'Y-m-d' }}">
-    <input type="hidden" name="mes_inicio"     value="{{ object.data_compra.month }}">
-    <input type="hidden" name="ano_inicio"     value="{{ object.data_compra.year }}">
-    <input type="hidden" name="categoria"      value="{{ object.categoria_id|default:'' }}">
-    <input type="hidden" name="observacao"     value="{{ object.observacao|default:'' }}">
-
-    <!-- Aviso bloqueio -->
-    <div style="display:flex;align-items:center;gap:8px;background:var(--accent)11;border:1px solid var(--accent)33;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--accent);">
-      <i data-lucide="lock" style="width:14px;height:14px;flex-shrink:0;"></i>
-      <span>Gasto parcelado — edite apenas o <strong>valor</strong> e o <strong>nº de parcelas</strong> aqui. Use a tabela abaixo para gerenciar cada mês individualmente.</span>
-    </div>
-
-    <!-- Info somente leitura -->
-    <div class="form-grid-2" style="gap:12px;margin-bottom:16px;">
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Responsável</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.responsavel }}</div>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Tipo</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.get_tipo_pagamento_display }}</div>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label" for="{{ form.descricao.id_for_label }}">Descrição *</label>
-        {{ form.descricao }}
-        {% if form.descricao.errors %}<div class="field-error">{{ form.descricao.errors.0 }}</div>{% endif %}
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Cartão</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.cartao.nome|default:"— Sem cartão —" }}</div>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Data da Compra</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.data_compra|date:"d/m/Y" }}</div>
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Categoria</label>
-        <div class="form-control" style="opacity:.65;cursor:not-allowed;pointer-events:none;">{{ object.categoria.nome|default:"— Sem categoria —" }}</div>
-      </div>
-    </div>
-
-    <!-- Editáveis -->
-    <div class="form-grid-2" style="margin-bottom:16px;">
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Valor da Parcela (R$) *</label>
-        {{ form.valor_total }}
-        {% if form.valor_total.errors %}<div class="field-error">{{ form.valor_total.errors.0 }}</div>{% endif %}
-      </div>
-      <div class="form-group" style="margin:0;">
-        <label class="form-label">Número de Parcelas</label>
-        {{ form.total_parcelas }}
-        {% if form.total_parcelas.errors %}<div class="field-error">{{ form.total_parcelas.errors.0 }}</div>{% endif %}
-      </div>
-    </div>
-
-    <!-- Cartão Adicional (parcelado sempre é cartão) -->
-    <div style="margin-bottom:16px;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
-        {{ form.cartao_adicional }}
-        <span style="font-size:13px;font-weight:600;color:var(--text);">
-          <i data-lucide="credit-card" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
-          Cartão Adicional
-        </span>
-      </label>
-    </div>
-
-    {% else %}
-    {# ── Modo normal: todos os campos ── #}
-
     <!-- 1. Responsável -->
-    <div class="form-group">
+    <div class="form-group" id="responsavel-row">
       <label class="form-label" for="{{ form.responsavel.id_for_label }}">Responsável *</label>
       {{ form.responsavel }}
       {% if form.responsavel.errors %}<div class="field-error">{{ form.responsavel.errors.0 }}</div>{% endif %}
@@ -128,7 +54,21 @@
       </div>
     </div>
 
-    <!-- 3c. Cartão Adicional (condicional com cartão) -->
+    <!-- 3b-rec-pix. Toggle recorrente para PIX / Empréstimo -->
+    <div id="pix-emp-rec-wrapper" style="display:none;margin-bottom:12px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+        <input type="checkbox" id="id_pix_emp_rec_chk"
+               style="width:15px;height:15px;accent-color:var(--accent);"
+               {% if is_pix_emp_rec %}checked{% endif %}
+               onchange="togglePixEmpRec(this.checked)">
+        <span style="font-size:13px;font-weight:600;color:var(--text);">
+          <i data-lucide="repeat" style="width:13px;height:13px;vertical-align:-1px;stroke:var(--accent);margin-right:3px;"></i>
+          Recorrente?
+        </span>
+      </label>
+    </div>
+
+    <!-- 3c. Cartão Adicional (condicional com cartão — não para ajuste_fatura) -->
     <div id="cartao-adicional-row" style="display:none;margin-bottom:14px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
         {{ form.cartao_adicional }}
@@ -137,6 +77,13 @@
           Cartão Adicional
         </span>
       </label>
+    </div>
+
+    <!-- 3d. Tipo do Ajuste (apenas para ajuste_fatura) -->
+    <div class="form-group" id="ajuste-tipo-row" style="display:none;">
+      <label class="form-label" for="id_ajuste_tipo">Tipo do Ajuste *</label>
+      {{ form.ajuste_tipo }}
+      {% if form.ajuste_tipo.errors %}<div class="field-error">{{ form.ajuste_tipo.errors.0 }}</div>{% endif %}
     </div>
 
     <!-- 3b. Conta de Débito (condicional) -->
@@ -224,9 +171,7 @@
       {{ form.observacao }}
     </div>
 
-    {% endif %}{# fim parcelado_edit #}
-
-    <!-- Divisão de gasto (aparece em ambos os modos) -->
+    <!-- Divisão de gasto -->
     <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;margin:0;">
         <input type="checkbox" id="id_dividir_gasto" name="dividir_gasto"{% if form.dividir_gasto.value %} checked{% endif %}
@@ -442,8 +387,9 @@ function pgCancelarEdit(pk) {
   })();
 
   var inicioDirty = IS_EDIT;
-  if (selMes) selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
-  if (selAno) selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); });
+  var _TIPOS_SEM_DATA = ['ajuste_fatura', 'pix', 'emprestimo'];
+  if (selMes) selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); if (tipoSelect && _TIPOS_SEM_DATA.indexOf(tipoSelect.value) !== -1) syncDataFromFatura(); });
+  if (selAno) selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); if (tipoSelect && _TIPOS_SEM_DATA.indexOf(tipoSelect.value) !== -1) syncDataFromFatura(); });
   if (inputData) inputData.addEventListener('change', function() {
     if (!inicioDirty) sincronizarInicio();
     atualizarPreview();
@@ -461,57 +407,107 @@ function pgCancelarEdit(pk) {
   function atualizarLayout() {
     if (!tipoSelect) return;
     var tipo = tipoSelect.value;
-    var isParcelado = tipo === 'credito_parcelado';
-    var isAvista    = tipo === 'credito_avista';
-    var isCartao    = TIPOS_CARTAO.indexOf(tipo) !== -1 || tipo === 'recorrente';
-    var isDebito    = tipo === 'debito';
-
+    var isParcelado  = tipo === 'credito_parcelado';
+    var isAvista     = tipo === 'credito_avista';
+    var isCartao     = TIPOS_CARTAO.indexOf(tipo) !== -1 || tipo === 'recorrente';
+    var isDebito     = tipo === 'debito';
     var isRecorrente = tipo === 'recorrente';
+    var isAjuste     = tipo === 'ajuste_fatura';
+    var isPix        = tipo === 'pix';
+    var isEmprestimo = tipo === 'emprestimo';
 
-    if (cartaoRow) cartaoRow.style.display = isCartao ? 'block' : 'none';
+    var respRow = document.getElementById('responsavel-row');
+    if (respRow) respRow.style.display = isAjuste ? 'none' : 'block';
+    if (cartaoRow) cartaoRow.style.display = (isCartao || isAjuste) ? 'block' : 'none';
     var adicionalRow = document.getElementById('cartao-adicional-row');
     if (adicionalRow) adicionalRow.style.display = isCartao ? 'block' : 'none';
+    var ajusteTipoRow = document.getElementById('ajuste-tipo-row');
+    if (ajusteTipoRow) ajusteTipoRow.style.display = isAjuste ? 'block' : 'none';
     var contaRow = document.getElementById('conta-origem-row');
     if (contaRow) contaRow.style.display = isDebito ? 'block' : 'none';
+
+    // Toggle de recorrente para PIX / Empréstimo / Débito
+    var pixEmpRecWrapper = document.getElementById('pix-emp-rec-wrapper');
+    var pixEmpRecChk     = document.getElementById('id_pix_emp_rec_chk');
+    var _temToggle = isPix || isEmprestimo || isDebito;
+    if (pixEmpRecWrapper) pixEmpRecWrapper.style.display = _temToggle ? 'block' : 'none';
+    if (!_temToggle && pixEmpRecChk) pixEmpRecChk.checked = false;
+
+    // Mostra recorrente-row: tipo=recorrente OU pix/emp/debito com toggle marcado
+    var pixEmpRecAtivo = _temToggle && pixEmpRecChk && pixEmpRecChk.checked;
     var recRow = document.getElementById('recorrente-row');
-    if (recRow) recRow.style.display = isRecorrente ? 'block' : 'none';
+    if (recRow) recRow.style.display = (isRecorrente || pixEmpRecAtivo) ? 'block' : 'none';
     var chkRec = document.getElementById('id_recorrente');
-    if (chkRec) chkRec.checked = isRecorrente;
+    if (chkRec) chkRec.checked = isRecorrente || pixEmpRecAtivo;
 
-    // Mostrar bloco mês/ano para crédito à vista E parcelado
-    var titulo  = document.getElementById('inicio-parcelas-titulo');
+    // Mostrar bloco mês/ano para crédito à vista, parcelado, recorrente e ajuste_fatura
+    var titulo   = document.getElementById('inicio-parcelas-titulo');
     var mesLabel = document.getElementById('mes-inicio-label');
-    var dica    = document.getElementById('inicio-parcelas-dica');
+    var dica     = document.getElementById('inicio-parcelas-dica');
 
-    if (isParcelado || isAvista || isRecorrente) {
+    if (isParcelado || isAvista || isRecorrente || isAjuste || isPix || isEmprestimo) {
       inicioRow.style.display = 'block';
-      var isP_label = isParcelado ? 'Mês de início das parcelas' : (isRecorrente ? 'Mês de início' : 'Mês da Fatura');
-      var isM_label = isParcelado ? 'Mês da 1ª Parcela *'        : (isRecorrente ? 'Primeiro mês *' : 'Mês da Fatura *');
-      if (titulo)   titulo.textContent   = isP_label;
-      if (mesLabel) mesLabel.textContent = isM_label;
-      if (dica)     dica.style.display   = 'block';
+      var titLabel, mesLbl, dicaMsg;
+      if (isParcelado) {
+        titLabel = 'Mês de início das parcelas'; mesLbl = 'Mês da 1ª Parcela *';
+        dicaMsg  = 'Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.';
+      } else if (isRecorrente) {
+        titLabel = 'Mês de início'; mesLbl = 'Primeiro mês *';
+        dicaMsg  = 'A recorrência será gerada a partir deste mês.';
+      } else if (isAjuste) {
+        titLabel = 'Mês da Fatura'; mesLbl = 'Mês da Fatura *';
+        dicaMsg  = '';
+      } else if (isPix) {
+        titLabel = 'Mês do PIX/Transferência'; mesLbl = 'Mês do PIX *';
+        dicaMsg  = 'Informe o mês em que o PIX ou transferência deve ser contabilizado.';
+      } else if (isEmprestimo) {
+        titLabel = 'Mês de início do empréstimo'; mesLbl = 'Mês de início *';
+        dicaMsg  = 'Informe o mês em que o empréstimo começa a ser contabilizado.';
+      } else {
+        titLabel = 'Mês da Fatura'; mesLbl = 'Mês da Fatura *';
+        dicaMsg  = 'Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.';
+      }
+      if (titulo)   titulo.textContent   = titLabel;
+      if (mesLabel) mesLabel.textContent = mesLbl;
+      if (dica)     dica.style.display   = (dicaMsg ? 'block' : 'none');
       var dicaTxt = document.getElementById('inicio-dica-txt');
-      if (dicaTxt) dicaTxt.textContent = isRecorrente
-        ? 'A recorrência será gerada a partir deste mês.'
-        : 'Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.';
+      if (dicaTxt) dicaTxt.textContent = dicaMsg;
       if (!inicioDirty) sincronizarInicio();
     } else {
       inicioRow.style.display = 'none';
     }
 
+    // Para ajuste_fatura, PIX e empréstimo: data_compra é derivada do mês/ano — esconder campo data
+    if (isAjuste || isPix || isEmprestimo) {
+      if (dataRow) dataRow.style.display = 'none';
+      syncDataFromFatura();
+    } else {
+      if (dataRow) {
+        dataRow.style.display = '';
+        dataRow.style.gridColumn = isParcelado ? '' : '2';
+        dataRow.style.gridRow    = isParcelado ? '' : '1';
+      }
+    }
+
     if (isParcelado) {
       parcelasRow.style.display    = 'block';
       labelValor.textContent       = 'Valor da Parcela (R$) *';
-      dataRow.style.gridColumn     = '1 / -1';
-      dataRow.style.gridRow        = '2';
+      if (dataRow) { dataRow.style.gridColumn = '1 / -1'; dataRow.style.gridRow = '2'; }
     } else {
       parcelasRow.style.display    = 'none';
-      labelValor.textContent       = 'Valor Total (R$) *';
-      dataRow.style.gridColumn     = '2';
-      dataRow.style.gridRow        = '1';
+      labelValor.textContent       = isAjuste ? 'Valor (R$) *' : 'Valor Total (R$) *';
     }
     atualizarTotal();
     atualizarPreview();
+  }
+
+  function syncDataFromFatura() {
+    if (!selMes || !selAno || !inputData) return;
+    var mes = parseInt(selMes.value) || 0;
+    var ano = parseInt(selAno.value) || 0;
+    if (mes && ano) {
+      inputData.value = ano + '-' + String(mes).padStart(2, '0') + '-01';
+    }
   }
 
   function atualizarTotal() {
@@ -578,6 +574,14 @@ function pgCancelarEdit(pk) {
     }
   }
   if (selRecMeses) selRecMeses.addEventListener('change', atualizarRecInfo);
+
+  // Toggle recorrente para PIX/Empréstimo
+  window.togglePixEmpRec = function(checked) {
+    var recRow = document.getElementById('recorrente-row');
+    var chkRec = document.getElementById('id_recorrente');
+    if (recRow) recRow.style.display = checked ? 'block' : 'none';
+    if (chkRec) chkRec.checked = checked;
+  };
 
   if (inputValor)    inputValor.addEventListener('input', function(){ atualizarTotal(); atualizar(); });
   if (inputParcelas) inputParcelas.addEventListener('input', function(){ atualizarTotal(); atualizarPreview(); });

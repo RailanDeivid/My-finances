@@ -159,7 +159,7 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
 /* ========================== CARDS ESTATÍSTICAS ========================== */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -192,8 +192,6 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
   color: var(--text-primary);
   line-height: 1.1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .stat-value.green { color: var(--success); }
@@ -218,6 +216,13 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
 .stat-card .icon-badge-lg img {
   width: 18px !important;
   height: 18px !important;
+}
+
+/* Content div inside stat-card must shrink in flex layout and not overflow */
+.stat-card > div > div {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
 }
 
 /* ========================== CARDS DE CARTÃO ========================== */
@@ -413,6 +418,7 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
 .badge-debito       { background: rgba(139,92,246,.15);   color: #8b5cf6; }
 .badge-emprestimo   { background: rgba(249,115,22,.15);   color: #f97316; }
 .badge-recorrente   { background: rgba(168,85,247,.15);   color: #a855f7; }
+.badge-ajuste       { background: rgba(20,184,166,.15);   color: #14b8a6; }
 .badge-salario      { background: rgba(34,197,94,.15);    color: #22c55e; }
 .badge-bonus        { background: rgba(96,165,250,.15);   color: #60a5fa; }
 .badge-outro        { background: rgba(139,92,246,.15);   color: #a78bfa; }
@@ -441,15 +447,25 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 .dash-penta-grid > *,
 .dash-inv-grid > * { min-width: 0; }
 
-/* Notebook (≤1500px): 6 cards → 3; 5 tabelas → 3 */
+/* Notebook (≤1500px): ícone compacto + topo-alinhado; cards ficam ~290px → label pode quebrar */
 @media (max-width: 1500px) {
-  .stats-grid      { grid-template-columns: repeat(4, 1fr); }
   .dash-penta-grid { grid-template-columns: repeat(3, 1fr); }
+  .stat-value      { font-size: 16px; }
+  .stat-card       { padding: 12px 14px; }
+  .stat-card > div { align-items: flex-start !important; gap: 8px !important; }
+  .stat-card .icon-badge-lg { margin-top: 1px; width: 32px; height: 32px; }
+  .stat-card .icon-badge-lg i,
+  .stat-card .icon-badge-lg img { width: 16px !important; height: 16px !important; }
+  .stat-label      { min-height: 2.6em; }
 }
 
-/* Tablet largo (≤1024px): stats 3 cols */
+/* Tablet largo (≤1024px): 3 cols; labels podem quebrar → reserva altura */
 @media (max-width: 1024px) {
   .stats-grid      { grid-template-columns: repeat(3, 1fr); }
+  .stat-value      { font-size: 16px; }
+  .stat-card       { padding: 12px 14px; }
+  .stat-card > div { gap: 8px !important; }
+  .stat-label      { min-height: 2.6em; }
 }
 
 /* Tablet (≤900px): grids de 2 cols empilham; charts empilha */
@@ -461,13 +477,22 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .stats-grid      { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* Mobile (≤768px): 2 cards por linha, topbar só ícone, filtros empilham */
+/* Mobile (≤768px): 2 cards por linha, sidebar 54px → mais espaço */
 @media (max-width: 768px) {
   .stats-grid       { grid-template-columns: repeat(2, 1fr); }
   .dash-penta-grid  { grid-template-columns: repeat(2, 1fr); }
   .page-header      { flex-wrap: wrap; gap: 8px; }
   .page-header h1   { font-size: 16px; }
   .topbar-btn-text  { display: none; }
+
+  /* Sidebar recolhida → cards bem mais largos → reseta ajustes de alinhamento */
+  .stat-label      { min-height: 0; }
+  .stat-card > div { align-items: center !important; gap: 10px !important; }
+  .stat-card .icon-badge-lg { margin-top: 0; width: 36px; height: 36px; }
+  .stat-card .icon-badge-lg i,
+  .stat-card .icon-badge-lg img { width: 18px !important; height: 18px !important; }
+  .stat-card       { padding: 14px 16px; }
+  .stat-value      { font-size: 18px; }
 
   /* Filtro do dashboard empilha em coluna */
   .mes-filtro {
@@ -482,35 +507,18 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
     gap: 4px;
     min-width: 0;
   }
-  /* Selects dentro do filtro ocupam 100% */
-  .mes-filtro select {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-  /* Linha Mês+Ano fica em flex row */
-  .mes-filtro > div > div {
-    display: flex;
-    gap: 6px;
-  }
-  .mes-filtro > div > div select {
-    flex: 1;
-    min-width: 0 !important;
-  }
+  .mes-filtro select { width: 100% !important; min-width: 0 !important; }
+  .mes-filtro > div > div { display: flex; gap: 6px; }
+  .mes-filtro > div > div select { flex: 1; min-width: 0 !important; }
 
   /* Filtros-form (gastos/entradas): 2 por linha */
-  .filtro-group {
-    flex: 1 1 calc(50% - 6px);
-    min-width: 0;
-  }
+  .filtro-group { flex: 1 1 calc(50% - 6px); min-width: 0; }
   .filtro-group select,
   .filtro-group input { width: 100%; min-width: 0; }
 
   /* Chart header empilha */
-  .chart-header     { flex-direction: column; align-items: flex-start; gap: 6px; }
-  .chart-legend     { gap: 10px; }
-
-  /* Tabela wrapper altura menor no mobile */
-  .tabela-wrapper   { max-height: 400px; }
+  .chart-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .chart-legend { gap: 10px; }
 }
 
 /* Mobile pequeno (≤480px): 1 coluna em tudo */
@@ -518,21 +526,12 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .stats-grid      { grid-template-columns: 1fr; }
   .dash-penta-grid { grid-template-columns: 1fr; }
 
-  /* Filtro-group 1 por linha */
   .filtro-group    { flex: 1 1 100%; }
-
-  /* Page header stack */
   .page-header     { flex-direction: column; align-items: flex-start; }
-
-  /* Topbar mais compacto */
   .topbar-title    { font-size: 12px; }
 
-  /* Tabela wrapper altura menor ainda */
-  .tabela-wrapper  { max-height: 320px; }
-
-  /* Stat card: valor menor */
-  .stat-value      { font-size: 17px; }
   .stat-label      { font-size: 9px; }
+  .stat-value      { font-size: 17px; }
 }
 
 /* ========================== RESPONSÁVEIS CARDS ========================== */

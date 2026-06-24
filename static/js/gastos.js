@@ -258,39 +258,88 @@
 
   window.mgGastoTipoToggle = function (tipo) {
     var TIPOS_C = TIPOS_CARTAO;
-    var isRec = tipo === 'recorrente';
-    var isC = TIPOS_C.indexOf(tipo) !== -1 || isRec;
-    var isP = tipo === 'credito_parcelado';
-    var isA = tipo === 'credito_avista';
-    var isD = tipo === 'debito';
+    var isRec    = tipo === 'recorrente';
+    var isAjuste = tipo === 'ajuste_fatura';
+    var isC      = TIPOS_C.indexOf(tipo) !== -1 || isRec;
+    var isP      = tipo === 'credito_parcelado';
+    var isA      = tipo === 'credito_avista';
+    var isD      = tipo === 'debito';
+    var isPix    = tipo === 'pix';
+    var isEmp    = tipo === 'emprestimo';
     var el;
-    _show('mg-cartao-row',           isC);
-    _show('mg-cartao-adicional-row', isC);
+
+    _show('mg-responsavel-row',      !isAjuste);
+    _show('mg-cartao-row',           isC || isAjuste);
+    _show('mg-cartao-adicional-row', isC && !isAjuste);
+    _show('mg-ajuste-tipo-row',      isAjuste);
     _show('mg-conta-origem-row',     isD);
     _show('mg-parcelas-row',         isP);
-    _show('mg-inicio-row',           isP || isA || isRec);
-    el = document.getElementById('mg-inicio-label');     if (el) el.textContent   = isA ? 'Mês da Fatura' : (isRec ? 'Mês de início' : 'Mês de início das parcelas');
-    el = document.getElementById('mg_label_valor');      if (el) el.textContent   = isP ? 'Valor da Parcela (R$) *' : 'Valor Total (R$) *';
+    _show('mg-inicio-row',           isP || isA || isRec || isAjuste || isPix || isEmp);
+
+    var inicioTxt = isA ? 'Mês da Fatura'
+      : isRec    ? 'Mês de início'
+      : isAjuste ? 'Mês da Fatura'
+      : isPix    ? 'Mês do PIX/Transferência'
+      : isEmp    ? 'Mês de início do empréstimo'
+      : 'Mês de início das parcelas';
+    el = document.getElementById('mg-inicio-label');  if (el) el.textContent = inicioTxt;
+    el = document.getElementById('mg_label_valor');   if (el) el.textContent = isP ? 'Valor da Parcela (R$) *' : 'Valor (R$) *';
 
     // Desabilita campos ocultos para evitar validação HTML5 em campos escondidos
-    _mgSetDisabled('mg_cartao',        !isC);
+    _mgSetDisabled('mg_responsavel',   isAjuste);
+    _mgSetDisabled('mg_cartao',        !(isC || isAjuste));
     _mgSetDisabled('mg_conta_origem',  !isD);
     _mgSetDisabled('mg_total_parcelas',!isP);
-    _mgSetDisabled('mg_mes_inicio',    !(isP || isA || isRec));
-    _mgSetDisabled('mg_ano_inicio',    !(isP || isA || isRec));
+    _mgSetDisabled('mg_mes_inicio',    !(isP || isA || isRec || isAjuste || isPix || isEmp));
+    _mgSetDisabled('mg_ano_inicio',    !(isP || isA || isRec || isAjuste || isPix || isEmp));
+    _mgSetDisabled('mg_ajuste_tipo',   !isAjuste);
 
     var dataRow = document.getElementById('mg-data-row');
     if (dataRow) {
-      dataRow.style.gridColumn = isP ? '1 / -1' : '2';
-      dataRow.style.gridRow    = isP ? '2'       : '1';
+      if (isAjuste || isPix || isEmp) {
+        dataRow.style.display = 'none';
+        mgSyncDataFromFatura();
+      } else {
+        dataRow.style.display = '';
+        dataRow.style.gridColumn = isP ? '1 / -1' : '2';
+        dataRow.style.gridRow    = isP ? '2'       : '1';
+      }
     }
+    // Toggle recorrente para PIX / Empréstimo / Débito
+    var pixEmpRecWrapper = document.getElementById('mg-pix-emp-rec-wrapper');
+    var pixEmpRecChk     = document.getElementById('mg_pix_emp_rec_chk');
+    var _mgTemToggle = isPix || isEmp || isD;
+    if (pixEmpRecWrapper) pixEmpRecWrapper.style.display = _mgTemToggle ? 'block' : 'none';
+    if (!_mgTemToggle && pixEmpRecChk) pixEmpRecChk.checked = false;
+    var pixEmpRecAtivo = _mgTemToggle && pixEmpRecChk && pixEmpRecChk.checked;
+
     var recWrapper = document.getElementById('mg-recorrente-wrapper');
     var chkR = document.getElementById('mg_recorrente');
-    if (recWrapper) recWrapper.style.display = isRec ? 'block' : 'none';
-    if (chkR) chkR.checked = isRec;
-    if (isRec) mgAtualizarRecorrenteInfo();
+    if (recWrapper) recWrapper.style.display = (isRec || pixEmpRecAtivo) ? 'block' : 'none';
+    if (chkR) chkR.checked = isRec || pixEmpRecAtivo;
+    if (isRec || pixEmpRecAtivo) mgAtualizarRecorrenteInfo();
     mgAtualizarTotal();
     mgAtualizarPreview();
+  };
+
+  window.mgTogglePixEmpRec = function(checked) {
+    var recWrapper = document.getElementById('mg-recorrente-wrapper');
+    var chkR       = document.getElementById('mg_recorrente');
+    if (recWrapper) recWrapper.style.display = checked ? 'block' : 'none';
+    if (chkR) chkR.checked = checked;
+    if (checked) mgAtualizarRecorrenteInfo();
+  };
+
+  var _MG_TIPOS_SEM_DATA = ['ajuste_fatura', 'pix', 'emprestimo'];
+  window.mgSyncDataFromFatura = function () {
+    var tipo = document.getElementById('mg_tipo_pagamento');
+    if (!tipo || _MG_TIPOS_SEM_DATA.indexOf(tipo.value) === -1) return;
+    var mes = parseInt((document.getElementById('mg_mes_inicio') || {}).value || 0);
+    var ano = parseInt((document.getElementById('mg_ano_inicio') || {}).value || 0);
+    var input = document.getElementById('mg_data_compra');
+    if (mes && ano && input) {
+      input.value = ano + '-' + String(mes).padStart(2, '0') + '-01';
+    }
   };
 
   window.mgAtualizarPreview = function () {

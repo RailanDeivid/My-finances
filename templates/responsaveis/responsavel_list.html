@@ -201,46 +201,53 @@
       <table class="tabela-dados">
         <thead>
           <tr>
-            <th style="text-align:left;">Gasto</th>
+            <th>Data</th>
+            <th style="text-align:left;">Descrição</th>
+            <th>Categoria</th>
+            <th>Cartão</th>
             <th>Tipo</th>
-            <th>Parcela</th>
-            <th style="text-align:left;">Cartão</th>
+            <th>Parcelas</th>
             <th style="text-align:right;">Valor</th>
           </tr>
         </thead>
         <tbody>
           {% for g in gastos %}
           <tr>
+            <td style="white-space:nowrap;">{{ g.data_compra|date:"d/m/Y" }}</td>
             <td style="text-align:left;font-weight:500;white-space:normal;">{{ g.descricao }}</td>
+            <td>
+              {% if g.categoria %}
+                <span style="display:inline-flex;align-items:center;gap:5px;">
+                  <span class="icon-badge icon-badge-xs" style="background:{{ g.categoria.cor }}22;">
+                    <i data-lucide="{{ g.categoria.icone }}" style="width:10px;height:10px;stroke:{{ g.categoria.cor }};"></i>
+                  </span>{{ g.categoria.nome }}
+                </span>
+              {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+            </td>
+            <td>
+              {% if g.cartao %}
+                <span class="badge badge-cartao" style="background:{{ g.cartao.cor }}22;color:{{ g.cartao.cor }};">{{ g.cartao.nome }}</span>
+              {% else %}
+                <span style="color:var(--text-muted);">—</span>
+              {% endif %}
+            </td>
             <td style="text-align:center;">
               {% if g.grupo_recorrente %}{% badge_tipo "recorrente" "Recorrente" %}{% else %}{% badge_tipo g.tipo_pagamento g.tipo_label %}{% endif %}
             </td>
             <td style="text-align:center;font-size:13px;">
               {% if g.parcela_num %}
                 {{ g.parcela_num }}/{{ g.parcela_total }}
-              {% elif g.tipo_pagamento == 'credito_avista' %}
-                À vista
-              {% else %}
-                —
-              {% endif %}
-            </td>
-            <td style="text-align:left;">
-              {% if g.cartao %}
-                <span style="display:inline-flex;align-items:center;gap:6px;">
-                  <span style="width:8px;height:8px;border-radius:50%;background:{{ g.cartao.cor }};flex-shrink:0;display:inline-block;"></span>
-                  {{ g.cartao.nome }}
-                </span>
               {% else %}
                 <span style="color:var(--text-muted);">—</span>
               {% endif %}
             </td>
-            <td style="text-align:right;font-weight:600;">R$ {{ g.valor_total|brl }}</td>
+            <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ g.valor_total|brl }}</td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
           <tr>
-            <td colspan="4" style="text-align:right;font-weight:700;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Total</td>
+            <td colspan="6" style="text-align:right;font-weight:700;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Total</td>
             <td style="text-align:right;font-weight:800;color:var(--accent,#22c55e);">
               R$ {{ total|default:"0"|brl }}
             </td>

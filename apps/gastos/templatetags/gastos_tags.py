@@ -10,6 +10,7 @@ _BADGE_TIPO_MAP = {
     "debito":            ("badge-debito",       "Débito"),
     "emprestimo":        ("badge-emprestimo",  "Empréstimo"),
     "recorrente":        ("badge-recorrente",  "Recorrente"),
+    "ajuste_fatura":     ("badge-ajuste",      "Ajuste"),
 }
 
 

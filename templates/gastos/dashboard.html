@@ -168,6 +168,19 @@
     </div>
   </div>
   {% endwith %}
+  <!-- Gastos Atribuídos (sempre visível) -->
+  <div class="stat-card" style="border-left-color:#a855f7;">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <span class="icon-badge icon-badge-lg" style="background:#a855f718;">
+        <i data-lucide="user-check" style="width:22px;height:22px;stroke:#a855f7;"></i>
+      </span>
+      <div>
+        <div class="stat-label">Gastos Atribuídos</div>
+        <div class="stat-value" style="color:#a855f7;">R$ {{ total_atribuido|brl }}</div>
+        <div class="stat-sub">Lançados por outro usuário</div>
+      </div>
+    </div>
+  </div>
   <!-- Total Gasto -->
   {% with pct=total_gasto|pct_diff:total_gasto_ant %}
   <div class="stat-card" style="border-left-color:#ef4444;">
@@ -179,7 +192,7 @@
         <div class="stat-label">Total Gasto</div>
         <div class="stat-value" style="color:#ef4444;">R$ {{ total_gasto|brl }}</div>
         <div class="stat-sub">
-          {{ qtd_gastos }} lançamento{{ qtd_gastos|pluralize:",s" }}
+          {{ qtd_gastos }} lançamento{{ qtd_gastos|pluralize:",s" }}{% if total_atribuido %} + atribuídos{% endif %}
           {% if pct is not None %} ·
             <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
               {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
