@@ -21,6 +21,7 @@
 .btn.btn-danger { background: rgba(231,76,60,.15); color: #e88070; border-color: rgba(231,76,60,.4); }
 .btn.btn-danger:hover { background: rgba(231,76,60,.28); border-color: #e74c3c; color: #f09080; }
 .btn.btn-sm { padding: 5px 10px; font-size: 12px; }
+.filtros-botoes .btn { height: 35px; padding: 0 14px; display: inline-flex; align-items: center; font-size: 13px; }
 
 /* ========================== ALERTS ========================== */
 .alert {
@@ -512,6 +513,7 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .mes-filtro > div > div select { flex: 1; min-width: 0 !important; }
 
   /* Filtros-form (gastos/entradas): 2 por linha */
+  .filtros-grid { flex-wrap: wrap; }
   .filtro-group { flex: 1 1 calc(50% - 6px); min-width: 0; }
   .filtro-group select,
   .filtro-group input { width: 100%; min-width: 0; }

@@ -68,8 +68,10 @@
              placeholder="Ex: Uber, Mercado..." class="form-control"
              style="min-width:180px;padding:5px 10px;font-size:13px;">
     </div>
-    <a href="{% url 'gasto-list' %}?_f=1" class="btn btn-sm" style="align-self:flex-end;flex-shrink:0;">Limpar</a>
-    <button type="submit" class="btn btn-sm btn-primary" style="align-self:flex-end;flex-shrink:0;">Buscar</button>
+    <div class="filtros-botoes">
+      <a href="{% url 'gasto-list' %}?_f=1" class="btn">Limpar</a>
+      <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
   </div>
 </form>
 
