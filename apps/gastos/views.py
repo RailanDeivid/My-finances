@@ -1274,6 +1274,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         old_valor = old.valor_total
         # Captura ANTES de form.save pois old is gasto (mesmo objeto Python)
         old_descricao = old.descricao
+        old_responsavel_id = old.responsavel_id
         old_grupo_parcelado = (
             _encontrar_grupo_parcelado(old, self.request.user)
             if old.tipo_pagamento == "credito_parcelado" else []
@@ -1423,9 +1424,17 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                 Gasto.objects.filter(
                     user=self.request.user,
                     grupo_recorrente=gasto.grupo_recorrente,
-                    responsavel=gasto.responsavel,
+                    responsavel_id=old_responsavel_id,
                     data_compra__gt=gasto.data_compra,
-                ).update(valor_total=novo_valor)
+                ).update(
+                    valor_total=novo_valor,
+                    categoria=gasto.categoria,
+                    responsavel=gasto.responsavel,
+                    cartao=gasto.cartao,
+                    cartao_adicional=gasto.cartao_adicional,
+                    conta_origem=gasto.conta_origem,
+                    observacao=gasto.observacao,
+                )
                 if gasto.grupo_divisao:
                     valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
                     Gasto.objects.filter(
