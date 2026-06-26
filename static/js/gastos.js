@@ -265,7 +265,6 @@
     var isA      = tipo === 'credito_avista';
     var isD      = tipo === 'debito';
     var isPix    = tipo === 'pix';
-    var isEmp    = tipo === 'emprestimo';
     var el;
 
     _show('mg-responsavel-row',      !isAjuste);
@@ -274,13 +273,12 @@
     _show('mg-ajuste-tipo-row',      isAjuste);
     _show('mg-conta-origem-row',     isD);
     _show('mg-parcelas-row',         isP);
-    _show('mg-inicio-row',           isP || isA || isRec || isAjuste || isPix || isEmp);
+    _show('mg-inicio-row',           isP || isA || isRec || isAjuste || isPix);
 
     var inicioTxt = isA ? 'Mês da Fatura'
       : isRec    ? 'Mês de início'
       : isAjuste ? 'Mês da Fatura'
       : isPix    ? 'Mês do PIX/Transferência'
-      : isEmp    ? 'Mês de início do empréstimo'
       : 'Mês de início das parcelas';
     el = document.getElementById('mg-inicio-label');  if (el) el.textContent = inicioTxt;
     el = document.getElementById('mg_label_valor');   if (el) el.textContent = isP ? 'Valor da Parcela (R$) *' : 'Valor (R$) *';
@@ -290,13 +288,13 @@
     _mgSetDisabled('mg_cartao',        !(isC || isAjuste));
     _mgSetDisabled('mg_conta_origem',  !isD);
     _mgSetDisabled('mg_total_parcelas',!isP);
-    _mgSetDisabled('mg_mes_inicio',    !(isP || isA || isRec || isAjuste || isPix || isEmp));
-    _mgSetDisabled('mg_ano_inicio',    !(isP || isA || isRec || isAjuste || isPix || isEmp));
+    _mgSetDisabled('mg_mes_inicio',    !(isP || isA || isRec || isAjuste || isPix));
+    _mgSetDisabled('mg_ano_inicio',    !(isP || isA || isRec || isAjuste || isPix));
     _mgSetDisabled('mg_ajuste_tipo',   !isAjuste);
 
     var dataRow = document.getElementById('mg-data-row');
     if (dataRow) {
-      if (isAjuste || isPix || isEmp) {
+      if (isAjuste || isPix) {
         dataRow.style.display = 'none';
         mgSyncDataFromFatura();
       } else {
@@ -305,10 +303,10 @@
         dataRow.style.gridRow    = isP ? '2'       : '1';
       }
     }
-    // Toggle recorrente para PIX / Empréstimo / Débito
+    // Toggle recorrente para PIX / Débito
     var pixEmpRecWrapper = document.getElementById('mg-pix-emp-rec-wrapper');
     var pixEmpRecChk     = document.getElementById('mg_pix_emp_rec_chk');
-    var _mgTemToggle = isPix || isEmp || isD;
+    var _mgTemToggle = isPix || isD;
     if (pixEmpRecWrapper) pixEmpRecWrapper.style.display = _mgTemToggle ? 'block' : 'none';
     if (!_mgTemToggle && pixEmpRecChk) pixEmpRecChk.checked = false;
     var pixEmpRecAtivo = _mgTemToggle && pixEmpRecChk && pixEmpRecChk.checked;
@@ -330,7 +328,7 @@
     if (checked) mgAtualizarRecorrenteInfo();
   };
 
-  var _MG_TIPOS_SEM_DATA = ['ajuste_fatura', 'pix', 'emprestimo'];
+  var _MG_TIPOS_SEM_DATA = ['ajuste_fatura', 'pix'];
   window.mgSyncDataFromFatura = function () {
     var tipo = document.getElementById('mg_tipo_pagamento');
     if (!tipo || _MG_TIPOS_SEM_DATA.indexOf(tipo.value) === -1) return;

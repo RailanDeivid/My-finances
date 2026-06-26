@@ -142,7 +142,7 @@ class GastoForm(FormControlMixin, forms.ModelForm):
             cleaned["conta_origem"] = None
         if tipo_val != "credito_parcelado":
             cleaned["total_parcelas"] = None
-        if tipo_val not in ("credito_parcelado", "credito_avista", "ajuste_fatura", "pix", "emprestimo"):
+        if tipo_val not in ("credito_parcelado", "credito_avista", "ajuste_fatura", "pix"):
             cleaned["mes_inicio"] = None
             cleaned["ano_inicio"] = None
         # Responsável: obrigatório para todos exceto ajuste_fatura (auto-atribuído)

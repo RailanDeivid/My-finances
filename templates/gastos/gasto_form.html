@@ -54,7 +54,7 @@
       </div>
     </div>
 
-    <!-- 3b-rec-pix. Toggle recorrente para PIX / Empréstimo -->
+    <!-- 3b-rec-pix. Toggle recorrente para PIX -->
     <div id="pix-emp-rec-wrapper" style="display:none;margin-bottom:12px;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
         <input type="checkbox" id="id_pix_emp_rec_chk"
@@ -387,7 +387,7 @@ function pgCancelarEdit(pk) {
   })();
 
   var inicioDirty = IS_EDIT;
-  var _TIPOS_SEM_DATA = ['ajuste_fatura', 'pix', 'emprestimo'];
+  var _TIPOS_SEM_DATA = ['ajuste_fatura', 'pix'];
   if (selMes) selMes.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); if (tipoSelect && _TIPOS_SEM_DATA.indexOf(tipoSelect.value) !== -1) syncDataFromFatura(); });
   if (selAno) selAno.addEventListener('change', function(){ inicioDirty = true; atualizarPreview(); if (tipoSelect && _TIPOS_SEM_DATA.indexOf(tipoSelect.value) !== -1) syncDataFromFatura(); });
   if (inputData) inputData.addEventListener('change', function() {
@@ -414,7 +414,6 @@ function pgCancelarEdit(pk) {
     var isRecorrente = tipo === 'recorrente';
     var isAjuste     = tipo === 'ajuste_fatura';
     var isPix        = tipo === 'pix';
-    var isEmprestimo = tipo === 'emprestimo';
 
     var respRow = document.getElementById('responsavel-row');
     if (respRow) respRow.style.display = isAjuste ? 'none' : 'block';
@@ -426,10 +425,10 @@ function pgCancelarEdit(pk) {
     var contaRow = document.getElementById('conta-origem-row');
     if (contaRow) contaRow.style.display = isDebito ? 'block' : 'none';
 
-    // Toggle de recorrente para PIX / Empréstimo / Débito
+    // Toggle de recorrente para PIX / Débito
     var pixEmpRecWrapper = document.getElementById('pix-emp-rec-wrapper');
     var pixEmpRecChk     = document.getElementById('id_pix_emp_rec_chk');
-    var _temToggle = isPix || isEmprestimo || isDebito;
+    var _temToggle = isPix || isDebito;
     if (pixEmpRecWrapper) pixEmpRecWrapper.style.display = _temToggle ? 'block' : 'none';
     if (!_temToggle && pixEmpRecChk) pixEmpRecChk.checked = false;
 
@@ -445,7 +444,7 @@ function pgCancelarEdit(pk) {
     var mesLabel = document.getElementById('mes-inicio-label');
     var dica     = document.getElementById('inicio-parcelas-dica');
 
-    if (isParcelado || isAvista || isRecorrente || isAjuste || isPix || isEmprestimo) {
+    if (isParcelado || isAvista || isRecorrente || isAjuste || isPix) {
       inicioRow.style.display = 'block';
       var titLabel, mesLbl, dicaMsg;
       if (isParcelado) {
@@ -460,9 +459,6 @@ function pgCancelarEdit(pk) {
       } else if (isPix) {
         titLabel = 'Mês do PIX/Transferência'; mesLbl = 'Mês do PIX *';
         dicaMsg  = 'Informe o mês em que o PIX ou transferência deve ser contabilizado.';
-      } else if (isEmprestimo) {
-        titLabel = 'Mês de início do empréstimo'; mesLbl = 'Mês de início *';
-        dicaMsg  = 'Informe o mês em que o empréstimo começa a ser contabilizado.';
       } else {
         titLabel = 'Mês da Fatura'; mesLbl = 'Mês da Fatura *';
         dicaMsg  = 'Se a compra é deste mês mas a 1ª fatura cai no mês seguinte, ajuste aqui.';
@@ -477,8 +473,8 @@ function pgCancelarEdit(pk) {
       inicioRow.style.display = 'none';
     }
 
-    // Para ajuste_fatura, PIX e empréstimo: data_compra é derivada do mês/ano — esconder campo data
-    if (isAjuste || isPix || isEmprestimo) {
+    // Para ajuste_fatura e PIX: data_compra é derivada do mês/ano — esconder campo data
+    if (isAjuste || isPix) {
       if (dataRow) dataRow.style.display = 'none';
       syncDataFromFatura();
     } else {
@@ -575,7 +571,7 @@ function pgCancelarEdit(pk) {
   }
   if (selRecMeses) selRecMeses.addEventListener('change', atualizarRecInfo);
 
-  // Toggle recorrente para PIX/Empréstimo
+  // Toggle recorrente para PIX
   window.togglePixEmpRec = function(checked) {
     var recRow = document.getElementById('recorrente-row');
     var chkRec = document.getElementById('id_recorrente');

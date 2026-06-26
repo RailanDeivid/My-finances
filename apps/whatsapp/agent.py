@@ -129,7 +129,7 @@ CANCEL_WORDS = {"cancelar", "sair", "parar", "stop", "menu", "início", "inicio"
 
 TIPO_PAG_MAP = {
     "1": "credito_avista", "2": "credito_parcelado", "3": "pix",
-    "4": "emprestimo",     "5": "debito",
+    "4": "debito",
     **_build_map("tipo_pagamento"),
     "credito_avista": "credito_avista", "credito_parcelado": "credito_parcelado",
     "debito": "debito",
@@ -152,7 +152,6 @@ TIPO_PAG_LABEL = {
     "credito_avista":    "Crédito à vista",
     "credito_parcelado": "Crédito parcelado",
     "pix":               "Pix / Transferência",
-    "emprestimo":        "Empréstimo",
     "debito":            "Débito",
 }
 
@@ -189,8 +188,7 @@ QUESTIONS = {
         "1 · Crédito à vista\n"
         "2 · Crédito parcelado\n"
         "3 · Pix / Transferência\n"
-        "4 · Empréstimo\n"
-        "5 · Débito"
+        "4 · Débito"
     ),
     "total_parcelas":   "🔢 Quantas parcelas?",
     "dividido":         "👥 Gasto dividido?\n\n1 · Sim\n2 · Não",

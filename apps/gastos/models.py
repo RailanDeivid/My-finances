@@ -134,8 +134,6 @@ class Categoria(models.Model):
         ("Pet",           "paw-print",      "#f97316"),
         ("Beleza",        "sparkles",       "#ec4899"),
         ("Presentes",     "gift",           "#ef4444"),
-        # Finanças
-        ("Empréstimo",    "landmark",       "#6366f1"),
         # Outros
         ("Outros",        "wallet",         "#888888"),
     ]
@@ -213,7 +211,6 @@ class Categoria(models.Model):
         ("coins",           "Investimento"),
         ("calculator",      "Impostos"),
         ("shield",          "Seguro"),
-        ("landmark",        "Empréstimo"),
         # Família / Pessoal
         ("baby",            "Filhos"),
         ("paw-print",       "Pet"),
@@ -335,7 +332,6 @@ class Gasto(models.Model):
         ("recorrente",        "Compra Recorrente"),
         ("pix",               "Pix / Transferência"),
         ("debito",            "Débito"),
-        ("emprestimo",        "Empréstimo"),
         ("ajuste_fatura",     "Ajuste de Fatura"),
     ]
 
@@ -584,7 +580,7 @@ class InvestimentoHistorico(models.Model):
 
 
 class PagamentoFeito(models.Model):
-    TIPO_CHOICES = [("pix", "Pix"), ("emprestimo", "Empréstimo"), ("acerto", "Acerto")]
+    TIPO_CHOICES = [("pix", "Pix"), ("acerto", "Acerto")]
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
     responsavel = models.ForeignKey(
         Responsavel, on_delete=models.CASCADE, related_name="pagamentos_feitos"

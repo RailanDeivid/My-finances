@@ -426,8 +426,8 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         gastos_mes_ant_qs = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes_ant, data_compra__year=ano_ant)
         ctx["total_gasto_ant"]  = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=_TIPOS_GASTO))
         ctx["total_cartao_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]))
-        ctx["total_debito_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="debito"))
-        ctx["total_pix_ant"]    = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="pix"))
+        ctx["total_debito_ant"]     = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="debito"))
+        ctx["total_pix_ant"]        = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="pix"))
 
         # Gastos do mês do próprio usuário, atribuídos ao seu responsável (base para cards e tabelas)
         gastos_mes_base = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes, data_compra__year=ano).filter(filtros_q)
@@ -443,12 +443,16 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         if responsavel_id:
             qs_cartao_todos = qs_cartao_todos.exclude(tipo_pagamento="ajuste_fatura")
         ctx["total_cartao_todos"] = _agg_sum_signed(qs_cartao_todos)
-        ctx["total_debito"] = _agg_sum(gastos_mes_base.filter(tipo_pagamento="debito"))
-        ctx["total_pix"]    = _agg_sum(gastos_mes_base.filter(tipo_pagamento="pix"))
-        ctx["tabela_por_responsavel"] = (
+        ctx["total_debito"]     = _agg_sum(gastos_mes_base.filter(tipo_pagamento="debito"))
+        ctx["total_pix"]        = _agg_sum(gastos_mes_base.filter(tipo_pagamento="pix"))
+        qs_outros_resp = (
             Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(filtros_q)
             .exclude(responsavel__usuario_vinculado=user)
+        )
+        ctx["total_outros_responsaveis"] = _agg_sum(qs_outros_resp)
+        ctx["tabela_por_responsavel"] = (
+            qs_outros_resp
             .values("responsavel__id", "responsavel__nome")
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
@@ -470,29 +474,19 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             )))
             .order_by("-total")
         )
-        ctx["tabela_por_emprestimo"] = (
-            Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
-            .filter(filtros_q)
-            .filter(tipo_pagamento="emprestimo")
-            .values("responsavel__id", "responsavel__nome")
-            .annotate(total=Sum("valor_total"))
-            .order_by("-total")
-        )
         ctx["tabela_por_pix"] = (
             Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(filtros_q)
             .filter(tipo_pagamento="pix")
-            .values("responsavel__id", "responsavel__nome")
-            .annotate(total=Sum("valor_total"))
-            .order_by("-total")
+            .select_related("responsavel")
+            .order_by("responsavel__nome", "data_compra")
         )
         ctx["tabela_por_debito"] = (
             Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(filtros_q)
             .filter(tipo_pagamento="debito")
-            .values("conta_origem__id", "conta_origem__nome", "conta_origem__banco")
-            .annotate(total=Sum("valor_total"))
-            .order_by("-total")
+            .select_related("conta_origem", "responsavel")
+            .order_by("conta_origem__nome", "data_compra")
         )
         ctx["faturas_pagas_ids"] = set(
             FaturaPaga.objects.filter(user=user, mes=mes, ano=ano)
@@ -500,10 +494,6 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         )
         ctx["pagamentos_pix_ids"] = set(
             PagamentoFeito.objects.filter(user=user, mes=mes, ano=ano, tipo="pix")
-            .values_list("responsavel_id", flat=True)
-        )
-        ctx["pagamentos_emp_ids"] = set(
-            PagamentoFeito.objects.filter(user=user, mes=mes, ano=ano, tipo="emprestimo")
             .values_list("responsavel_id", flat=True)
         )
 
@@ -1262,7 +1252,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         form = super().get_form(form_class)
         if self.object and self.object.grupo_recorrente:
             # PIX, empréstimo e débito recorrente mantêm o seu tipo — só credito_avista usa o alias "recorrente"
-            if self.object.tipo_pagamento not in ("pix", "emprestimo", "debito"):
+            if self.object.tipo_pagamento not in ("pix", "debito"):
                 form.initial["tipo_pagamento"] = "recorrente"
         return form
 
@@ -1290,7 +1280,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
             gasto.tipo_pagamento = "credito_avista"
 
         # Aplica mes_inicio/ano_inicio como data_compra para crédito à vista, PIX e empréstimo
-        if gasto.tipo_pagamento in ("credito_avista", "pix", "emprestimo"):
+        if gasto.tipo_pagamento in ("credito_avista", "pix"):
             mes_ini = form.cleaned_data.get("mes_inicio")
             ano_ini = form.cleaned_data.get("ano_inicio")
             if mes_ini and ano_ini:
@@ -1473,7 +1463,7 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         ctx["is_edit"] = True
         gasto = self.object
         ctx["is_divisao_main"] = self._is_divisao_main(gasto)
-        ctx["is_pix_emp_rec"] = bool(gasto.grupo_recorrente and gasto.tipo_pagamento in ("pix", "emprestimo", "debito"))
+        ctx["is_pix_emp_rec"] = bool(gasto.grupo_recorrente and gasto.tipo_pagamento in ("pix", "debito"))
         if gasto.grupo_divisao:
             ctx["parceiro_divisao"] = (
                 Gasto.objects.filter(
@@ -2242,7 +2232,7 @@ def pagamento_toggle(request, tipo, responsavel_id):
     if request.method != "POST":
         from django.http import HttpResponseNotAllowed
         return HttpResponseNotAllowed(["POST"])
-    if tipo not in ("pix", "emprestimo", "acerto"):
+    if tipo not in ("pix", "acerto"):
         from django.http import Http404
         raise Http404
     responsavel = get_object_or_404(Responsavel, pk=responsavel_id, user=request.user)

@@ -548,13 +548,14 @@
   {% endif %}
 </div>
 
-<!-- ④ Gastos por Responsável | Gastos Cartões de Crédito | Pix | Débito | Empréstimos -->
-<div class="dash-penta-grid" style="gap:16px;margin-bottom:20px;">
-  <div class="tabela-wrapper" style="margin-top:0;">
-    <div class="tabela-header" style="padding:10px 16px;">
+<!-- ④ Gastos por Responsável | Gastos Cartões de Crédito | Pix | Débito -->
+<div class="dash-penta-grid" style="gap:16px;margin-bottom:20px;align-items:stretch;">
+  <!-- Gastos por Responsável -->
+  <div class="tabela-wrapper" style="display:flex;flex-direction:column;overflow:visible;max-height:none;">
+    <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos por Responsável</span>
     </div>
-    <div style="max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:right;">%</th></tr></thead>
       <tbody>
@@ -567,7 +568,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="2">
+        <tr><td colspan="3">
           <div class="tabela-empty-state">
             <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
             <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
@@ -577,12 +578,19 @@
       </tbody>
     </table>
     </div>
+    {% if tabela_por_responsavel %}
+    <div style="flex-shrink:0;border-top:2px solid var(--border);background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:8px 12px;">
+      <span style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</span>
+      <span style="font-weight:700;color:#ef4444;">R$ {{ total_outros_responsaveis|brl }}</span>
+    </div>
+    {% endif %}
   </div>
-  <div class="tabela-wrapper" style="margin-top:0;">
-    <div class="tabela-header" style="padding:10px 16px;">
+  <!-- Gastos Cartões de Crédito -->
+  <div class="tabela-wrapper" style="display:flex;flex-direction:column;overflow:visible;max-height:none;">
+    <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos Cartões de Crédito</span>
     </div>
-    <div style="max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Cartão</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
@@ -621,31 +629,39 @@
       </tbody>
     </table>
     </div>
+    {% if tabela_por_cartao %}
+    <div style="flex-shrink:0;border-top:2px solid var(--border);background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:8px 12px;">
+      <span style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</span>
+      <span style="font-weight:700;color:#ef4444;">R$ {{ total_cartao_todos|brl }}</span>
+    </div>
+    {% endif %}
   </div>
-  <div class="tabela-wrapper" style="margin-top:0;">
-    <div class="tabela-header" style="padding:10px 16px;">
+  <!-- Pix / Transferência -->
+  <div class="tabela-wrapper" style="display:flex;flex-direction:column;overflow:visible;max-height:none;">
+    <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Pix / Transferência</span>
     </div>
-    <div style="max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
     <table class="tabela-dados">
-      <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
+      <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Descrição</th><th style="text-align:right;">Valor</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
         {% for p in tabela_por_pix %}
         <tr>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;flex-shrink:0;display:inline-block;"></span>
-              <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ p.responsavel__id }}&amp;tipo=pix" style="color:var(--text-primary);text-decoration:none;">{{ p.responsavel__nome }}</a>
+              <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ p.responsavel_id }}&amp;tipo=pix" style="color:var(--text-primary);text-decoration:none;">{{ p.responsavel.nome }}</a>
             </div>
           </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ p.total|brl }}</td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ p.descricao }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ p.valor_total|brl }}</td>
           <td style="text-align:center;">
-            <form method="post" action="{% url 'pagamento-toggle' 'pix' p.responsavel__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
+            <form method="post" action="{% url 'pagamento-toggle' 'pix' p.responsavel_id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
               {% csrf_token %}
               <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <button type="submit" title="{% if p.responsavel__id in pagamentos_pix_ids %}Pago — clique para desmarcar{% else %}Marcar como pago{% endif %}"
+              <button type="submit" title="{% if p.responsavel_id in pagamentos_pix_ids %}Pago — clique para desmarcar{% else %}Marcar como pago{% endif %}"
                       style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;">
-                {% if p.responsavel__id in pagamentos_pix_ids %}
+                {% if p.responsavel_id in pagamentos_pix_ids %}
                   <i data-lucide="check-circle" style="width:16px;height:16px;stroke:#22c55e;"></i>
                 {% else %}
                   <i data-lucide="circle" style="width:16px;height:16px;stroke:var(--text-muted);"></i>
@@ -655,7 +671,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="3">
+        <tr><td colspan="4">
           <div class="tabela-empty-state">
             <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
             <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
@@ -665,76 +681,37 @@
       </tbody>
     </table>
     </div>
+    {% if tabela_por_pix %}
+    <div style="flex-shrink:0;border-top:2px solid var(--border);background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:8px 12px;">
+      <span style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</span>
+      <span style="font-weight:700;color:#ef4444;">R$ {{ total_pix|brl }}</span>
+    </div>
+    {% endif %}
   </div>
   <!-- Débito por Conta -->
-  <div class="tabela-wrapper" style="margin-top:0;">
-    <div class="tabela-header" style="padding:10px 16px;">
+  <div class="tabela-wrapper" style="display:flex;flex-direction:column;overflow:visible;max-height:none;">
+    <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Débito por Conta</span>
     </div>
-    <div style="max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
     <table class="tabela-dados">
-      <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Conta</th><th>Total {{ mes }}/{{ ano }}</th></tr></thead>
+      <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Conta</th><th>Descrição</th><th style="text-align:right;">Valor</th></tr></thead>
       <tbody>
         {% for d in tabela_por_debito %}
         <tr>
           <td>
             <div style="display:flex;align-items:center;gap:6px;">
-              {% load static %}
-              {% if d.conta_origem__banco %}
-              <img src="{% static 'img/bancos/'|add:d.conta_origem__banco|add:'.png' %}"
-                   alt="{{ d.conta_origem__banco }}"
+              {% if d.conta_origem.banco %}
+              <img src="{% static 'img/bancos/'|add:d.conta_origem.banco|add:'.png' %}"
+                   alt="{{ d.conta_origem.banco }}"
                    style="width:16px;height:16px;border-radius:3px;object-fit:contain;"
                    onerror="this.style.display='none'">
               {% endif %}
-              <span style="color:var(--text-primary);font-weight:500;">{{ d.conta_origem__nome }}</span>
+              <span style="color:var(--text-primary);font-weight:500;">{{ d.conta_origem.nome }}</span>
             </div>
           </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ d.total|brl }}</td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="2">
-          <div class="tabela-empty-state">
-            <div class="tabela-empty-state-icon"><i data-lucide="inbox" style="width:20px;height:20px;"></i></div>
-            <span class="tabela-empty-state-text">Nenhum gasto neste período.</span>
-          </div>
-        </td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    </div>
-  </div>
-
-  <div class="tabela-wrapper" style="margin-top:0;">
-    <div class="tabela-header" style="padding:10px 16px;">
-      <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Empréstimos</span>
-    </div>
-    <div style="max-height:252px;overflow-y:auto;">
-    <table class="tabela-dados">
-      <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
-      <tbody>
-        {% for e in tabela_por_emprestimo %}
-        <tr>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="width:10px;height:10px;border-radius:50%;background:#f97316;flex-shrink:0;display:inline-block;"></span>
-              <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ e.responsavel__id }}&amp;tipo=emprestimo" style="color:var(--text-primary);text-decoration:none;">{{ e.responsavel__nome }}</a>
-            </div>
-          </td>
-          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ e.total|brl }}</td>
-          <td style="text-align:center;">
-            <form method="post" action="{% url 'pagamento-toggle' 'emprestimo' e.responsavel__id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <button type="submit" title="{% if e.responsavel__id in pagamentos_emp_ids %}Pago — clique para desmarcar{% else %}Marcar como pago{% endif %}"
-                      style="background:none;border:none;cursor:pointer;padding:2px;display:inline-flex;align-items:center;">
-                {% if e.responsavel__id in pagamentos_emp_ids %}
-                  <i data-lucide="check-circle" style="width:16px;height:16px;stroke:#22c55e;"></i>
-                {% else %}
-                  <i data-lucide="circle" style="width:16px;height:16px;stroke:var(--text-muted);"></i>
-                {% endif %}
-              </button>
-            </form>
-          </td>
+          <td style="font-size:12px;color:var(--text-muted);">{{ d.descricao }}</td>
+          <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ d.valor_total|brl }}</td>
         </tr>
         {% empty %}
         <tr><td colspan="3">
@@ -747,7 +724,14 @@
       </tbody>
     </table>
     </div>
+    {% if tabela_por_debito %}
+    <div style="flex-shrink:0;border-top:2px solid var(--border);background:var(--bg);display:flex;justify-content:space-between;align-items:center;padding:8px 12px;">
+      <span style="font-weight:700;font-size:12px;color:var(--text-muted);">Total</span>
+      <span style="font-weight:700;color:#ef4444;">R$ {{ total_debito|brl }}</span>
+    </div>
+    {% endif %}
   </div>
+
 </div>
 
 <!-- ⑤ Gastos do mês filtrado -->

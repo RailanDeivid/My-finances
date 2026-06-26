@@ -417,7 +417,7 @@ body.light-theme .alert-info    { background: rgba(37,99,235,.10);  color: #1d4e
 .badge-parcelado    { background: rgba(251,146,60,.15);   color: #fb923c; }
 .badge-pix          { background: rgba(6,182,212,.15);    color: #06b6d4; }
 .badge-debito       { background: rgba(139,92,246,.15);   color: #8b5cf6; }
-.badge-emprestimo   { background: rgba(249,115,22,.15);   color: #f97316; }
+
 .badge-recorrente   { background: rgba(168,85,247,.15);   color: #a855f7; }
 .badge-ajuste       { background: rgba(20,184,166,.15);   color: #14b8a6; }
 .badge-salario      { background: rgba(34,197,94,.15);    color: #22c55e; }
@@ -440,7 +440,7 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 
 /* ========================== GRIDS RESPONSIVOS DO DASHBOARD ========================== */
 .dash-duo-grid   { display: grid; grid-template-columns: 1fr 1fr; }
-.dash-penta-grid { display: grid; grid-template-columns: repeat(5, 1fr); }
+.dash-penta-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
 .dash-inv-grid   { display: grid; grid-template-columns: 2fr 1fr; }
 
 /* impede que filhos de grid bloqueiem o overflow-x das tabelas internas */
@@ -450,7 +450,6 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 
 /* Notebook (≤1500px): ícone compacto + topo-alinhado; cards ficam ~290px → label pode quebrar */
 @media (max-width: 1500px) {
-  .dash-penta-grid { grid-template-columns: repeat(3, 1fr); }
   .stat-value      { font-size: 16px; }
   .stat-card       { padding: 12px 14px; }
   .stat-card > div { align-items: flex-start !important; gap: 8px !important; }
@@ -461,6 +460,10 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 }
 
 /* Tablet largo (≤1024px): 3 cols; labels podem quebrar → reserva altura */
+@media (max-width: 1200px) {
+  .dash-penta-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 1024px) {
   .stats-grid      { grid-template-columns: repeat(3, 1fr); }
   .stat-value      { font-size: 16px; }
