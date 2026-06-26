@@ -270,7 +270,7 @@
 
     _show('mg-responsavel-row',      !isAjuste);
     _show('mg-cartao-row',           isC || isAjuste);
-    _show('mg-cartao-adicional-row', isC && !isAjuste);
+    _show('mg-cartao-adicional-row', isC || isAjuste);
     _show('mg-ajuste-tipo-row',      isAjuste);
     _show('mg-conta-origem-row',     isD);
     _show('mg-parcelas-row',         isP);

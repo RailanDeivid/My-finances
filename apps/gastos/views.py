@@ -71,6 +71,19 @@ def _mes_ano_from_request(request, prefix=""):
     return mes, ano
 
 
+def _filtros_from_session(request, prefix, keys):
+    """Lê filtros do GET quando _f=1 (submetido pelo form) salvando na session;
+    caso contrário restaura da session. Funciona para qualquer aba com filtros persistentes."""
+    session_key = f"filtros_{prefix}"
+    if request.GET.get("_f") == "1":
+        values = {k: request.GET.get(k, "") for k in keys}
+        request.session[session_key] = values
+    else:
+        saved = request.session.get(session_key, {})
+        values = {k: saved.get(k, "") for k in keys}
+    return values
+
+
 def _impacto_q(user):
     """Q que representa todos os gastos que impactam financeiramente um usuário:
     qualquer gasto cujo responsável está vinculado a este usuário (próprios ou atribuídos)."""
@@ -321,11 +334,14 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
 
         ctx["anos_lista"] = list(range(2026, 2051))
 
-        # Filtros
-        responsavel_id = self.request.GET.get("responsavel")
-        cartao_id = self.request.GET.get("cartao")
-        tipo_filtro = self.request.GET.get("tipo")
-        categoria_id = self.request.GET.get("categoria")
+        # Filtros — persistidos na session entre navegações
+        _f = _filtros_from_session(
+            self.request, "dashboard", ["responsavel", "cartao", "tipo", "categoria"]
+        )
+        responsavel_id = _f["responsavel"]
+        cartao_id = _f["cartao"]
+        tipo_filtro = _f["tipo"]
+        categoria_id = _f["categoria"]
 
         ctx["responsaveis_lista"] = Responsavel.objects.filter(ativo=True, user=user)
         ctx["cartoes_lista"] = Cartao.objects.filter(ativo=True, user=user)
@@ -409,22 +425,24 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
 
         gastos_mes_ant_qs = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes_ant, data_compra__year=ano_ant)
         ctx["total_gasto_ant"]  = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=_TIPOS_GASTO))
-        ctx["total_cartao_ant"] = _agg_sum_signed(gastos_mes_ant_qs.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado", "ajuste_fatura"]))
+        ctx["total_cartao_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]))
         ctx["total_debito_ant"] = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="debito"))
         ctx["total_pix_ant"]    = _agg_sum(gastos_mes_ant_qs.filter(tipo_pagamento="pix"))
 
         # Gastos do mês do próprio usuário, atribuídos ao seu responsável (base para cards e tabelas)
         gastos_mes_base = Gasto.objects.filter(_impacto_q(user), user=user, data_compra__month=mes, data_compra__year=ano).filter(filtros_q)
 
-        ctx["total_cartao"] = _agg_sum_signed(gastos_mes_base.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado", "ajuste_fatura"]))
-        ctx["total_cartao_todos"] = _agg_sum_signed(
-            Gasto.objects.filter(
-                user=user,
-                data_compra__month=mes,
-                data_compra__year=ano,
-                tipo_pagamento__in=["credito_avista", "credito_parcelado", "ajuste_fatura"],
-            ).filter(filtros_q)
-        )
+        # "Total Gasto Meus Cartões": sem ajuste_fatura (mostra só o que o responsável gastou)
+        ctx["total_cartao"] = _agg_sum(gastos_mes_base.filter(tipo_pagamento__in=["credito_avista", "credito_parcelado"]))
+        # "Total Cartões": gastos - estornos; ajuste_fatura é do cartão, não da pessoa
+        # Quando há filtro de responsavel, excluir ajuste_fatura (para não subtrair estornos do total pessoal)
+        qs_cartao_todos = Gasto.objects.filter(
+            user=user, data_compra__month=mes, data_compra__year=ano,
+            tipo_pagamento__in=["credito_avista", "credito_parcelado", "ajuste_fatura"],
+        ).filter(filtros_q)
+        if responsavel_id:
+            qs_cartao_todos = qs_cartao_todos.exclude(tipo_pagamento="ajuste_fatura")
+        ctx["total_cartao_todos"] = _agg_sum_signed(qs_cartao_todos)
         ctx["total_debito"] = _agg_sum(gastos_mes_base.filter(tipo_pagamento="debito"))
         ctx["total_pix"]    = _agg_sum(gastos_mes_base.filter(tipo_pagamento="pix"))
         ctx["tabela_por_responsavel"] = (
@@ -435,10 +453,15 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
             .annotate(total=Sum("valor_total"))
             .order_by("-total")
         )
-        ctx["tabela_por_cartao"] = (
+        qs_tabela_cartao = (
             Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
             .filter(filtros_q)
             .filter(cartao__isnull=False)
+        )
+        if responsavel_id:
+            qs_tabela_cartao = qs_tabela_cartao.exclude(tipo_pagamento="ajuste_fatura")
+        ctx["tabela_por_cartao"] = (
+            qs_tabela_cartao
             .values("cartao__id", "cartao__nome", "cartao__cor", "cartao__tipo")
             .annotate(total=Sum(Case(
                 When(tipo_pagamento="ajuste_fatura", ajuste_tipo="desconto", then=-F("valor_total")),
@@ -971,7 +994,12 @@ class GastoListView(MesAnoMixin, UserOwnedMixin, ListView):
 
     def get_queryset(self):
         user = self.request.user
-        atribuido = self.request.GET.get("atribuido", "")
+        self._filtros_gastos = _filtros_from_session(
+            self.request, "gastos",
+            ["responsavel", "cartao", "tipo_cartao", "categoria", "tipo", "atribuido", "busca"],
+        )
+        f = self._filtros_gastos
+        atribuido = f["atribuido"]
 
         if atribuido == "sim":
             qs = Gasto.objects.filter(
@@ -987,15 +1015,20 @@ class GastoListView(MesAnoMixin, UserOwnedMixin, ListView):
         qs = qs.select_related("responsavel", "cartao", "categoria", "user")
         qs = qs.filter(data_compra__month=self.mes, data_compra__year=self.ano)
 
-        responsavel = self.request.GET.get("responsavel")
-        cartao = self.request.GET.get("cartao")
-        categoria = self.request.GET.get("categoria")
-        tipo = self.request.GET.get("tipo")
-        busca = self.request.GET.get("busca", "").strip()
+        responsavel = f["responsavel"]
+        cartao = f["cartao"]
+        tipo_cartao = f["tipo_cartao"]
+        categoria = f["categoria"]
+        tipo = f["tipo"]
+        busca = f["busca"].strip()
         if responsavel:
             qs = qs.filter(responsavel_id=responsavel).exclude(tipo_pagamento="ajuste_fatura")
         if cartao:
             qs = qs.filter(cartao_id=cartao)
+        if tipo_cartao == "adicional":
+            qs = qs.filter(cartao_adicional=True)
+        elif tipo_cartao == "principal":
+            qs = qs.filter(cartao_adicional=False, cartao__isnull=False)
         if categoria:
             qs = qs.filter(categoria_id=categoria)
         if tipo:
@@ -1015,9 +1048,10 @@ class GastoListView(MesAnoMixin, UserOwnedMixin, ListView):
         ctx["cartoes"] = Cartao.objects.filter(ativo=True, user=self.request.user)
         ctx["categorias"] = Categoria.objects.filter(ativo=True, user=self.request.user)
         ctx["tipos"] = Gasto.TIPO_PAGAMENTO_CHOICES
-        ctx["filtros"] = self.request.GET
-        ctx["atribuido_filtro"] = self.request.GET.get("atribuido", "")
+        ctx["filtros"] = self._filtros_gastos
+        ctx["atribuido_filtro"] = self._filtros_gastos["atribuido"]
         ctx["total_filtrado"] = _agg_sum_signed(self.object_list)
+        ctx["total_filtrado_col8"] = _agg_sum(self.object_list.exclude(tipo_pagamento="ajuste_fatura"))
         return ctx
 
 
@@ -1703,19 +1737,15 @@ class CartaoDetailView(MesAnoMixin, UserOwnedMixin, DetailView):
             qs = qs.filter(responsavel_id=responsavel_id).exclude(tipo_pagamento="ajuste_fatura")
 
         ctx["gastos"] = qs
-        # Ajustes de fatura com desconto subtraem do total; adições somam
-        # Quando há filtro por responsável, ajuste_fatura já foi excluído do qs → soma simples
-        ctx["total_fatura"] = qs.aggregate(
-            _t=Sum(Case(
-                When(tipo_pagamento="ajuste_fatura", ajuste_tipo="desconto", then=-F("valor_total")),
-                default=F("valor_total"),
-                output_field=DecimalField(),
-            ))
-        )["_t"] or Decimal("0")
-        ctx["total_adicional"] = _agg_sum(
-            qs.filter(cartao_adicional=True).exclude(tipo_pagamento="ajuste_fatura")
-        )
+        # Col 8 "Valor Gasto": soma dos gastos normais sem ajuste_fatura
+        ctx["total_valor_gasto"] = _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
+        # Col 9 "Valor Total": gastos - estornos (total real da fatura)
+        ctx["total_fatura"] = _agg_sum_signed(qs)
+        # Adicional col 8: apenas gastos normais; col 9: gastos - estornos do adicional
+        ctx["total_adicional_valor_gasto"] = _agg_sum(qs.filter(cartao_adicional=True).exclude(tipo_pagamento="ajuste_fatura"))
+        ctx["total_adicional"] = _agg_sum_signed(qs.filter(cartao_adicional=True))
         ctx["total_principal"] = ctx["total_fatura"] - ctx["total_adicional"]
+        ctx["total_principal_valor_gasto"] = ctx["total_valor_gasto"] - ctx["total_adicional_valor_gasto"]
         ctx["mes_ant"], ctx["ano_ant"], ctx["mes_prox"], ctx["ano_prox"] = _mes_vizinhos(mes, ano)
         ctx["responsaveis"] = Responsavel.objects.filter(user=request.user, ativo=True).order_by("nome")
         ctx["filtro_tipo_cartao"] = tipo_cartao

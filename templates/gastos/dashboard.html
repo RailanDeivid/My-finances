@@ -8,6 +8,7 @@
 
 <!-- Filtros -->
 <form method="get" class="mes-filtro" id="form-filtros" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+  <input type="hidden" name="_f" value="1">
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Mês/Ano</label>
     <div style="display:flex;gap:6px;">
@@ -70,7 +71,7 @@
   </div>
   {% if filtro_responsavel or filtro_cartao or filtro_tipo or filtro_categoria %}
   <div>
-    <a href="?mes={{ mes }}&amp;ano={{ ano }}" class="btn btn-sm" style="margin-top:18px;" title="Limpar filtros">
+    <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;_f=1" class="btn btn-sm" style="margin-top:18px;" title="Limpar filtros">
       <i data-lucide="x"></i> Limpar
     </a>
   </div>

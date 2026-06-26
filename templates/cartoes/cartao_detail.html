@@ -63,6 +63,11 @@
         {% endfor %}
       </select>
     </label>
+    {% if filtro_tipo_cartao or filtro_responsavel %}
+    <a href="?mes={{ mes }}&amp;ano={{ ano }}" class="btn btn-sm" title="Limpar filtros" style="white-space:nowrap;">
+      <i data-lucide="x"></i> Limpar
+    </a>
+    {% endif %}
   </form>
   <a href="?mes={{ mes_prox }}&amp;ano={{ ano_prox }}{% if filtro_tipo_cartao %}&amp;tipo_cartao={{ filtro_tipo_cartao }}{% endif %}{% if filtro_responsavel %}&amp;responsavel_filtro={{ filtro_responsavel }}{% endif %}" class="btn btn-sm" title="Próximo mês">
     <i data-lucide="chevron-right"></i>
@@ -193,19 +198,22 @@
     <tfoot>
       <tr style="border-top:2px solid var(--border);">
         <td colspan="7" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total da Fatura</td>
+        <td style="text-align:right;font-weight:700;color:var(--text);padding:8px 12px;">R$ {{ total_valor_gasto|brl }}</td>
         <td style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">R$ {{ total_fatura|brl }}</td>
-        <td colspan="3"></td>
+        <td colspan="2"></td>
       </tr>
-      {% if total_adicional %}
+      {% if total_adicional_valor_gasto or total_adicional %}
       <tr>
         <td colspan="7" style="font-size:11px;color:var(--text-muted);padding:4px 12px 2px;border-top:none!important;box-shadow:none!important;">↳ Cartão Principal</td>
+        <td style="text-align:right;font-size:11px;color:var(--text);font-weight:600;padding:4px 12px 2px;border-top:none!important;box-shadow:none!important;">R$ {{ total_principal_valor_gasto|brl }}</td>
         <td style="text-align:right;font-size:11px;color:#22c55e;font-weight:600;padding:4px 12px 2px;border-top:none!important;box-shadow:none!important;">R$ {{ total_principal|brl }}</td>
-        <td colspan="3" style="border-top:none!important;box-shadow:none!important;"></td>
+        <td colspan="2" style="border-top:none!important;box-shadow:none!important;"></td>
       </tr>
       <tr>
         <td colspan="7" style="font-size:11px;color:var(--text-muted);padding:2px 12px 8px;border-top:none!important;box-shadow:none!important;">↳ Cartão Adicional</td>
+        <td style="text-align:right;font-size:11px;color:#6366f1;font-weight:600;padding:2px 12px 8px;border-top:none!important;box-shadow:none!important;">R$ {{ total_adicional_valor_gasto|brl }}</td>
         <td style="text-align:right;font-size:11px;color:#6366f1;font-weight:600;padding:2px 12px 8px;border-top:none!important;box-shadow:none!important;">R$ {{ total_adicional|brl }}</td>
-        <td colspan="3" style="border-top:none!important;box-shadow:none!important;"></td>
+        <td colspan="2" style="border-top:none!important;box-shadow:none!important;"></td>
       </tr>
       {% endif %}
     </tfoot>

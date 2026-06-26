@@ -420,7 +420,7 @@ function pgCancelarEdit(pk) {
     if (respRow) respRow.style.display = isAjuste ? 'none' : 'block';
     if (cartaoRow) cartaoRow.style.display = (isCartao || isAjuste) ? 'block' : 'none';
     var adicionalRow = document.getElementById('cartao-adicional-row');
-    if (adicionalRow) adicionalRow.style.display = isCartao ? 'block' : 'none';
+    if (adicionalRow) adicionalRow.style.display = (isCartao || isAjuste) ? 'block' : 'none';
     var ajusteTipoRow = document.getElementById('ajuste-tipo-row');
     if (ajusteTipoRow) ajusteTipoRow.style.display = isAjuste ? 'block' : 'none';
     var contaRow = document.getElementById('conta-origem-row');
