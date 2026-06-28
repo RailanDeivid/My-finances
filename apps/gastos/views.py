@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 from django.contrib.auth import update_session_auth_hash
 from django.db.models import Sum, Q, F, Case, When, DecimalField
 from django.http import HttpResponseRedirect, JsonResponse
+from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -17,6 +18,12 @@ from django.views.generic import (
     TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView
 )
 from django.contrib import messages
+
+
+def landing(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    return render(request, "initial_page/initial.html")
 
 from django.shortcuts import get_object_or_404
 from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, FaturaPaga, Conta, PagamentoFeito, Investimento, InvestimentoHistorico
