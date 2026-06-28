@@ -42,6 +42,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.gastos.middleware.AdminPanelMiddleware",
+    "apps.gastos.middleware.ErrorLoggingMiddleware",
     "axes.middleware.AxesMiddleware",
 ]
 
@@ -142,6 +143,7 @@ LOGGING = {
 }
 
 UNFOLD = {
+    "DASHBOARD_CALLBACK": "apps.gastos.dashboard.dashboard_callback",
     "SITE_TITLE": "MyFinances — Painel Admin",
     "SITE_HEADER": "MyFinances",
     "SITE_SUBHEADER": "Controle de finanças pessoal",
@@ -155,6 +157,9 @@ UNFOLD = {
             "type": "image/svg+xml",
             "href": lambda r: static("img/piggy-bank.svg"),
         },
+    ],
+    "STYLES": [
+        lambda request: static("css/admin-custom.css"),
     ],
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
@@ -200,6 +205,14 @@ UNFOLD = {
         "show_all_applications": False,
         "navigation": [
             {
+                "title": "Geral",
+                "separator": False,
+                "collapsible": False,
+                "items": [
+                    {"title": "Dashboard", "icon": "dashboard", "link": reverse_lazy("admin:index")},
+                ],
+            },
+            {
                 "title": "Gastos",
                 "separator": True,
                 "collapsible": True,
@@ -226,6 +239,7 @@ UNFOLD = {
                     {"title": "Grupos",            "icon": "groups",          "link": reverse_lazy("admin:auth_group_changelist")},
                     {"title": "Contatos WhatsApp", "icon": "chat",            "link": reverse_lazy("admin:whatsapp_whatsappaccess_changelist")},
                     {"title": "Uso de LLM",        "icon": "query_stats",     "link": reverse_lazy("admin:whatsapp_llmusage_changelist")},
+                    {"title": "Logs de Erro",      "icon": "bug_report",      "link": reverse_lazy("admin:gastos_logerro_changelist")},
                 ],
             },
         ],

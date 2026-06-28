@@ -14,6 +14,7 @@ def admin_login_view(request):
     else:
         next_url = "/painel-interno/"
 
+    error = False
     if request.method == "POST":
         username = request.POST.get("username", "").strip()
         password = request.POST.get("password", "")

@@ -1,0 +1,62 @@
+{% if health_bar and health_bar.days %}
+<div class="glass-panel health-bar" style="margin-bottom:1.5rem;overflow:visible;">
+  <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <span style="display:flex;align-items:center;gap:8px;">
+      <span class="material-symbols-outlined health-bar-icon health-bar-icon-{% if health_bar.total_falhas %}red{% elif health_bar.total_retries or health_bar.total_login_falhas %}amber{% else %}green{% endif %}">
+        favorite
+      </span>
+      Saúde do sistema
+    </span>
+    <span class="health-bar-pct">{{ health_bar.healthy_pct }}%</span>
+  </div>
+
+  <div class="health-bar-body">
+    <div class="health-bar-days" role="list">
+      {% for day in health_bar.days %}
+        <div class="day-group day-group-{{ day.level }}" role="listitem">
+          {% if day.marks %}
+            {% for mark in day.marks %}
+              {% if mark.url %}
+                <a href="{{ mark.url }}" class="day-mark day-mark-{{ mark.level }}" aria-label="{{ mark.label }} {{ mark.status_label }}">
+                  <span class="day-mark-tooltip">
+                    <span class="day-mark-tooltip-time">{{ mark.time|date:"d/m/Y H:i" }}</span>
+                    <span class="day-mark-tooltip-label">{{ mark.label }}{% if mark.descr %} <span class="day-mark-tooltip-descr">— {{ mark.descr }}</span>{% endif %}</span>
+                    <span class="day-mark-tooltip-status status-{{ mark.level }}">{{ mark.status_label }}</span>
+                  </span>
+                </a>
+              {% else %}
+                <span class="day-mark day-mark-{{ mark.level }}">
+                  <span class="day-mark-tooltip">
+                    <span class="day-mark-tooltip-time">{{ mark.time|date:"d/m/Y H:i" }}</span>
+                    <span class="day-mark-tooltip-label">{{ mark.label }}{% if mark.descr %} <span class="day-mark-tooltip-descr">— {{ mark.descr }}</span>{% endif %}</span>
+                    <span class="day-mark-tooltip-status status-{{ mark.level }}">{{ mark.status_label }}</span>
+                  </span>
+                </span>
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            <span class="day-mark day-mark-idle">
+              <span class="day-mark-tooltip">
+                <span class="day-mark-tooltip-time">{{ day.date|date:"d/m/Y" }}</span>
+                <span class="day-mark-tooltip-label">Sem atividade</span>
+              </span>
+            </span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="health-bar-meta">
+      <span>últimos {{ health_bar.window_days }} dias</span>
+      <span class="health-bar-sep">·</span>
+      <span class="health-bar-stat-falhas">{{ health_bar.total_falhas }} falhas</span>
+      <span class="health-bar-sep">·</span>
+      <span class="health-bar-stat-retries">{{ health_bar.total_retries }} tentativas suspeitas</span>
+      {% if health_bar.total_login_falhas %}
+        <span class="health-bar-sep">·</span>
+        <span class="health-bar-stat-falhas">{{ health_bar.total_login_falhas }} falhas de login</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}

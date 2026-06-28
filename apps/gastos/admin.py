@@ -8,6 +8,7 @@ from unfold.admin import ModelAdmin, TabularInline
 from .models import (
     Gasto, Cartao, Responsavel, Categoria, Entrada,
     Conta, Investimento, InvestimentoHistorico, FaturaPaga, PagamentoFeito,
+    LogErro,
 )
 
 User = get_user_model()
@@ -143,3 +144,23 @@ class FaturaPagaAdmin(ModelAdmin):
 class PagamentoFeitoAdmin(ModelAdmin):
     list_display = ["tipo", "responsavel", "mes", "ano", "user"]
     list_filter = ["tipo", "user", "ano"]
+
+
+@admin.register(LogErro)
+class LogErroAdmin(ModelAdmin):
+    compressed_fields = False
+    list_display  = ["timestamp", "tipo", "status_code", "method", "path", "exception_type", "user"]
+    list_filter   = ["tipo", "status_code", "method"]
+    search_fields = ["path", "exception_type", "exception_message"]
+    readonly_fields = [
+        "timestamp", "tipo", "path", "method", "status_code",
+        "exception_type", "exception_message", "traceback", "user",
+    ]
+    date_hierarchy = "timestamp"
+    ordering       = ["-timestamp"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

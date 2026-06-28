@@ -598,3 +598,33 @@ class PagamentoFeito(models.Model):
 
     def __str__(self):
         return f"{self.tipo} — {self.responsavel.nome} {self.mes}/{self.ano}"
+
+
+class LogErro(models.Model):
+    TIPO_CHOICES = [
+        ("500",     "Erro interno (500)"),
+        ("webhook", "Erro Webhook WhatsApp"),
+        ("llm",     "Erro LLM"),
+        ("outro",   "Outro"),
+    ]
+
+    timestamp         = models.DateTimeField(auto_now_add=True, db_index=True)
+    tipo              = models.CharField(max_length=20, choices=TIPO_CHOICES, default="500", db_index=True)
+    path              = models.CharField(max_length=500, blank=True)
+    method            = models.CharField(max_length=10, blank=True)
+    status_code       = models.PositiveSmallIntegerField(null=True, blank=True)
+    exception_type    = models.CharField(max_length=200, blank=True)
+    exception_message = models.TextField(blank=True)
+    traceback         = models.TextField(blank=True)
+    user              = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="erros_registrados",
+    )
+
+    class Meta:
+        verbose_name        = "Log de Erro"
+        verbose_name_plural = "Logs de Erro"
+        ordering            = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} — {self.path} ({self.timestamp:%d/%m/%Y %H:%M})"

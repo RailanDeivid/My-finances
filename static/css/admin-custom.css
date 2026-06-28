@@ -1,0 +1,346 @@
+/* ── Barra de saúde do sistema ─────────────────────────────────────── */
+.health-bar.glass-panel { overflow: visible; }
+.health-bar .health-bar-icon { font-size: 18px; }
+.health-bar-icon-green { color: rgb(74, 222, 128); }
+.health-bar-icon-amber { color: rgb(251, 191, 36); }
+.health-bar-icon-red   { color: rgb(248, 113, 113); }
+
+.health-bar-pct {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: rgb(241, 245, 249);
+}
+.health-bar-body { padding: 1rem 1.25rem 1.1rem; overflow: visible; }
+
+.health-bar-days {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  height: 36px;
+  align-items: stretch;
+}
+
+.day-group {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  gap: 1.5px;
+}
+
+.day-mark {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: block;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.day-group .day-mark:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+.day-group .day-mark:last-child  { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+.day-mark:hover { filter: brightness(1.2); z-index: 10; }
+.day-mark-ok    { background: rgb(34, 197, 94); }
+.day-mark-retry { background: rgb(245, 158, 11); }
+.day-mark-falha { background: rgb(239, 68, 68); }
+.day-mark-idle  { background: rgba(148, 163, 184, 0.22); cursor: default; }
+
+.day-mark-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 210px;
+  max-width: 300px;
+  background: rgba(15, 23, 42, 0.97);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.78rem;
+  color: rgb(226, 232, 240);
+  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 140ms ease, visibility 140ms;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  white-space: normal;
+  word-break: break-word;
+  text-align: left;
+}
+.day-mark-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: rgba(15, 23, 42, 0.97);
+}
+.day-mark:hover .day-mark-tooltip { opacity: 1; visibility: visible; }
+
+.day-mark-tooltip-time  { font-size: 0.7rem; color: rgb(148,163,184); font-variant-numeric: tabular-nums; }
+.day-mark-tooltip-label { font-weight: 600; color: rgb(241,245,249); line-height: 1.35; }
+.day-mark-tooltip-descr { font-weight: 400; color: rgb(148,163,184); }
+.day-mark-tooltip-status {
+  align-self: flex-start;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+.day-mark-tooltip-status.status-ok    { background: rgba(34,197,94,.18);  color: rgb(74,222,128); }
+.day-mark-tooltip-status.status-retry { background: rgba(245,158,11,.18); color: rgb(251,191,36); }
+.day-mark-tooltip-status.status-falha { background: rgba(239,68,68,.18);  color: rgb(248,113,113); }
+
+/* tooltip das primeiras/últimas colunas não sai da viewport */
+.day-group:nth-child(-n+3) .day-mark-tooltip { left: 0; right: auto; transform: none; }
+.day-group:nth-child(-n+3) .day-mark-tooltip::after { left: 14px; right: auto; transform: none; }
+.day-group:nth-last-child(-n+3) .day-mark-tooltip { left: auto; right: 0; transform: none; }
+.day-group:nth-last-child(-n+3) .day-mark-tooltip::after { left: auto; right: 14px; transform: none; }
+
+.health-bar-meta {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: rgb(148, 163, 184);
+}
+.health-bar-sep { color: rgba(148,163,184,.4); }
+.health-bar-stat-falhas  { color: rgb(248,113,113); font-weight: 500; }
+.health-bar-stat-retries { color: rgb(251,191,36);  font-weight: 500; }
+
+@media (max-width: 640px) {
+  .health-bar-days { height: 28px; gap: 3px; }
+  .day-group { gap: 1px; }
+  .day-mark-tooltip { min-width: 180px; font-size: 0.74rem; }
+}
+
+/* ── Grid de KPI cards ─────────────────────────────────────────────── */
+.dash-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Card de KPI ───────────────────────────────────────────────────── */
+.kpi-card {
+  position: relative;
+  display: block;
+  padding: 1.25rem;
+  background: rgba(30, 41, 59, 0.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(148, 163, 184, 0.10);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 24px -10px rgba(0,0,0,.5);
+  transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  text-decoration: none !important;
+  color: inherit;
+}
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 18px 40px -12px rgba(0,0,0,.6);
+}
+.kpi-card .kpi-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  margin-bottom: 0.9rem;
+}
+.kpi-card .kpi-icon .material-symbols-outlined { font-size: 22px; }
+.kpi-card .kpi-value {
+  font-size: 1.85rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: rgb(248, 250, 252);
+  letter-spacing: -0.02em;
+}
+.kpi-card .kpi-label {
+  font-size: 0.82rem;
+  color: rgb(148, 163, 184);
+  margin-top: 0.2rem;
+}
+.kpi-card .kpi-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: rgb(251, 146, 60);
+}
+
+/* Variantes de cor dos ícones */
+.kpi-icon-blue   { background: rgba(59,130,246,.12);  color: rgb(96,165,250); }
+.kpi-icon-green  { background: rgba(34,197,94,.12);   color: rgb(74,222,128); }
+.kpi-icon-amber  { background: rgba(245,158,11,.12);  color: rgb(251,191,36); }
+.kpi-icon-red    { background: rgba(239,68,68,.12);   color: rgb(248,113,113); }
+.kpi-icon-purple { background: rgba(168,85,247,.12);  color: rgb(192,132,252); }
+.kpi-icon-cyan   { background: rgba(6,182,212,.12);   color: rgb(34,211,238); }
+.kpi-icon-pink   { background: rgba(236,72,153,.12);  color: rgb(244,114,182); }
+
+/* ── Card de custo LLM (destaque) ─────────────────────────────────── */
+.dash-llm-cost-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: 1.4rem 1.6rem;
+  background: linear-gradient(135deg, rgba(168,85,247,0.10) 0%, rgba(99,102,241,0.06) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 24px -8px rgba(168,85,247,0.15);
+}
+.dash-llm-cost-card .llm-cost-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: rgba(168, 85, 247, 0.18);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.dash-llm-cost-card .llm-cost-icon .material-symbols-outlined {
+  font-size: 28px;
+  color: rgb(192, 132, 252);
+}
+.dash-llm-cost-card .llm-cost-body {
+  flex: 1;
+  min-width: 0;
+}
+.dash-llm-cost-card .llm-cost-label {
+  font-size: 0.80rem;
+  font-weight: 500;
+  color: rgb(148, 163, 184);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+.dash-llm-cost-card .llm-cost-value {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: rgb(216, 180, 254);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-bottom: 0.75rem;
+}
+.dash-llm-cost-card .llm-cost-substats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+}
+.dash-llm-cost-card .llm-cost-stat {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.dash-llm-cost-card .llm-cost-stat-value {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgb(241, 245, 249);
+  font-variant-numeric: tabular-nums;
+}
+.dash-llm-cost-card .llm-cost-stat-label {
+  font-size: 0.72rem;
+  color: rgb(100, 116, 139);
+}
+.dash-llm-cost-card .llm-cost-stat-sep {
+  color: rgba(148,163,184,0.3);
+  font-size: 1rem;
+  line-height: 1;
+  align-self: center;
+  margin: 0 2px;
+}
+.dash-llm-cost-card .llm-cost-link {
+  margin-left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+  font-size: 0.80rem;
+  font-weight: 500;
+  color: rgb(192, 132, 252);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(168,85,247,0.25);
+  border-radius: 8px;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.dash-llm-cost-card .llm-cost-link:hover {
+  background: rgba(168,85,247,0.12);
+  border-color: rgba(168,85,247,0.45);
+  color: rgb(216,180,254);
+}
+.dash-llm-cost-card .llm-cost-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+.llm-token-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0.22rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.llm-token-badge .material-symbols-outlined { font-size: 13px; }
+.llm-token-in  { background: rgba(34,197,94,0.10);  color: rgb(74,222,128);  border: 1px solid rgba(34,197,94,0.18); }
+.llm-token-out { background: rgba(251,146,60,0.10); color: rgb(253,186,116); border: 1px solid rgba(251,146,60,0.18); }
+
+/* ── Painel glass (container genérico) ────────────────────────────── */
+.glass-panel {
+  background: rgba(30, 41, 59, 0.45);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid rgba(148, 163, 184, 0.10);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.glass-panel-header {
+  padding: 0.9rem 1.25rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: rgb(241, 245, 249);
+}
+
+/* ── Tabelas internas (atividades / LLM por usuário) ──────────────── */
+.atividades-tabela {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.atividades-tabela thead tr { background: rgba(15, 23, 42, 0.6); }
+.atividades-tabela th {
+  text-align: left;
+  font-weight: 500;
+  color: rgb(148, 163, 184);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.7rem 1rem;
+}
+.atividades-tabela td {
+  padding: 0.7rem 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.06);
+  color: rgb(226, 232, 240);
+}
+.atividades-tabela tbody tr { transition: background 150ms ease; }
+.atividades-tabela tbody tr:hover { background: rgba(148, 163, 184, 0.04); }

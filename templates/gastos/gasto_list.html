@@ -100,14 +100,15 @@
       <tr>
         <th>Data</th>
         <th>Descrição</th>
+        <th>Valor Gasto</th>
+        <th>Valor Total</th>
         <th>Categoria</th>
         <th>Responsável</th>
         <th style="text-align:center;">Dividido</th>
         <th>Cartão</th>
         <th>Tipo</th>
+        <th>Pagamento</th>
         <th>Parcelas</th>
-        <th>Valor Gasto</th>
-        <th>Valor Total</th>
         <th></th>
       </tr>
     </thead>
@@ -124,6 +125,10 @@
             <span style="font-size:10px;font-weight:600;background:rgba(99,102,241,.15);color:#818cf8;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;">+ Adição</span>
           {% endif %}
         </td>
+        <td style="text-align:right;color:var(--text-muted);">—</td>
+        <td style="text-align:right;font-weight:700;white-space:nowrap;color:{% if g.ajuste_tipo == 'desconto' %}#22c55e{% else %}#818cf8{% endif %};">
+          {% if g.ajuste_tipo == "desconto" %}−{% else %}+{% endif %} R$ {{ g.valor_total|brl }}
+        </td>
         <td><span style="color:var(--text-muted);">—</span></td>
         <td><span style="color:var(--text-muted);">—</span></td>
         <td style="text-align:center;"><span style="color:var(--text-muted);font-size:12px;">—</span></td>
@@ -133,11 +138,8 @@
           {% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
         </td>
         <td><span class="badge badge-ajuste">Ajuste</span></td>
+        <td><span style="font-size:11px;font-weight:600;background:rgba(99,102,241,.12);color:#818cf8;border-radius:4px;padding:2px 7px;white-space:nowrap;">Ajuste de Fatura</span></td>
         <td style="text-align:center;"><span style="color:var(--text-muted);">—</span></td>
-        <td style="text-align:right;color:var(--text-muted);">—</td>
-        <td style="text-align:right;font-weight:700;white-space:nowrap;color:{% if g.ajuste_tipo == 'desconto' %}#22c55e{% else %}#818cf8{% endif %};">
-          {% if g.ajuste_tipo == "desconto" %}−{% else %}+{% endif %} R$ {{ g.valor_total|brl }}
-        </td>
         <td style="white-space:nowrap;">
           <button type="button" class="btn btn-sm btn-danger" title="Excluir"
                   onclick="openDeleteModal('{% url 'gasto-delete' g.pk %}', 'Excluir ajuste \'{{ g.descricao|escapejs }}\'? Esta ação não pode ser desfeita.')">
@@ -155,6 +157,15 @@
               <i data-lucide="user-check" style="width:9px;height:9px;vertical-align:middle;"></i>
               atribuído por {{ g.user.get_full_name|default:g.user.username }}
             </span>
+          {% endif %}
+        </td>
+        <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|brl }}</td>
+        <td style="text-align:right;white-space:nowrap;">
+          {% if g.grupo_divisao %}
+            <span style="font-weight:600;color:var(--text);">R$ {{ g.valor_compra_total|brl }}</span>
+            <span style="font-size:10px;color:var(--text-muted);display:block;">{{ g.pct_divisao }}% seu</span>
+          {% else %}
+            <span style="font-weight:600;">R$ {{ g.valor_total|brl }}</span>
           {% endif %}
         </td>
         <td>
@@ -182,17 +193,17 @@
         <td>
           {% if g.grupo_recorrente %}{% badge_tipo "recorrente" "Recorrente" %}{% else %}{% badge_tipo g.tipo_pagamento g.get_tipo_pagamento_display %}{% endif %}
         </td>
+        <td>
+          {% if g.tipo_pagamento == "credito_avista" or g.tipo_pagamento == "credito_parcelado" or g.tipo_pagamento == "recorrente" %}
+            <span style="font-size:11px;font-weight:600;background:rgba(239,68,68,.12);color:#ef4444;border-radius:4px;padding:2px 7px;white-space:nowrap;">Cartão de Crédito</span>
+          {% elif g.tipo_pagamento == "pix" or g.tipo_pagamento == "debito" %}
+            <span style="font-size:11px;font-weight:600;background:rgba(34,197,94,.12);color:#22c55e;border-radius:4px;padding:2px 7px;white-space:nowrap;">PIX/Débito</span>
+          {% else %}
+            <span style="color:var(--text-muted);">—</span>
+          {% endif %}
+        </td>
         <td style="text-align:center;">
           {% if g.tipo_pagamento == "credito_parcelado" %}{{ g.total_parcelas }}x{% else %}—{% endif %}
-        </td>
-        <td style="text-align:right;font-weight:600;white-space:nowrap;">R$ {{ g.valor_total|brl }}</td>
-        <td style="text-align:right;white-space:nowrap;">
-          {% if g.grupo_divisao %}
-            <span style="font-weight:600;color:var(--text);">R$ {{ g.valor_compra_total|brl }}</span>
-            <span style="font-size:10px;color:var(--text-muted);display:block;">{{ g.pct_divisao }}% seu</span>
-          {% else %}
-            <span style="font-weight:600;">R$ {{ g.valor_total|brl }}</span>
-          {% endif %}
         </td>
         <td style="white-space:nowrap;">
           {% if g.user == request.user %}
@@ -220,7 +231,7 @@
       {% endif %}
       {% empty %}
       <tr>
-        <td colspan="11">
+        <td colspan="12">
           {% url 'gasto-create' as create_url %}
           {% with es_icon="receipt" es_title="Nenhum gasto encontrado" es_description="Nenhum gasto corresponde aos filtros aplicados, ou ainda não há gastos registrados." es_url=create_url es_button="Registrar gasto" %}
             {% include "includes/empty_state.html" %}
@@ -232,10 +243,10 @@
     {% if gastos %}
     <tfoot>
       <tr style="border-top:2px solid var(--border);">
-        <td colspan="8" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total filtrado</td>
+        <td colspan="2" style="font-weight:700;font-size:12px;color:var(--text-muted);padding:8px 12px;">Total filtrado</td>
         <td style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">R$ {{ total_filtrado_col8|brl }}</td>
         <td style="text-align:right;font-weight:700;color:#ef4444;padding:8px 12px;">R$ {{ total_filtrado|brl }}</td>
-        <td></td>
+        <td colspan="8"></td>
       </tr>
     </tfoot>
     {% endif %}

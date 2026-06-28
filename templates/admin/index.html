@@ -1,0 +1,168 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block title %}Dashboard | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+  <a href="{% url 'admin:index' %}">{{ site_header|default:_('Django administration') }}</a>
+</h1>
+{% endblock %}
+
+{% block content %}
+
+{# ── Cards KPI ─────────────────────────────────────────────────────── #}
+{% if kpis %}
+<div class="dash-kpi-grid">
+  {% for kpi in kpis %}
+  <a href="{{ kpi.link }}" class="kpi-card">
+    <div class="kpi-icon kpi-icon-{{ kpi.color }}">
+      <span class="material-symbols-outlined">{{ kpi.icon }}</span>
+    </div>
+    <div class="kpi-value">{{ kpi.value }}</div>
+    <div class="kpi-label">{{ kpi.label }}</div>
+    <div class="kpi-link">Ver todos →</div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Card de Custo LLM ──────────────────────────────────────────────── #}
+<div class="dash-llm-cost-card">
+  <div class="llm-cost-icon">
+    <span class="material-symbols-outlined">smart_toy</span>
+  </div>
+  <div class="llm-cost-body">
+    <div class="llm-cost-label">Custo total LLM (acumulado)</div>
+    <div class="llm-cost-value">${{ llm_cost_usd|floatformat:6 }}</div>
+    <div class="llm-cost-substats">
+      <div class="llm-cost-stat">
+        <span class="llm-cost-stat-value">${{ llm_cost_mes|floatformat:6 }}</span>
+        <span class="llm-cost-stat-label">este mês</span>
+      </div>
+      <div class="llm-cost-stat-sep">·</div>
+      <div class="llm-cost-stat">
+        <span class="llm-cost-stat-value">{{ llm_calls_total }}</span>
+        <span class="llm-cost-stat-label">chamadas totais</span>
+      </div>
+      <div class="llm-cost-stat-sep">·</div>
+      <div class="llm-cost-stat">
+        <span class="llm-cost-stat-value">{{ llm_calls_mes }}</span>
+        <span class="llm-cost-stat-label">chamadas este mês</span>
+      </div>
+      <div class="llm-cost-stat-sep">·</div>
+      <div class="llm-cost-stat">
+        <span class="llm-cost-stat-value">${{ llm_avg_cost|floatformat:6 }}</span>
+        <span class="llm-cost-stat-label">média por chamada</span>
+      </div>
+    </div>
+    <div class="llm-cost-tokens">
+      <span class="llm-token-badge llm-token-in">
+        <span class="material-symbols-outlined">arrow_downward</span>
+        {{ llm_tokens_in|default:0 }} tokens entrada
+      </span>
+      <span class="llm-token-badge llm-token-out">
+        <span class="material-symbols-outlined">arrow_upward</span>
+        {{ llm_tokens_out|default:0 }} tokens saída
+      </span>
+    </div>
+  </div>
+  <a href="{% url 'admin:whatsapp_llmusage_changelist' %}" class="llm-cost-link">Ver uso →</a>
+</div>
+
+{# ── Barra de saúde do sistema ─────────────────────────────────────── #}
+{% include "admin/widgets/health_bar.html" %}
+
+{# ── Tabela de Uso de LLM por Usuário ──────────────────────────────── #}
+{% if llm_por_usuario %}
+<div class="glass-panel" style="margin-bottom:1.5rem;">
+  <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>
+      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:-4px;margin-right:6px;color:rgb(192,132,252);">smart_toy</span>
+      Uso de LLM por usuário
+    </span>
+    <a href="{% url 'admin:whatsapp_llmusage_changelist' %}" style="font-size:0.78rem;color:rgb(251,146,60);text-decoration:none;">Ver tudo →</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="atividades-tabela">
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th style="text-align:right;">Chamadas</th>
+          <th style="text-align:right;">Tokens totais</th>
+          <th style="text-align:right;">Custo (USD)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in llm_por_usuario %}
+        <tr>
+          <td style="font-weight:500;">{{ row.user__username|default:"—" }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;">{{ row.total_calls }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;">{{ row.total_tokens }}</td>
+          <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:rgb(192,132,252);">${{ row.total_cost }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Lista de módulos (default Unfold) ─────────────────────────────── #}
+<div style="margin-bottom:1.5rem;">
+  {% include "unfold/helpers/app_list_default.html" %}
+</div>
+
+{# ── Atividades recentes ────────────────────────────────────────────── #}
+{% if recent_actions %}
+<div class="glass-panel" style="margin-bottom:1.5rem;">
+  <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>
+      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:-4px;margin-right:6px;color:rgb(251,191,36);">history</span>
+      Atividades recentes
+    </span>
+    <span style="font-size:0.78rem;color:rgb(148,163,184);">últimas {{ recent_actions|length }} ações</span>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="atividades-tabela">
+      <thead>
+        <tr>
+          <th>Usuário</th>
+          <th>Ação</th>
+          <th>Objeto</th>
+          <th>Data/Hora</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for action in recent_actions %}
+        <tr>
+          <td>{{ action.user.username|default:"—" }}</td>
+          <td>
+            {% if action.is_addition %}
+              <span style="color:rgb(74,222,128);">+ Adicionou</span>
+            {% elif action.is_change %}
+              <span style="color:rgb(251,191,36);">✎ Modificou</span>
+            {% elif action.is_deletion %}
+              <span style="color:rgb(248,113,113);">✗ Excluiu</span>
+            {% else %}
+              <span style="color:rgb(148,163,184);">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ action.object_repr|truncatechars:55 }}
+            {% if action.content_type %}
+              <span style="display:block;font-size:0.72rem;color:rgb(148,163,184);margin-top:2px;">{{ action.content_type.name|capfirst }}</span>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap;color:rgb(148,163,184);">{{ action.action_time|date:"d/m/Y H:i" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
