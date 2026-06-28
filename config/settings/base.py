@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "apps.gastos",
     "apps.whatsapp",
+    "axes",
 ]
 
 MIDDLEWARE = [
@@ -41,6 +42,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.gastos.middleware.AdminPanelMiddleware",
+    "axes.middleware.AxesMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -95,8 +97,12 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
     "apps.gastos.backends.EmailOrUsernameBackend",
 ]
+
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1
 
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
@@ -112,6 +118,7 @@ OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.2"))
 EVOLUTION_API_URL       = os.environ.get("EVOLUTION_API_URL", "http://evolution-api:8080")
 EVOLUTION_INSTANCE_NAME = os.environ.get("EVOLUTION_INSTANCE_NAME", "myfinances")
 EVOLUTION_API_KEY       = os.environ.get("EVOLUTION_API_KEY", "")
+WEBHOOK_SECRET          = os.environ.get("WEBHOOK_SECRET", "")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
@@ -225,3 +232,8 @@ UNFOLD = {
     },
     "TABS": [],
 }
+
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "")
+AXES_FAILURE_LIMIT = 5          # bloqueia após 5 tentativas erradas
+AXES_COOLOFF_TIME = 1           # desbloqueia após 1 hora
+AXES_LOCKOUT_CALLABLE = None    # retorna 403 padrão

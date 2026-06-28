@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, Conta, Investimento
+from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
 
@@ -308,7 +309,13 @@ class SenhaForm(FormControlMixin, forms.Form):
         confirmar = cleaned.get("confirmar_senha")
         if nova and confirmar and nova != confirmar:
             self.add_error("confirmar_senha", "As senhas não coincidem.")
+        if nova:
+            try:
+                validate_password(nova, self.user)
+            except forms.ValidationError as e:
+                self.add_error("nova_senha", e)
         return cleaned
+
 
 
 class InvestimentoForm(FormControlMixin, forms.ModelForm):

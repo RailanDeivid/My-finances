@@ -9,6 +9,7 @@ python-dotenv==1.0.1
 
 # UI do admin (tema moderno tailwind-based) — mesma do CAIXINHA
 django-unfold==0.44.0
+django-axes==7.0.1
 
 # Datas para cálculo de parcelas
 python-dateutil==2.9.0

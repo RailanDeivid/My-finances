@@ -1,5 +1,5 @@
 from django import template
-from django.utils.html import mark_safe
+from django.utils.html import escape, mark_safe
 
 register = template.Library()
 
@@ -21,7 +21,7 @@ def badge_tipo(tipo_pag, fallback_label=""):
     if tipo_pag in _BADGE_TIPO_MAP:
         cls, texto = _BADGE_TIPO_MAP[tipo_pag]
         return mark_safe(f'<span class="badge {cls}">{texto}</span>')
-    texto = fallback_label if fallback_label else (tipo_pag or "—")
+    texto = escape(fallback_label if fallback_label else (tipo_pag or "—"))
     return mark_safe(f'<span class="badge badge-outro">{texto}</span>')
 
 

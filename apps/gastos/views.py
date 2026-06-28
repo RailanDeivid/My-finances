@@ -23,6 +23,8 @@ from .models import Gasto, Cartao, Responsavel, Categoria, Entrada, FaturaPaga, 
 from .forms import GastoForm, CartaoForm, ResponsavelForm, CategoriaForm, EntradaForm, ContaForm, PerfilForm, SenhaForm, InvestimentoForm, InvestimentoAtualizarSaldoForm
 
 
+
+
 _PERIODO_DEFAULT_MES = 7
 _PERIODO_DEFAULT_ANO = 2026
 
@@ -599,8 +601,8 @@ class DashboardView(MesAnoMixin, LoginRequiredMixin, TemplateView):
         periodo_labels  = [f"{meses_nomes[m-1]}/{ano}" for _, m in todos_meses_display]
         periodo_valores = [dados_periodo.get(m, 0.0) for _, m in todos_meses_display]
 
-        ctx["periodo_labels"] = json.dumps(periodo_labels)
-        ctx["periodo_valores"] = json.dumps(periodo_valores)
+        ctx["periodo_labels"] = _safe_json(periodo_labels)
+        ctx["periodo_valores"] = _safe_json(periodo_valores)
 
         # Tabela combinada: entradas + gastos + gastos atribuídos (ajuste_fatura só aparece no detalhe do cartão)
         gastos_lista = list(
@@ -1269,6 +1271,28 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
             _encontrar_grupo_parcelado(old, self.request.user)
             if old.tipo_pagamento == "credito_parcelado" else []
         )
+        # Busca parcelas irmãs diretamente do DB — old.descricao e old.responsavel_id já
+        # foram atualizados por _post_clean() antes de form_valid ser chamado, então não
+        # são confiáveis como "valores antigos". O DB ainda tem os valores originais aqui.
+        _outras_parcelas_parcelado = []
+        _old_responsavel_id_db = None
+        if old.tipo_pagamento == "credito_parcelado":
+            _db_row = Gasto.objects.filter(pk=old.pk).values("responsavel_id", "descricao").first()
+            if _db_row:
+                _old_responsavel_id_db = _db_row["responsavel_id"]
+                _m_db = _PARCELA_GROUP_RE.match(_db_row["descricao"])
+                if _m_db:
+                    _base_db = _m_db.group(1)
+                    _total_db = int(_m_db.group(3))
+                    _padroes_db = [f"{_base_db} ({i}/{_total_db})" for i in range(1, _total_db + 1)]
+                    _outras_parcelas_parcelado = list(
+                        Gasto.objects.filter(
+                            user=self.request.user,
+                            descricao__in=_padroes_db,
+                            responsavel_id=_old_responsavel_id_db,
+                            tipo_pagamento="credito_parcelado",
+                        ).exclude(pk=old.pk).order_by("data_compra")
+                    )
 
         # Reverte débito anterior antes de salvar
         _reverter_debito(old_tipo, old_conta_id, old_valor)
@@ -1311,6 +1335,25 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
             gasto.pct_divisao = _pct_meu
             gasto.valor_total = _valor_meu
 
+        # Remove divisão: usuário desmarcou "Dividir gasto" num gasto que já era dividido
+        _remover_divisao = (
+            old.grupo_divisao is not None
+            and not form.cleaned_data.get("dividir_gasto")
+        )
+        _parceiro_remover = None
+        if _remover_divisao:
+            _parceiro_remover = (
+                Gasto.objects.filter(user=self.request.user, grupo_divisao=old.grupo_divisao)
+                .exclude(pk=old.pk)
+                .first()
+            )
+            # Busca o valor da própria parcela no DB (antes do save) para somar com o parceiro
+            _share_db = Gasto.objects.filter(pk=old.pk).values_list('valor_total', flat=True).first() or Decimal('0')
+            _valor_parceiro = _parceiro_remover.valor_total if _parceiro_remover else Decimal('0')
+            gasto.valor_total = _share_db + _valor_parceiro
+            gasto.grupo_divisao = None
+            gasto.pct_divisao = None
+
         # Propaga descrição para todo o grupo parcelado
         if old.tipo_pagamento == "credito_parcelado":
             m_old = _PARCELA_GROUP_RE.match(old_descricao)
@@ -1341,14 +1384,6 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
 
         gasto.save()
 
-        # Propaga descrição para recorrentes futuros (mesmo grupo_recorrente)
-        if gasto.grupo_recorrente and gasto.descricao != old_descricao:
-            Gasto.objects.filter(
-                user=self.request.user,
-                grupo_recorrente=gasto.grupo_recorrente,
-                data_compra__gte=gasto.data_compra,
-            ).exclude(pk=gasto.pk).update(descricao=gasto.descricao)
-
         # Aplica novo débito
         _debitar_conta(gasto)
 
@@ -1374,6 +1409,50 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                 valor_total=_valor_outro,
                 ajuste_tipo=gasto.ajuste_tipo,
             )
+
+        # Remove o parceiro quando o usuário desmarcou "Dividir gasto"
+        if _remover_divisao and _parceiro_remover:
+            _parceiro_remover.delete()
+
+        # Propaga responsável e/ou divisão para as demais parcelas do grupo parcelado
+        _resp_mudou_parcelado = bool(
+            _outras_parcelas_parcelado
+            and _old_responsavel_id_db is not None
+            and gasto.responsavel_id != _old_responsavel_id_db
+        )
+        for _p in _outras_parcelas_parcelado:
+            if _p.data_compra <= gasto.data_compra:
+                continue  # não toca parcelas passadas ou do mesmo mês da editada
+            if _dividir_novo:
+                _novo_grp_p = uuid.uuid4()
+                _v_meu_p = (_p.valor_total * Decimal(_pct_meu) / 100).quantize(Decimal("0.01"))
+                _v_outro_p = _p.valor_total - _v_meu_p
+                _p.grupo_divisao = _novo_grp_p
+                _p.pct_divisao = _pct_meu
+                _p.valor_total = _v_meu_p
+                _p.responsavel = gasto.responsavel
+                _p.save(update_fields=["grupo_divisao", "pct_divisao", "valor_total", "responsavel"])
+                Gasto.objects.create(
+                    descricao=_p.descricao,
+                    data_compra=_p.data_compra,
+                    tipo_pagamento=_p.tipo_pagamento,
+                    cartao=_p.cartao,
+                    conta_origem=_p.conta_origem,
+                    responsavel=_dividir_com_resp,
+                    categoria=_p.categoria,
+                    observacao=_p.observacao,
+                    total_parcelas=_p.total_parcelas,
+                    user=self.request.user,
+                    grupo_divisao=_novo_grp_p,
+                    pct_divisao=_pct_outro,
+                    grupo_recorrente=_p.grupo_recorrente,
+                    cartao_adicional=_p.cartao_adicional,
+                    valor_total=_v_outro_p,
+                    ajuste_tipo=_p.ajuste_tipo,
+                )
+            elif _resp_mudou_parcelado:
+                _p.responsavel = gasto.responsavel
+                _p.save(update_fields=["responsavel"])
 
         # Sincroniza com o outro lado do split (se existir) — exclui o próprio responsável para
         # não pegar outra parcela do mesmo responsável em grupos de parcelado+dividido
@@ -1424,7 +1503,14 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                     cartao_adicional=gasto.cartao_adicional,
                     conta_origem=gasto.conta_origem,
                     observacao=gasto.observacao,
+                    ajuste_tipo=gasto.ajuste_tipo,
                 )
+                # Propaga descrição para todos do grupo (inclui parceiro de divisão)
+                Gasto.objects.filter(
+                    user=self.request.user,
+                    grupo_recorrente=gasto.grupo_recorrente,
+                    data_compra__gt=gasto.data_compra,
+                ).update(descricao=gasto.descricao)
                 if gasto.grupo_divisao:
                     valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
                     Gasto.objects.filter(
@@ -1432,6 +1518,19 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
                         grupo_recorrente=gasto.grupo_recorrente,
                         data_compra__gt=gasto.data_compra,
                     ).exclude(responsavel=gasto.responsavel).update(valor_total=valor_parceiro)
+            elif gasto.tipo_pagamento == "credito_parcelado" and gasto.grupo_divisao and _outras_parcelas_parcelado:
+                # Parcelado + split: cada parcela tem seu próprio grupo_divisao, então precisa
+                # iterar pelas parcelas futuras para atualizar cada par (principal + parceiro)
+                valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
+                for _p in _outras_parcelas_parcelado:
+                    if _p.data_compra > gasto.data_compra:
+                        _p.valor_total = novo_valor
+                        _p.save(update_fields=["valor_total"])
+                        if _p.grupo_divisao:
+                            Gasto.objects.filter(
+                                user=self.request.user,
+                                grupo_divisao=_p.grupo_divisao,
+                            ).exclude(pk=_p.pk).update(valor_total=valor_parceiro)
             elif gasto.grupo_divisao:
                 valor_parceiro = _calcular_valor_parceiro(novo_valor, pct_meu)
                 Gasto.objects.filter(
@@ -1449,7 +1548,12 @@ class GastoUpdateView(UserFormKwargsMixin, UserOwnedMixin, UpdateView):
         _recalcular_para_datas(data_antiga, gasto.data_compra, self.request.user)
         if usuario_atribuido and usuario_atribuido != self.request.user:
             _recalcular_para_datas(data_antiga, gasto.data_compra, usuario_atribuido)
-        if _dividir_novo:
+        if _remover_divisao:
+            messages.success(self.request, "Divisão removida. O valor total foi atribuído ao responsável.")
+        elif _dividir_novo and _outras_parcelas_parcelado:
+            n = len([_p for _p in _outras_parcelas_parcelado if _p.data_compra > gasto.data_compra]) + 1
+            messages.success(self.request, f"Gasto dividido em todas as {n} parcelas restantes.")
+        elif _dividir_novo:
             messages.success(self.request, "Gasto dividido e registrado para os dois responsáveis.")
         elif aplicar_escopo == "este_e_proximos" and (gasto.grupo_recorrente or gasto.grupo_divisao):
             messages.success(self.request, "Gasto atualizado e alterações aplicadas aos próximos meses.")

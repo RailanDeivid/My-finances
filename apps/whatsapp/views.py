@@ -10,6 +10,20 @@ from .access_control import BLOCKED_MSG, get_user_by_phone
 from .agent import MENU_TEXT, _MSG_SPLIT, process_message
 from .evolution import send_message, send_presence
 from .session import is_duplicate, is_rate_limited
+import hmac
+from django.conf import settings
+
+@csrf_exempt
+@require_POST
+def webhook(request):
+    # Validar autenticação da Evolution API
+    token = request.headers.get("X-Api-Key", "")
+    if not settings.WEBHOOK_SECRET or not hmac.compare_digest(token, settings.WEBHOOK_SECRET):
+        return JsonResponse({"status": "unauthorized"}, status=401)
+
+    import json as _json
+    # ... resto do código continua igual
+
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +84,15 @@ def _keep_typing(phone: str, stop: threading.Event) -> None:
 @csrf_exempt
 @require_POST
 def webhook(request):
+    import hmac as _hmac
     import json as _json
+    from django.conf import settings as _settings
+
+    secret = _settings.WEBHOOK_SECRET
+    if secret:
+        token = request.headers.get("X-Api-Key", "")
+        if not _hmac.compare_digest(token, secret):
+            return JsonResponse({"status": "unauthorized"}, status=401)
 
     try:
         payload = _json.loads(request.body)
