@@ -526,10 +526,23 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .chart-legend { gap: 10px; }
 }
 
+/* Grids específicos de investimentos */
+@media (max-width: 900px) {
+  .inv-charts-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 600px) {
+  .inv-saldo-form-grid { grid-template-columns: 1fr 1fr !important; }
+}
+@media (max-width: 480px) {
+  .inv-stats-grid      { grid-template-columns: 1fr !important; }
+  .inv-saldo-form-grid { grid-template-columns: 1fr !important; }
+}
+
 /* Mobile pequeno (≤480px): 1 coluna em tudo */
 @media (max-width: 480px) {
   .stats-grid      { grid-template-columns: 1fr; }
   .dash-penta-grid { grid-template-columns: 1fr; }
+  .cartoes-grid    { grid-template-columns: 1fr; }
 
   .filtro-group    { flex: 1 1 100%; }
   .page-header     { flex-direction: column; align-items: flex-start; }
@@ -537,6 +550,9 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
 
   .stat-label      { font-size: 9px; }
   .stat-value      { font-size: 17px; }
+
+  /* Responsáveis: 2 cards por linha em vez de min-width fixo */
+  .resp-mini-card  { flex: 1 1 calc(50% - 6px); min-width: 0; }
 }
 
 /* ========================== RESPONSÁVEIS CARDS ========================== */

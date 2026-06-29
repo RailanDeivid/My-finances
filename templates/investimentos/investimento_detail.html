@@ -64,7 +64,7 @@
   <div style="padding:16px 20px;">
     <form method="post" action="{% url 'investimento-atualizar-saldo' inv.pk %}">
       {% csrf_token %}
-      <div style="display:grid;grid-template-columns:auto 1fr 2fr auto;gap:12px;align-items:end;">
+      <div class="inv-saldo-form-grid" style="display:grid;grid-template-columns:auto 1fr 2fr auto;gap:12px;align-items:end;">
         <div class="form-group" style="margin:0;">
           <label class="form-label">Tipo *</label>
           {{ form_saldo.tipo }}

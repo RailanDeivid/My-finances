@@ -138,6 +138,7 @@
 
   <!-- Modal de confirmação de exclusão em massa -->
   <div id="modal-delete-all"
+       role="dialog" aria-modal="true" aria-labelledby="modal-delete-title"
        style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
               align-items:center;justify-content:center;padding:24px;">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
@@ -167,6 +168,7 @@
 
   <!-- Modal exclusão de compra recorrente -->
   <div id="modal-delete-recorrente"
+       role="dialog" aria-modal="true" aria-labelledby="modal-rec-title"
        style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
               align-items:center;justify-content:center;padding:24px;">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;
@@ -176,7 +178,7 @@
                   display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
         <i data-lucide="repeat" style="width:30px;height:30px;color:#a855f7;"></i>
       </div>
-      <h3 style="margin:0 0 8px;font-size:19px;font-weight:700;color:var(--text);">Excluir compra recorrente</h3>
+      <h3 id="modal-rec-title" style="margin:0 0 8px;font-size:19px;font-weight:700;color:var(--text);">Excluir compra recorrente</h3>
       <p id="modal-rec-desc" style="margin:0 0 24px;color:var(--text-muted);font-size:14px;line-height:1.65;"></p>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <form id="modal-rec-form-este" method="post" style="display:contents;">

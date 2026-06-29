@@ -1,5 +1,6 @@
 <!-- Modal: Nova Entrada -->
 <div id="modal-nova-entrada"
+     role="dialog" aria-modal="true" aria-labelledby="modal-nova-entrada-title"
      style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
             align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;"
      onclick="if(event.target===this)event.stopPropagation()">
@@ -13,9 +14,9 @@
                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <i data-lucide="banknote-arrow-up" style="width:18px;height:18px;stroke:#22c55e;"></i>
         </span>
-        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Nova Entrada</h3>
+        <h3 id="modal-nova-entrada-title" style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Nova Entrada</h3>
       </div>
-      <button onclick="closeFormModal('modal-nova-entrada')"
+      <button onclick="closeFormModal('modal-nova-entrada')" aria-label="Fechar modal"
               style="background:none;border:none;cursor:pointer;color:var(--text-muted);
                      font-size:24px;line-height:1;padding:0 4px;">&times;</button>
     </div>

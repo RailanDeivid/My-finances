@@ -1,5 +1,6 @@
 <!-- Modal: Novo Gasto -->
 <div id="modal-novo-gasto"
+     role="dialog" aria-modal="true" aria-labelledby="modal-novo-gasto-title"
      style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);
             align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;"
      onclick="if(event.target===this)event.stopPropagation()">
@@ -17,9 +18,9 @@
                      display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <i data-lucide="banknote-arrow-down" style="width:18px;height:18px;stroke:#ef4444;"></i>
         </span>
-        <h3 style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Novo Gasto</h3>
+        <h3 id="modal-novo-gasto-title" style="margin:0;font-size:16px;font-weight:700;color:var(--text-primary);">Novo Gasto</h3>
       </div>
-      <button onclick="closeFormModal('modal-novo-gasto')"
+      <button onclick="closeFormModal('modal-novo-gasto')" aria-label="Fechar modal"
               style="background:none;border:none;cursor:pointer;color:var(--text-muted);
                      font-size:24px;line-height:1;padding:0 4px;">&times;</button>
     </div>

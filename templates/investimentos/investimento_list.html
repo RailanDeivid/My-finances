@@ -6,7 +6,7 @@
 {% load gastos_tags %}
 
 <!-- Cards de resumo -->
-<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;">
+<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;" class="inv-stats-grid">
   <div class="stat-card" style="border-left-color:#3b82f6;">
     <div style="display:flex;align-items:center;gap:14px;">
       <span class="icon-badge icon-badge-lg" style="background:#3b82f618;">
@@ -235,7 +235,7 @@
 </div>
 
 <!-- ── Gráficos de Investimentos ──────────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:20px;">
+<div class="inv-charts-grid" style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-top:20px;">
 
   <!-- Evolução -->
   <div class="tabela-wrapper" style="margin-bottom:0;">
@@ -246,7 +246,7 @@
       <div style="display:flex;align-items:center;gap:8px;">
         <label style="font-size:12px;color:var(--text-muted);white-space:nowrap;">Conta:</label>
         <select id="filtro-conta-chart" class="form-control"
-                style="font-size:12px;padding:5px 10px;height:auto;width:auto;min-width:160px;"
+                style="font-size:12px;padding:5px 10px;height:auto;min-width:0;width:auto;"
                 onchange="atualizarGrafico(this.value)">
           <option value="">Todas as Contas</option>
           {% for c in contas_com_inv %}

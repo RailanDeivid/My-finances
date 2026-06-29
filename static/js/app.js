@@ -123,9 +123,17 @@
       });
     }
 
-    // Escape fecha apenas o modal de exclusão (formulários exigem clique em Cancelar)
+    // Escape fecha qualquer modal visível
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") closeDeleteModal();
+      if (e.key !== "Escape") return;
+      ["modal-delete-all", "modal-delete-recorrente", "modal-novo-gasto", "modal-nova-entrada", "modal-perfil"].forEach(function (id) {
+        var m = document.getElementById(id);
+        if (m && m.style.display !== "none") {
+          if (id === "modal-delete-all") closeDeleteModal();
+          else if (id === "modal-delete-recorrente") closeDeleteRecorrenteModal();
+          else closeFormModal(id);
+        }
+      });
     });
 
     // Tooltip da sidebar recolhida
@@ -193,6 +201,7 @@
     var modal = document.getElementById(id);
     if (!modal) return;
     modal.style.display = "flex";
+    modal.removeAttribute("aria-hidden");
     // Atualiza campo 'next' com a URL atual do browser (AJAX altera a URL sem recarregar)
     var nextInput = modal.querySelector('input[name="next"]');
     if (nextInput) nextInput.value = window.location.pathname + window.location.search;
@@ -205,6 +214,10 @@
       if (typeof window.meToggleRecorrente === "function") window.meToggleRecorrente(false);
     }
     if (typeof lucide !== "undefined") lucide.createIcons();
+
+    // Foca o primeiro campo do formulário ou o botão fechar
+    var firstFocusable = modal.querySelector("input:not([type='hidden']), select, textarea, button");
+    if (firstFocusable) firstFocusable.focus();
 
     var now = new Date();
     var today = now.toISOString().split("T")[0];
@@ -246,7 +259,7 @@
 
   window.closeFormModal = function (id) {
     var modal = document.getElementById(id);
-    if (modal) modal.style.display = "none";
+    if (modal) { modal.style.display = "none"; modal.setAttribute("aria-hidden", "true"); }
   };
 
   window.openDeleteModal = function (action, msg, titulo, btnLabel, btnIcon) {
@@ -266,12 +279,13 @@
       if (typeof lucide !== "undefined") lucide.createIcons({ root: confirmBtn });
     }
     modal.style.display = "flex";
+    modal.removeAttribute("aria-hidden");
     modal.querySelector("button[data-cancel]").focus();
   };
 
   window.closeDeleteModal = function () {
     var modal = document.getElementById("modal-delete-all");
-    if (modal) modal.style.display = "none";
+    if (modal) { modal.style.display = "none"; modal.setAttribute("aria-hidden", "true"); }
   };
 
   window.openDeleteRecorrenteModal = function (action, descricao) {
@@ -289,12 +303,13 @@
     if (n1) n1.value = next;
     if (n2) n2.value = next;
     modal.style.display = "flex";
+    modal.removeAttribute("aria-hidden");
     if (typeof lucide !== "undefined") lucide.createIcons({ root: modal });
   };
 
   window.closeDeleteRecorrenteModal = function () {
     var modal = document.getElementById("modal-delete-recorrente");
-    if (modal) modal.style.display = "none";
+    if (modal) { modal.style.display = "none"; modal.setAttribute("aria-hidden", "true"); }
   };
 
   window.toggleSenha = function (id, btn) {

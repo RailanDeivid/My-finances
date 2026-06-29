@@ -105,8 +105,8 @@
         <div class="stat-value" style="color:#6366f1;">R$ {{ total_cartao|brl }}</div>
         <div class="stat-sub">
           {% if pct is not None %}
-            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
-              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+              <i data-lucide="{% if pct > 0 %}trending-up{% else %}trending-down{% endif %}" style="width:12px;height:12px;"></i>{{ pct|abs_val }}%
             </span> vs mês ant.
           {% else %}Crédito à vista e parcelado{% endif %}
         </div>
@@ -139,8 +139,8 @@
         <div class="stat-value" style="color:#f59e0b;">R$ {{ total_debito|brl }}</div>
         <div class="stat-sub">
           {% if pct is not None %}
-            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
-              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+              <i data-lucide="{% if pct > 0 %}trending-up{% else %}trending-down{% endif %}" style="width:12px;height:12px;"></i>{{ pct|abs_val }}%
             </span> vs mês ant.
           {% else %}Débito em conta{% endif %}
         </div>
@@ -160,8 +160,8 @@
         <div class="stat-value" style="color:#06b6d4;">R$ {{ total_pix|brl }}</div>
         <div class="stat-sub">
           {% if pct is not None %}
-            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;">
-              {% if pct > 0 %}↑{% else %}↓{% endif %} {{ pct|abs_val }}%
+            <span style="color:{% if pct > 0 %}#ef4444{% else %}#22c55e{% endif %};font-weight:600;display:inline-flex;align-items:center;gap:3px;">
+              <i data-lucide="{% if pct > 0 %}trending-up{% else %}trending-down{% endif %}" style="width:12px;height:12px;"></i>{{ pct|abs_val }}%
             </span> vs mês ant.
           {% else %}Pix e transferências{% endif %}
         </div>
@@ -214,7 +214,7 @@
         <div class="stat-label">Saldo do Mês</div>
         <div class="stat-value" style="color:{% if saldo >= 0 %}#22c55e{% else %}#ef4444{% endif %};">R$ {{ saldo|brl }}</div>
         <div class="stat-sub">
-          {% if saldo < 0 %}<span style="color:#ef4444;font-weight:600;">⚠ Saldo negativo</span>{% else %}Anterior + Receitas − Gastos{% endif %}
+          {% if saldo < 0 %}<span style="color:#ef4444;font-weight:600;display:inline-flex;align-items:center;gap:4px;"><i data-lucide="alert-triangle" style="width:12px;height:12px;"></i>Saldo negativo</span>{% else %}Anterior + Receitas − Gastos{% endif %}
         </div>
       </div>
     </div>
@@ -271,7 +271,7 @@
     {% else %}
     <div style="text-align:center;padding:24px 16px;">
       <span style="color:var(--text-muted);font-size:13px;">Nenhuma conta cadastrada. </span>
-      <a href="{% url 'conta-list' %}" style="color:var(--accent);font-size:13px;text-decoration:none;">Adicionar conta →</a>
+      <a href="{% url 'conta-list' %}" style="color:var(--accent);font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">Adicionar conta <i data-lucide="arrow-right" style="width:12px;height:12px;"></i></a>
     </div>
     {% endif %}
   </div>
@@ -331,7 +331,7 @@
     {% else %}
     <div style="text-align:center;padding:24px 16px;">
       <span style="color:var(--text-muted);font-size:13px;">Nenhum investimento cadastrado. </span>
-      <a href="{% url 'investimento-list' %}" style="color:var(--accent);font-size:13px;text-decoration:none;">Adicionar →</a>
+      <a href="{% url 'investimento-list' %}" style="color:var(--accent);font-size:13px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">Adicionar <i data-lucide="arrow-right" style="width:12px;height:12px;"></i></a>
     </div>
     {% endif %}
   </div>
@@ -908,8 +908,8 @@
       <div class="chart-title">Gastos por Categoria</div>
       <div style="display:flex;gap:6px;" id="cat-btns">
         <button id="btn-cat-ordem" onclick="catToggleOrdem()"
-                style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-muted);cursor:pointer;">
-          ↓ Maior → Menor
+                style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+          <i data-lucide="arrow-down-up" style="width:11px;height:11px;"></i><span id="btn-cat-ordem-label">Maior → Menor</span>
         </button>
         <button id="btn-cat-qtd" onclick="catToggleQtd()"
                 style="font-size:11px;padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-muted);cursor:pointer;">
@@ -1071,7 +1071,8 @@
   function catToggleOrdem() {
     catAsc = !catAsc;
     var btn = document.getElementById('btn-cat-ordem');
-    if (btn) btn.textContent = catAsc ? '↑ Menor → Maior' : '↓ Maior → Menor';
+    var labelEl = document.getElementById('btn-cat-ordem-label');
+    if (labelEl) labelEl.textContent = catAsc ? 'Menor → Maior' : 'Maior → Menor';
     catBuild();
   }
   window.catToggleOrdem = catToggleOrdem;

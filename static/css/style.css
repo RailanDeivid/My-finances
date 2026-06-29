@@ -546,6 +546,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 .tabela-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border-radius: 8px;
   border: 1px solid var(--border);
   max-height: 540px;
@@ -716,4 +717,13 @@ body.light-theme .tabela-dados tfoot td { background: #ffffff; }
   .topbar > div:last-child { display: none; }
   .topbar-title            { max-width: none; }
   .main-content            { padding-left: 8px; padding-right: 8px; }
+}
+
+/* Reduz movimento para usuários com preferência de menos animação */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -48,7 +48,7 @@
     </select>
     <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;">
       Tipo:
-      <select name="tipo_cartao" class="auto-submit" style="min-width:110px;">
+      <select name="tipo_cartao" class="auto-submit">
         <option value=""           {% if not filtro_tipo_cartao %}selected{% endif %}>Todos</option>
         <option value="principal"  {% if filtro_tipo_cartao == "principal" %}selected{% endif %}>Principal</option>
         <option value="adicional"  {% if filtro_tipo_cartao == "adicional" %}selected{% endif %}>Adicional</option>
@@ -56,7 +56,7 @@
     </label>
     <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;">
       Responsável:
-      <select name="responsavel_filtro" class="auto-submit" style="min-width:130px;">
+      <select name="responsavel_filtro" class="auto-submit">
         <option value="" {% if not filtro_responsavel %}selected{% endif %}>Todos</option>
         {% for r in responsaveis %}
         <option value="{{ r.pk }}" {% if filtro_responsavel == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.nome }}</option>
