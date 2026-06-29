@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-dev-key-change-me")
+SECRET_KEY = os.environ["SECRET_KEY"]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:8001",

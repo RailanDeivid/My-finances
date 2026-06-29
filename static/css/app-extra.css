@@ -538,6 +538,12 @@ body:not(.light-theme) .badge-cartao { color: #fff !important; }
   .inv-saldo-form-grid { grid-template-columns: 1fr !important; }
 }
 
+/* Gráficos menores no mobile para não ocupar toda a tela */
+@media (max-width: 480px) {
+  .chart-canvas-h280 { height: 200px !important; }
+  .chart-canvas-h220 { height: 180px !important; }
+}
+
 /* Mobile pequeno (≤480px): 1 coluna em tudo */
 @media (max-width: 480px) {
   .stats-grid      { grid-template-columns: 1fr; }

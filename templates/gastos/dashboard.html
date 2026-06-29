@@ -7,7 +7,7 @@
 {% load gastos_tags %}
 
 <!-- Filtros -->
-<form method="get" class="mes-filtro" id="form-filtros" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+<form method="get" class="mes-filtro" id="form-filtros" style="flex-wrap:wrap;gap:10px;">
   <input type="hidden" name="_f" value="1">
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Mês/Ano</label>
@@ -35,7 +35,7 @@
   </div>
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Responsável</label>
-    <select name="responsavel" class="auto-submit" style="min-width:130px;">
+    <select name="responsavel" class="auto-submit">
       <option value="">Todos</option>
       {% for r in responsaveis_lista %}
       <option value="{{ r.pk }}" {% if filtro_responsavel == r.pk|stringformat:"s" %}selected{% endif %}>{{ r.nome }}</option>
@@ -44,7 +44,7 @@
   </div>
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Cartão</label>
-    <select name="cartao" class="auto-submit" style="min-width:120px;">
+    <select name="cartao" class="auto-submit">
       <option value="">Todos</option>
       {% for c in cartoes_lista %}
       <option value="{{ c.pk }}" {% if filtro_cartao == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nome }}</option>
@@ -53,7 +53,7 @@
   </div>
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Tipo</label>
-    <select name="tipo" class="auto-submit" style="min-width:120px;">
+    <select name="tipo" class="auto-submit">
       <option value="">Todos</option>
       {% for valor, nome in tipos_lista %}
       <option value="{{ valor }}" {% if filtro_tipo == valor %}selected{% endif %}>{{ nome }}</option>
@@ -62,7 +62,7 @@
   </div>
   <div>
     <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">Categoria</label>
-    <select name="categoria" class="auto-submit" style="min-width:120px;">
+    <select name="categoria" class="auto-submit">
       <option value="">Todas</option>
       {% for cat in categorias_lista %}
       <option value="{{ cat.pk }}" {% if filtro_categoria == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nome }}</option>
@@ -403,7 +403,7 @@
     <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos Divididos — Visão Mensal</span>
   </div>
   {% if tabela_divididos %}
-  <div style="max-height:440px;overflow-y:auto;overflow-x:auto;">
+  <div style="max-height:440px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;">
   <table class="tabela-dados" style="min-width:max-content;width:100%;">
     <thead style="position:sticky;top:0;z-index:3;background:var(--bg-card);">
       <tr>
@@ -466,7 +466,7 @@
     <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos Parcelados e Recorrentes</span>
   </div>
   {% if tabela_parcelados %}
-  <div style="max-height:360px;overflow-y:auto;overflow-x:auto;">
+  <div style="max-height:360px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;">
   <table class="tabela-dados" style="min-width:max-content;width:100%;">
     <thead style="position:sticky;top:0;z-index:3;background:var(--bg-card);">
       <tr>
@@ -555,7 +555,7 @@
     <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos por Responsável</span>
     </div>
-    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;overflow-x:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:right;">%</th></tr></thead>
       <tbody>
@@ -590,7 +590,7 @@
     <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos Cartões de Crédito</span>
     </div>
-    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;overflow-x:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Cartão</th><th>Total {{ mes }}/{{ ano }}</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
@@ -641,7 +641,7 @@
     <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Pix / Transferência</span>
     </div>
-    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;overflow-x:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Responsável</th><th>Descrição</th><th style="text-align:right;">Valor</th><th style="text-align:center;width:36px;"></th></tr></thead>
       <tbody>
@@ -653,7 +653,7 @@
               <a href="?mes={{ mes }}&amp;ano={{ ano }}&amp;responsavel={{ p.responsavel_id }}&amp;tipo=pix" style="color:var(--text-primary);text-decoration:none;">{{ p.responsavel.nome }}</a>
             </div>
           </td>
-          <td style="font-size:12px;color:var(--text-muted);">{{ p.descricao }}</td>
+          <td style="font-size:12px;color:var(--text-muted);white-space:normal;word-break:break-word;max-width:160px;">{{ p.descricao }}</td>
           <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ p.valor_total|brl }}</td>
           <td style="text-align:center;">
             <form method="post" action="{% url 'pagamento-toggle' 'pix' p.responsavel_id %}?mes={{ mes }}&amp;ano={{ ano }}" style="display:inline;">
@@ -693,7 +693,7 @@
     <div class="tabela-header" style="padding:10px 16px;flex-shrink:0;">
       <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Débito por Conta</span>
     </div>
-    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;">
+    <div style="flex:1;min-height:0;max-height:252px;overflow-y:auto;overflow-x:auto;">
     <table class="tabela-dados">
       <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);"><tr><th>Conta</th><th>Descrição</th><th style="text-align:right;">Valor</th></tr></thead>
       <tbody>
@@ -710,7 +710,7 @@
               <span style="color:var(--text-primary);font-weight:500;">{{ d.conta_origem.nome }}</span>
             </div>
           </td>
-          <td style="font-size:12px;color:var(--text-muted);">{{ d.descricao }}</td>
+          <td style="font-size:12px;color:var(--text-muted);white-space:normal;word-break:break-word;max-width:160px;">{{ d.descricao }}</td>
           <td style="text-align:right;font-weight:600;color:#ef4444;">R$ {{ d.valor_total|brl }}</td>
         </tr>
         {% empty %}
@@ -740,7 +740,7 @@
     <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Gastos — {{ mes }}/{{ ano }}</span>
     <a href="{% url 'gasto-list' %}?mes={{ mes }}&amp;ano={{ ano }}" class="btn btn-sm" style="font-size:11px;">Ver todos</a>
   </div>
-  <div style="max-height:440px;overflow-y:auto;">
+  <div style="max-height:440px;overflow-y:auto;overflow-x:auto;">
   <table class="tabela-dados">
     <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);">
       <tr>
@@ -820,7 +820,7 @@
     <span style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Entradas — {{ mes }}/{{ ano }}</span>
     <a href="{% url 'entrada-list' %}?mes={{ mes }}&amp;ano={{ ano }}" class="btn btn-sm" style="font-size:11px;">Ver todas</a>
   </div>
-  <div style="max-height:380px;overflow-y:auto;">
+  <div style="max-height:380px;overflow-y:auto;overflow-x:auto;">
   <table class="tabela-dados">
     <thead style="position:sticky;top:0;z-index:2;background:var(--bg-card);">
       <tr>
@@ -881,7 +881,7 @@
       <div class="legend-item"><span class="legend-line" style="background:#3b82f6;"></span>Saldo</div>
     </div>
   </div>
-  <div style="height:280px;position:relative;">
+  <div class="chart-canvas-h280" style="height:280px;position:relative;">
     <canvas id="chartComparativo"></canvas>
   </div>
 </div>
@@ -894,7 +894,7 @@
       <div class="legend-item"><span class="legend-line" style="background:#22c55e;"></span>Receitas mensais</div>
     </div>
   </div>
-  <div style="height:220px;position:relative;">
+  <div class="chart-canvas-h220" style="height:220px;position:relative;">
     <canvas id="chartReceitas"></canvas>
   </div>
 </div>
@@ -927,7 +927,7 @@
     <div class="chart-header">
       <div class="chart-title">Histórico de Gastos</div>
     </div>
-    <div style="height:280px;position:relative;">
+    <div class="chart-canvas-h280" style="height:280px;position:relative;">
       <canvas id="chartPeriodo"></canvas>
     </div>
   </div>
@@ -943,7 +943,7 @@
       <div class="chart-title">Evolução dos Investimentos</div>
       <a href="{% url 'investimento-list' %}" class="btn btn-sm" style="font-size:11px;">Ver tudo</a>
     </div>
-    <div style="height:280px;position:relative;">
+    <div class="chart-canvas-h280" style="height:280px;position:relative;">
       <canvas id="chartInvEvolucao"></canvas>
       <div id="inv-chart-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-muted);">
         <i data-lucide="trending-up" style="width:36px;height:36px;opacity:.2;"></i>
@@ -957,7 +957,7 @@
     <div class="chart-header">
       <div class="chart-title">Por Tipo</div>
     </div>
-    <div style="height:280px;position:relative;display:flex;align-items:center;justify-content:center;">
+    <div class="chart-canvas-h280" style="height:280px;position:relative;display:flex;align-items:center;justify-content:center;">
       <canvas id="chartInvRosca"></canvas>
       <div id="inv-rosca-empty" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--text-muted);">
         <i data-lucide="pie-chart" style="width:36px;height:36px;opacity:.2;"></i>
