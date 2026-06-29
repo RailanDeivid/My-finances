@@ -161,6 +161,10 @@ UNFOLD = {
     "STYLES": [
         lambda request: static("css/admin-custom.css"),
     ],
+    "SCRIPTS": [
+        lambda request: static("js/lucide.min.js"),
+        lambda request: static("js/admin-lucide-init.js"),
+    ],
     "SHOW_HISTORY": True,
     "SHOW_VIEW_ON_SITE": True,
     "SHOW_BACK_BUTTON": True,

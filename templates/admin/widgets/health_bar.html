@@ -2,9 +2,7 @@
 <div class="glass-panel health-bar" style="margin-bottom:1.5rem;overflow:visible;">
   <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
     <span style="display:flex;align-items:center;gap:8px;">
-      <span class="material-symbols-outlined health-bar-icon health-bar-icon-{% if health_bar.total_falhas %}red{% elif health_bar.total_retries or health_bar.total_login_falhas %}amber{% else %}green{% endif %}">
-        favorite
-      </span>
+      <i data-lucide="heart-pulse" class="health-bar-icon health-bar-icon-{% if health_bar.total_falhas %}red{% elif health_bar.total_retries or health_bar.total_login_falhas %}amber{% else %}green{% endif %}"></i>
       Saúde do sistema
     </span>
     <span class="health-bar-pct">{{ health_bar.healthy_pct }}%</span>

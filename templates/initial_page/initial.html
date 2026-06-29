@@ -282,6 +282,29 @@
     .footer-linkedin:hover { color: #0a66c2; }
     .footer-linkedin svg { width: 15px; height: 15px; }
 
+    /* ── LUCIDE ICONS ── */
+    .feat-icon svg { width: 22px; height: 22px; }
+    .txn-icon svg { width: 18px; height: 18px; }
+    .txn-icon { font-size: 0; }
+    .wa-avatar svg { width: 20px; height: 20px; stroke: #fff; fill: none; }
+    .wa-avatar { font-size: 0; }
+    .btn-primary svg { width: 16px; height: 16px; }
+
+    /* ── FOCUS VISIBLE ── */
+    :focus-visible {
+      outline: 2px solid #1f8a5b;
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    /* ── REDUCED MOTION ── */
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .bar { animation: none; }
+      .wa-typing span { animation: none; opacity: 0.5; }
+      .btn-primary, .btn-entrar, .feat-card { transition: none; }
+    }
+
     /* ── RESPONSIVE ── */
     @media (max-width: 960px) {
       .hero { grid-template-columns: 1fr; gap: 40px; padding: 50px 20px 40px; }
@@ -320,7 +343,7 @@
         <p>Acompanhe gastos, entradas e investimentos em um só lugar. Com bot no WhatsApp, relatórios e muito mais.</p>
         <a href="{% url 'login' %}" class="btn-primary">
           Entrar na conta
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <i data-lucide="arrow-right"></i>
         </a>
       </div>
       <div class="reveal reveal-delay-2">
@@ -342,17 +365,17 @@
           </div>
           <div class="txn-list">
             <div class="txn">
-              <div class="txn-icon" style="background:#eaf4ee">🛒</div>
+              <div class="txn-icon" style="background:#eaf4ee;color:#1f8a5b"><i data-lucide="shopping-cart"></i></div>
               <div><div class="txn-name">Supermercado</div><div class="txn-cat">Alimentação · Hoje</div></div>
               <div class="txn-amt">- R$ 184,90</div>
             </div>
             <div class="txn">
-              <div class="txn-icon" style="background:#e9eef3">💸</div>
+              <div class="txn-icon" style="background:#e9eef3;color:#3b6b91"><i data-lucide="wallet"></i></div>
               <div><div class="txn-name">Salário</div><div class="txn-cat">Receita · 5 jun</div></div>
               <div class="txn-amt" style="color:#1f8a5b">+ R$ 5.200,00</div>
             </div>
             <div class="txn">
-              <div class="txn-icon" style="background:#f3eee9">🎬</div>
+              <div class="txn-icon" style="background:#f3eee9;color:#9a6833"><i data-lucide="tv"></i></div>
               <div><div class="txn-name">Streaming</div><div class="txn-cat">Assinaturas · 3 jun</div></div>
               <div class="txn-amt">- R$ 39,90</div>
             </div>
@@ -381,7 +404,7 @@
       <div class="reveal reveal-delay-2">
         <div class="wa-chat">
           <div class="wa-chat-bar">
-            <div class="wa-avatar">🐷</div>
+            <div class="wa-avatar"><i data-lucide="piggy-bank"></i></div>
             <div>
               <div class="wa-contact-name">MyFinances Bot</div>
               <div class="wa-contact-sub">● online</div>
@@ -427,27 +450,32 @@
     </div>
     <div class="feat-grid">
       <div class="feat-card reveal reveal-delay-1">
-        <div class="feat-icon" style="background:#eaf4ee">📊</div>
+        <div class="feat-icon" style="background:#eaf4ee;color:#1f8a5b"><i data-lucide="layout-dashboard"></i></div>
         <h3>Visão geral instantânea</h3>
         <p>Veja entradas, saídas e saldo de todas as contas em um painel claro e atualizado.</p>
       </div>
       <div class="feat-card reveal reveal-delay-2">
-        <div class="feat-icon" style="background:#e9eef3">🏷️</div>
+        <div class="feat-icon" style="background:#e9eef3;color:#3b6b91"><i data-lucide="tag"></i></div>
         <h3>Categorias automáticas</h3>
         <p>Cada gasto entra na categoria certa. Descubra para onde o dinheiro vai de verdade.</p>
       </div>
       <div class="feat-card reveal reveal-delay-3">
-        <div class="feat-icon" style="background:#f1ece6">🔔</div>
+        <div class="feat-icon" style="background:#f1ece6;color:#9a6833"><i data-lucide="bell"></i></div>
         <h3>Alertas inteligentes</h3>
         <p>Receba avisos de contas a vencer e gastos acima do normal antes que virem problema.</p>
       </div>
+      <div class="feat-card reveal reveal-delay-4">
+        <div class="feat-icon" style="background:#edf1f8;color:#3b6b91"><i data-lucide="credit-card"></i></div>
+        <h3>Controle de cartões</h3>
+        <p>Vincule gastos a cartões de crédito e acompanhe os limites e faturas de cada um.</p>
+      </div>
       <div class="feat-card reveal reveal-delay-5">
-        <div class="feat-icon" style="background:#eaf4ee">👥</div>
+        <div class="feat-icon" style="background:#eaf4ee;color:#1f8a5b"><i data-lucide="users"></i></div>
         <h3>Gastos entre pessoas</h3>
         <p>Divida despesas entre contas de forma simples: basta adicionar um responsável a um gasto existente. Cada pessoa vê só o que é dela.</p>
       </div>
       <div class="feat-card reveal reveal-delay-6">
-        <div class="feat-icon" style="background:#e9eef3">📈</div>
+        <div class="feat-icon" style="background:#e9eef3;color:#3b6b91"><i data-lucide="trending-up"></i></div>
         <h3>Relatórios mensais</h3>
         <p>Resumos do mês com o que melhorou e onde dá para economizar, em linguagem simples.</p>
       </div>
@@ -496,7 +524,9 @@
     </div>
   </footer>
 
+  <script src="{% static 'js/lucide.min.js' %}"></script>
   <script>
+    lucide.createIcons();
     const observer = new IntersectionObserver(
       entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }),
       { threshold: 0.12 }

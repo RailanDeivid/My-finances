@@ -19,7 +19,7 @@
   {% for kpi in kpis %}
   <a href="{{ kpi.link }}" class="kpi-card">
     <div class="kpi-icon kpi-icon-{{ kpi.color }}">
-      <span class="material-symbols-outlined">{{ kpi.icon }}</span>
+      <i data-lucide="{{ kpi.icon }}"></i>
     </div>
     <div class="kpi-value">{{ kpi.value }}</div>
     <div class="kpi-label">{{ kpi.label }}</div>
@@ -32,7 +32,7 @@
 {# ── Card de Custo LLM ──────────────────────────────────────────────── #}
 <div class="dash-llm-cost-card">
   <div class="llm-cost-icon">
-    <span class="material-symbols-outlined">smart_toy</span>
+    <i data-lucide="bot"></i>
   </div>
   <div class="llm-cost-body">
     <div class="llm-cost-label">Custo total LLM (acumulado)</div>
@@ -60,11 +60,11 @@
     </div>
     <div class="llm-cost-tokens">
       <span class="llm-token-badge llm-token-in">
-        <span class="material-symbols-outlined">arrow_downward</span>
+        <i data-lucide="arrow-down"></i>
         {{ llm_tokens_in|default:0 }} tokens entrada
       </span>
       <span class="llm-token-badge llm-token-out">
-        <span class="material-symbols-outlined">arrow_upward</span>
+        <i data-lucide="arrow-up"></i>
         {{ llm_tokens_out|default:0 }} tokens saída
       </span>
     </div>
@@ -80,7 +80,7 @@
 <div class="glass-panel" style="margin-bottom:1.5rem;">
   <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
     <span>
-      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:-4px;margin-right:6px;color:rgb(192,132,252);">smart_toy</span>
+      <i data-lucide="bot" style="width:16px;height:16px;color:rgb(192,132,252);flex-shrink:0;"></i>
       Uso de LLM por usuário
     </span>
     <a href="{% url 'admin:whatsapp_llmusage_changelist' %}" style="font-size:0.78rem;color:rgb(251,146,60);text-decoration:none;">Ver tudo →</a>
@@ -120,7 +120,7 @@
 <div class="glass-panel" style="margin-bottom:1.5rem;">
   <div class="glass-panel-header" style="display:flex;align-items:center;justify-content:space-between;">
     <span>
-      <span class="material-symbols-outlined" style="font-size:18px;vertical-align:-4px;margin-right:6px;color:rgb(251,191,36);">history</span>
+      <i data-lucide="history" style="width:16px;height:16px;color:rgb(251,191,36);flex-shrink:0;"></i>
       Atividades recentes
     </span>
     <span style="font-size:0.78rem;color:rgb(148,163,184);">últimas {{ recent_actions|length }} ações</span>
@@ -141,11 +141,11 @@
           <td>{{ action.user.username|default:"—" }}</td>
           <td>
             {% if action.is_addition %}
-              <span style="color:rgb(74,222,128);">+ Adicionou</span>
+              <span style="color:rgb(74,222,128);display:inline-flex;align-items:center;gap:4px;"><i data-lucide="plus" style="width:13px;height:13px;"></i> Adicionou</span>
             {% elif action.is_change %}
-              <span style="color:rgb(251,191,36);">✎ Modificou</span>
+              <span style="color:rgb(251,191,36);display:inline-flex;align-items:center;gap:4px;"><i data-lucide="pencil" style="width:13px;height:13px;"></i> Modificou</span>
             {% elif action.is_deletion %}
-              <span style="color:rgb(248,113,113);">✗ Excluiu</span>
+              <span style="color:rgb(248,113,113);display:inline-flex;align-items:center;gap:4px;"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Excluiu</span>
             {% else %}
               <span style="color:rgb(148,163,184);">—</span>
             {% endif %}
