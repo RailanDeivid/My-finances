@@ -233,7 +233,7 @@ def build_oci_section() -> str:
         <td width="2%"></td>
         {stat_box("Banda saída", f"{bw_tb}TB&nbsp;/&nbsp;10TB", bw_color, f"{bw_pct}% do mês")}
         <td width="2%"></td>
-        {stat_box("Região", oci.get("instancias_shapes", ["N/A"])[0] if oci.get("instancias_shapes") else "N/A", "#333")}
+        {stat_box("Shape", oci.get("instancias_shapes", ["N/A"])[0] if oci.get("instancias_shapes") else "N/A", "#333", "free tier")}
       </tr></table>
       {bar(str(st_pct) + "%", st_color)}
       <div style="font-size:11px;color:#888;margin-top:4px;">Storage {st_gb}GB de 200GB</div>
