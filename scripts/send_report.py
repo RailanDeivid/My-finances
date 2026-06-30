@@ -339,13 +339,11 @@ def build_html(d: dict) -> str:
 
     sec_content = f"""
       <table width="100%" style="border-spacing:8px;"><tr>
-        {stat_box("Erros 500",    str(n500), c500, "últ. 24h")}
+        {stat_box("Erros 500", str(n500), c500, "últ. 24h")}
         <td width="2%"></td>
-        {stat_box("Erros 404",    str(n404), "#888",  "últ. 24h")}
+        {stat_box("Erros 404", str(n404), "#888", "últ. 24h")}
         <td width="2%"></td>
-        {stat_box("401/403",      str(n401), c401, "últ. 24h")}
-        <td width="2%"></td>
-        {stat_box("",             "",       "#333")}
+        {stat_box("401/403",   str(n401), c401, "últ. 24h")}
       </tr></table>
       <div style="margin-top:14px;">
         <div style="font-size:12px;color:#888;margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;">Top IPs (requisições)</div>
@@ -363,8 +361,8 @@ def build_html(d: dict) -> str:
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,sans-serif;">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:Arial,sans-serif">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa;padding:24px 0;">
 <tr><td align="center">
 <table width="640" cellpadding="0" cellspacing="0"
