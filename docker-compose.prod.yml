@@ -96,6 +96,21 @@ services:
     depends_on:
       - nginx
 
+  monitor:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.monitor
+    container_name: my-finances-monitor
+    restart: always
+    env_file: .env.prod
+    environment:
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/host:ro
+    depends_on:
+      - web
+
 volumes:
   postgres_data:
     name: my-finances-postgres-data

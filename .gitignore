@@ -12,3 +12,4 @@ logs/
 .vscode/
 
 deploy-server-update.md
+scripts/.monitor_credentials
