@@ -176,7 +176,9 @@ def section(title: str, content: str) -> str:
   </td></tr>"""
 
 
-def build_oci_section() -> str:
+def build_oci_section(d: dict = None) -> str:
+    if d is None:
+        d = {}
     try:
         oci_py = os.path.join(SCRIPT_DIR, "oci_check.py")
         result = subprocess.run(["python3", oci_py], capture_output=True, text=True, timeout=30)
@@ -204,10 +206,14 @@ def build_oci_section() -> str:
                   if no_free else
                   '<span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">⚠️ GERANDO CUSTO</span>')
 
-    # Storage
-    st_gb   = oci.get("storage_usado_gb", "N/A")
-    st_pct  = oci.get("storage_pct", 0)
-    st_ok   = oci.get("storage_ok", True)
+    # Storage — usa uso real do filesystem vs limite free tier (200GB)
+    disk_used = d.get("DISK_USED", "N/A")
+    disk_pct_str = d.get("DISK_PCT", "0%")
+    try:
+        st_pct = int(disk_pct_str.replace("%", ""))
+    except Exception:
+        st_pct = 0
+    st_ok    = st_pct < 80
     st_color = "#27ae60" if st_ok else "#e74c3c"
 
     # Banda
@@ -229,14 +235,14 @@ def build_oci_section() -> str:
       <table width="100%" style="border-spacing:8px;"><tr>
         {stat_box("Instâncias", str(inst_total), inst_color, "rodando")}
         <td width="2%"></td>
-        {stat_box("Storage", f"{st_gb}GB&nbsp;/&nbsp;200GB", st_color, f"{st_pct}% usado")}
+        {stat_box("Storage", f"{disk_used}&nbsp;/&nbsp;200GB", st_color, f"{st_pct}% usado")}
         <td width="2%"></td>
         {stat_box("Banda saída", f"{bw_tb}TB&nbsp;/&nbsp;10TB", bw_color, f"{bw_pct}% do mês")}
         <td width="2%"></td>
         {stat_box("Shape", oci.get("instancias_shapes", ["N/A"])[0] if oci.get("instancias_shapes") else "N/A", "#333", "free tier")}
       </tr></table>
       {bar(str(st_pct) + "%", st_color)}
-      <div style="font-size:11px;color:#888;margin-top:4px;">Storage {st_gb}GB de 200GB</div>
+      <div style="font-size:11px;color:#888;margin-top:4px;">Disco {disk_used} de 200GB free tier</div>
       {bar(str(bw_pct) + "%", bw_color)}
       <div style="font-size:11px;color:#888;margin-top:4px;">Banda {bw_tb}TB de 10TB/mês</div>"""
 
@@ -357,7 +363,7 @@ def build_html(d: dict) -> str:
       </div>"""
 
     # ── Oracle Cloud ─────────────────────────────────────────────
-    oci_section = build_oci_section()
+    oci_section = build_oci_section(d)
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
