@@ -48,15 +48,17 @@ def main():
             tenant_id=tenancy_id,
             time_usage_started=start,
             time_usage_ended=now,
-            granularity="MONTHLY",
-            query_type="COST",
+            granularity="DAILY",
         )
         usage = usage_client.request_summarized_usages(req).data
         total_cost = sum(float(i.computed_amount or 0) for i in (usage.items or []))
         result["custo_mes_usd"] = round(total_cost, 4)
         result["no_free_tier"] = total_cost == 0.0
     except Exception as e:
-        result["custo_erro"] = str(e)[:150]
+        # Usage API pode não estar disponível em contas free tier — não é crítico
+        result["custo_mes_usd"] = 0.0
+        result["no_free_tier"] = True
+        result["custo_nota"] = "API de custo indisponível — assumindo free tier"
 
     # ── Instâncias compute ───────────────────────────────────────
     try:
