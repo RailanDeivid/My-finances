@@ -106,6 +106,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /:/host:ro
+      - /home/ubuntu/.oci/oci_api_key.pem:/app/oci_key.pem:ro
     depends_on:
       - web
 
