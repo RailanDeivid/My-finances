@@ -263,7 +263,7 @@ def send_email(html_body: str, subject: str, app_password: str):
 
 def main():
     result = subprocess.run(
-        ["bash", MONITOR_SH],
+        ["sh", MONITOR_SH],
         capture_output=True, text=True, timeout=60
     )
     if result.returncode != 0:
