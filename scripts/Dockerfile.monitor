@@ -1,6 +1,8 @@
 FROM python:3.11-alpine
 
-RUN apk add --no-cache docker-cli bc postgresql-client iproute2
+RUN apk add --no-cache docker-cli bc postgresql-client iproute2 gcc musl-dev libffi-dev openssl-dev
+
+RUN pip install --no-cache-dir oci
 
 WORKDIR /app/scripts
 COPY scripts/monitor_server.sh monitor_server.sh
@@ -8,6 +10,7 @@ COPY scripts/alert_check.sh    alert_check.sh
 COPY scripts/send_report.py    send_report.py
 COPY scripts/send_alert.py     send_alert.py
 COPY scripts/scheduler.py      scheduler.py
+COPY scripts/oci_check.py      oci_check.py
 
 RUN chmod +x monitor_server.sh alert_check.sh
 

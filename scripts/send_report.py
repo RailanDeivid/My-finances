@@ -5,6 +5,7 @@ import subprocess
 import smtplib
 import os
 import sys
+import json
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, timezone, timedelta
@@ -175,6 +176,73 @@ def section(title: str, content: str) -> str:
   </td></tr>"""
 
 
+def build_oci_section() -> str:
+    try:
+        oci_py = os.path.join(SCRIPT_DIR, "oci_check.py")
+        result = subprocess.run(["python3", oci_py], capture_output=True, text=True, timeout=30)
+        oci = json.loads(result.stdout.strip()) if result.stdout.strip() else {}
+    except Exception:
+        oci = {"erro": "Falha ao consultar OCI"}
+
+    if "erro" in oci:
+        content = f'<p style="color:#e74c3c;font-size:13px;">⚠️ {oci["erro"]}</p>'
+        return section("☁️ Oracle Cloud (Free Tier)", content)
+
+    # Custo
+    custo = oci.get("custo_mes_usd", "N/A")
+    no_free = oci.get("no_free_tier", True)
+    if custo == "N/A":
+        custo_color, custo_label = "#666", "N/A"
+    elif custo == 0.0:
+        custo_color, custo_label = "#27ae60", "US$ 0,00"
+    elif custo < 1:
+        custo_color, custo_label = "#f39c12", f"US$ {custo:.4f}"
+    else:
+        custo_color, custo_label = "#e74c3c", f"US$ {custo:.2f}"
+
+    free_badge = ('<span style="background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">✅ FREE TIER</span>'
+                  if no_free else
+                  '<span style="background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;">⚠️ GERANDO CUSTO</span>')
+
+    # Storage
+    st_gb   = oci.get("storage_usado_gb", "N/A")
+    st_pct  = oci.get("storage_pct", 0)
+    st_ok   = oci.get("storage_ok", True)
+    st_color = "#27ae60" if st_ok else "#e74c3c"
+
+    # Banda
+    bw_tb   = oci.get("banda_saida_tb", "N/A")
+    bw_pct  = oci.get("banda_pct", 0)
+    bw_ok   = oci.get("banda_ok", True)
+    bw_color = "#27ae60" if bw_ok else "#e74c3c"
+
+    # Instâncias
+    inst_ok    = oci.get("instancias_ok", True)
+    inst_total = oci.get("instancias_rodando", "N/A")
+    inst_color = "#27ae60" if inst_ok else "#e74c3c"
+
+    content = f"""
+      <div style="margin-bottom:14px;">{free_badge}
+        <span style="font-size:20px;font-weight:700;color:{custo_color};margin-left:12px;">{custo_label}</span>
+        <span style="color:#888;font-size:12px;margin-left:6px;">gasto no mês</span>
+      </div>
+      <table width="100%" style="border-spacing:8px;"><tr>
+        {stat_box("Instâncias", str(inst_total), inst_color, "rodando")}
+        <td width="2%"></td>
+        {stat_box("Storage", f"{st_gb}GB / 200GB", st_color, f"{st_pct}% usado")}
+        <td width="2%"></td>
+        {stat_box("Banda saída", f"{bw_tb}TB / 10TB", bw_color, f"{bw_pct}% do mês")}
+        <td width="2%"></td>
+        {stat_box("Região", oci.get("instancias_shapes", ["N/A"])[0] if oci.get("instancias_shapes") else "N/A", "#333")}
+      </tr></table>
+      {bar(str(st_pct) + "%", st_color)}
+      <div style="font-size:11px;color:#888;margin-top:4px;">Storage {st_gb}GB de 200GB</div>
+      {bar(str(bw_pct) + "%", bw_color)}
+      <div style="font-size:11px;color:#888;margin-top:4px;">Banda {bw_tb}TB de 10TB/mês</div>"""
+
+    return section("☁️ Oracle Cloud (Free Tier)", content)
+
+
 def build_html(d: dict) -> str:
     date_str = datetime.now(tz=BRT).strftime("%d/%m/%Y %H:%M") + " (Brasília)"
     mc = color_pct(d.get("USED_MEM_PCT", "0%"))
@@ -290,6 +358,9 @@ def build_html(d: dict) -> str:
         </table>
       </div>"""
 
+    # ── Oracle Cloud ─────────────────────────────────────────────
+    oci_section = build_oci_section()
+
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -318,6 +389,7 @@ def build_html(d: dict) -> str:
   {section("📈 Containers — Uso de Recursos", stats_content)}
   {section("🗄️ Banco de Dados (PostgreSQL)", db_content)}
   {section("🛡️ Segurança (últimas 24h)", sec_content)}
+  {oci_section}
 
   <tr><td style="padding:24px 32px;border-top:1px solid #f0f0f0;margin-top:20px;">
     <p style="margin:0;color:#aaa;font-size:12px;text-align:center;">
