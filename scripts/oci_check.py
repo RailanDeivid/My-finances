@@ -77,14 +77,23 @@ def main():
     except Exception as e:
         result["instancias_erro"] = str(e)[:150]
 
-    # ── Block Storage ────────────────────────────────────────────
+    # ── Block Storage (volumes + boot volumes) ───────────────────
     try:
         block = oci.core.BlockstorageClient(config)
+
         volumes = oci.pagination.list_call_get_all_results(
             block.list_volumes, compartment_id=tenancy_id
         ).data
-        ativo = [v for v in volumes if v.lifecycle_state not in ("TERMINATED", "FAULTY")]
-        total_gb = sum(v.size_in_gbs for v in ativo)
+        try:
+            boot_volumes = oci.pagination.list_call_get_all_results(
+                block.list_boot_volumes, compartment_id=tenancy_id
+            ).data
+        except Exception:
+            boot_volumes = []
+
+        ativo_vols  = [v for v in volumes      if v.lifecycle_state not in ("TERMINATED", "FAULTY")]
+        ativo_boots = [v for v in boot_volumes if v.lifecycle_state not in ("TERMINATED", "FAULTY")]
+        total_gb = sum(v.size_in_gbs for v in ativo_vols + ativo_boots)
 
         result["storage_usado_gb"]  = total_gb
         result["storage_limite_gb"] = 200
