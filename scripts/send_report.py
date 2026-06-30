@@ -229,9 +229,9 @@ def build_oci_section() -> str:
       <table width="100%" style="border-spacing:8px;"><tr>
         {stat_box("Instâncias", str(inst_total), inst_color, "rodando")}
         <td width="2%"></td>
-        {stat_box("Storage", f"{st_gb}GB / 200GB", st_color, f"{st_pct}% usado")}
+        {stat_box("Storage", f"{st_gb}GB&nbsp;/&nbsp;200GB", st_color, f"{st_pct}% usado")}
         <td width="2%"></td>
-        {stat_box("Banda saída", f"{bw_tb}TB / 10TB", bw_color, f"{bw_pct}% do mês")}
+        {stat_box("Banda saída", f"{bw_tb}TB&nbsp;/&nbsp;10TB", bw_color, f"{bw_pct}% do mês")}
         <td width="2%"></td>
         {stat_box("Região", oci.get("instancias_shapes", ["N/A"])[0] if oci.get("instancias_shapes") else "N/A", "#333")}
       </tr></table>
