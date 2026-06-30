@@ -1,12 +1,14 @@
 FROM python:3.11-alpine
 
-RUN apk add --no-cache docker-cli bc
+RUN apk add --no-cache docker-cli bc postgresql-client iproute2
 
 WORKDIR /app/scripts
 COPY scripts/monitor_server.sh monitor_server.sh
+COPY scripts/alert_check.sh    alert_check.sh
 COPY scripts/send_report.py    send_report.py
+COPY scripts/send_alert.py     send_alert.py
 COPY scripts/scheduler.py      scheduler.py
 
-RUN chmod +x monitor_server.sh
+RUN chmod +x monitor_server.sh alert_check.sh
 
 CMD ["python3", "/app/scripts/scheduler.py"]
