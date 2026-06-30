@@ -61,7 +61,9 @@ services:
     restart: always
     env_file: .env
     environment:
-      DJANGO_SETTINGS_MODULE: config.settings.production
+      DJANGO_SETTINGS_MODULE: config.settings.development
+    ports:
+      - "8000:8000"
     volumes:
       - static_volume:/app/staticfiles
     depends_on:
