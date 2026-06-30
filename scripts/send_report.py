@@ -10,10 +10,10 @@ from email.mime.text import MIMEText
 from datetime import datetime
 
 # ── Configurações ────────────────────────────────────────────────────────────
-GMAIL_USER  = os.environ.get("GMAIL_USER", "contato.railandeivid@gmail.com")
-DEST_EMAIL  = os.environ.get("DEST_EMAIL", "contato.railandeivid@gmail.com")
+GMAIL_USER  = os.environ.get("GMAIL_USER")
+DEST_EMAIL  = os.environ.get("DEST_EMAIL")
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
-CREDS_FILE  = os.path.join(SCRIPT_DIR, ".monitor_credentials")
+CREDS_FILE  = os.environ.get("GMAIL_APP_PASSWORD")
 MONITOR_SH  = os.path.join(SCRIPT_DIR, "monitor_server.sh")
 
 CONTAINERS_ESPERADOS = ["my-finances-web", "my-finances-db", "my-finances-redis"]
