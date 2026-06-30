@@ -4,16 +4,14 @@
 import subprocess
 import smtplib
 import os
-import dotenv
 import sys
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 
 # ── Configurações ────────────────────────────────────────────────────────────
-dotenv.load_dotenv()
-GMAIL_USER  = os.getenv("GMAIL_USER")
-DEST_EMAIL  = os.getenv("DEST_EMAIL")
+GMAIL_USER  = os.environ.get("GMAIL_USER", "contato.railandeivid@gmail.com")
+DEST_EMAIL  = os.environ.get("DEST_EMAIL", "contato.railandeivid@gmail.com")
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 CREDS_FILE  = os.path.join(SCRIPT_DIR, ".monitor_credentials")
 MONITOR_SH  = os.path.join(SCRIPT_DIR, "monitor_server.sh")
