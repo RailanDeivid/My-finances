@@ -64,7 +64,7 @@ nginx_logs=$(docker logs --since 24h my-finances-nginx 2>&1)
 nginx_500=$(echo "$nginx_logs" | grep -c '" 5' 2>/dev/null || echo 0)
 nginx_404=$(echo "$nginx_logs" | grep -c '" 404' 2>/dev/null || echo 0)
 nginx_401=$(echo "$nginx_logs" | grep -c '" 401\|" 403' 2>/dev/null || echo 0)
-top_ips=$(echo "$nginx_logs" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | awk '{print $1}' | sort | uniq -c | sort -rn | head -5 | awk '{print $2"|"$1}')
+top_ips=$(echo "$nginx_logs" | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ - / {print $1}' | sort | uniq -c | sort -rn | head -5 | awk '{print $2"|"$1}')
 
 # ── BANCO DE DADOS ───────────────────────────────────────────────
 if [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_DB" ]; then
