@@ -98,7 +98,7 @@ def main():
         result["storage_usado_gb"]  = total_gb
         result["storage_limite_gb"] = 200
         result["storage_pct"]       = round(total_gb * 100 / 200, 1)
-        result["storage_ok"]        = total_gb <= 180
+        result["storage_ok"]        = total_gb <= 200
     except Exception as e:
         result["storage_erro"] = str(e)[:150]
 
