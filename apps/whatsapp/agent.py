@@ -128,11 +128,11 @@ CANCEL_WORDS = {"cancelar", "sair", "parar", "stop", "menu", "início", "inicio"
 # ── Mapeamentos de choices ────────────────────────────────────────────────────
 
 TIPO_PAG_MAP = {
-    "1": "credito_avista", "2": "credito_parcelado", "3": "pix",
-    "4": "debito",
+    "1": "credito_avista", "2": "credito_parcelado", "3": "recorrente",
+    "4": "pix", "5": "debito", "6": "ajuste_fatura",
     **_build_map("tipo_pagamento"),
     "credito_avista": "credito_avista", "credito_parcelado": "credito_parcelado",
-    "debito": "debito",
+    "recorrente": "recorrente", "debito": "debito", "ajuste_fatura": "ajuste_fatura",
 }
 
 TIPO_ENT_MAP = {
@@ -151,9 +151,16 @@ BANDEIRA_MAP = {
 TIPO_PAG_LABEL = {
     "credito_avista":    "Crédito à vista",
     "credito_parcelado": "Crédito parcelado",
+    "recorrente":        "Compra recorrente",
     "pix":               "Pix / Transferência",
     "debito":            "Débito",
+    "ajuste_fatura":     "Ajuste de fatura",
 }
+
+AJUSTE_TIPO_LABEL = {"desconto": "Desconto", "adicao": "Adição"}
+
+# Tipos de gasto que exigem seleção de cartão
+TIPOS_CARTAO_GASTO = {"credito_avista", "credito_parcelado", "recorrente", "ajuste_fatura"}
 
 TIPO_ENT_LABEL  = {"salario": "Salário", "bonus": "Bônus", "outros": "Outros"}
 BANDEIRA_LABEL  = {
@@ -167,17 +174,25 @@ GASTO_STEPS = [
     "valor",
     "descricao",
     "tipo_pagamento",
-    "total_parcelas",   # skip unless parcelado
-    "cartao_id",        # skip unless credito
-    "conta_origem_id",  # skip unless debito
-    "responsavel_id",
-    "categoria_id",     # always asked (mandatory)
-    "dividido",         # yes/no (skip if only 1 responsavel)
-    "responsavel2_id",  # skip unless dividido
-    "pct_divisao",      # skip unless dividido
+    "total_parcelas",     # skip unless parcelado
+    "cartao_id",          # skip unless TIPOS_CARTAO_GASTO
+    "cartao_adicional",   # skip unless cartao_id preenchido
+    "ajuste_tipo",        # skip unless ajuste_fatura
+    "conta_origem_id",    # skip unless debito
+    "recorrente",         # skip unless pix/debito (pergunta se é recorrente)
+    "recorrente_meses",   # skip unless tipo==recorrente ou recorrente=True
     "data_compra",
+    "responsavel_id",     # skip para ajuste_fatura (auto-atribuído)
+    "categoria_id",       # sempre perguntado
+    "observacao",         # opcional
+    "dividido",           # yes/no (skip para ajuste_fatura ou só 1 responsavel)
+    "responsavel2_id",    # skip unless dividido
+    "pct_divisao",        # skip unless dividido
 ]
-ENTRADA_STEPS = ["tipo_entrada", "valor", "descricao_entrada", "conta_id", "responsavel_id"]
+ENTRADA_STEPS = [
+    "tipo_entrada", "valor", "descricao_entrada", "conta_id",
+    "responsavel_id", "recorrente_entrada",
+]
 CARTAO_STEPS  = ["nome_cartao", "bandeira", "limite", "dia_fechamento"]
 
 QUESTIONS = {
@@ -187,15 +202,30 @@ QUESTIONS = {
         "💳 Tipo de pagamento?\n\n"
         "1 · Crédito à vista\n"
         "2 · Crédito parcelado\n"
-        "3 · Pix / Transferência\n"
-        "4 · Débito"
+        "3 · Recorrente (todo mês)\n"
+        "4 · Pix / Transferência\n"
+        "5 · Débito\n"
+        "6 · Ajuste de Fatura"
     ),
     "total_parcelas":   "🔢 Quantas parcelas?",
+    "cartao_adicional": "💳 É no cartão adicional?\n\n1 · Sim\n2 · Não",
+    "ajuste_tipo":      "🧾 Tipo do ajuste?\n\n1 · Desconto _(subtrai da fatura)_\n2 · Adição _(soma à fatura)_",
+    "recorrente":       "🔁 Esse gasto é recorrente? _(repete todo mês)_\n\n1 · Sim\n2 · Não",
+    "recorrente_meses": (
+        "🔁 Repetir por quantos meses?\n\n"
+        "1 · 12 meses (padrão)\n"
+        "2 · 24 meses\n"
+        "3 · 36 meses\n"
+        "4 · Sempre _(até dez/2050)_\n"
+        "_Ou digite o número de meses (2-60)_"
+    ),
+    "observacao":       "🗒️ Observação? _(opcional — ou *0* para pular)_",
     "dividido":         "👥 Gasto dividido?\n\n1 · Sim\n2 · Não",
     "pct_divisao":      "📊 Como dividir?\n\n1 · 50/50 — Meio a meio\n2 · 60/40\n3 · 70/30\n_Ou digite o % do 1º responsável (ex: 65)_",
     "data_compra":      "📅 Data da compra?\n_(hoje, ontem, dia 15, 15/06 — ou *0* para hoje)_",
     "tipo_entrada":     "💰 Tipo de entrada?\n\n1 · Salário\n2 · Bônus\n3 · Outros",
     "descricao_entrada":"📝 Descrição? _(ou *0* para pular)_",
+    "recorrente_entrada": "🔁 Repetir todo mês? _(recorrente)_\n\n1 · Sim\n2 · Não",
     "nome_cartao":      "📛 Nome do cartão? _(ex: Nubank, Inter, C6)_",
     "bandeira":         "💳 Bandeira?\n\n1 · Visa\n2 · Mastercard\n3 · Elo\n4 · American Express\n5 · Outro",
     "limite":           "💰 Limite do cartão? _(ou *0* para pular)_",
@@ -288,9 +318,21 @@ def _should_skip(step: str, fields: dict) -> bool:
     if step == "total_parcelas":
         return tipo != "credito_parcelado"
     if step == "cartao_id":
-        return tipo not in {"credito_avista", "credito_parcelado"}
+        return tipo not in TIPOS_CARTAO_GASTO
+    if step == "cartao_adicional":
+        return tipo not in TIPOS_CARTAO_GASTO or not fields.get("cartao_id")
+    if step == "ajuste_tipo":
+        return tipo != "ajuste_fatura"
     if step == "conta_origem_id":
         return tipo != "debito"
+    if step == "recorrente":
+        return tipo not in ("pix", "debito")
+    if step == "recorrente_meses":
+        return not (tipo == "recorrente" or fields.get("recorrente"))
+    if step == "responsavel_id":
+        return tipo == "ajuste_fatura"
+    if step == "dividido":
+        return tipo == "ajuste_fatura"
     if step == "responsavel2_id":
         return not fields.get("dividido")
     if step == "pct_divisao":
@@ -339,6 +381,14 @@ def _question_for_step(step: str, user, session: dict) -> str | None:
         session["options_map"]["responsavel_id"] = {str(i+1): r["id"] for i, r in enumerate(resps)}
         session["options_map"]["resp_nome_map"] = {r["nome"].lower(): r["id"] for r in resps}
         return f"👤 Responsável?\n\n{opts}"
+
+    if step == "data_compra":
+        tipo = session["fields"].get("tipo_pagamento")
+        if tipo == "ajuste_fatura":
+            return "📅 Mês da fatura?\n_(ex: 06/2026, dia 15, ou *0* para o mês atual)_"
+        if tipo == "pix":
+            return "📅 Mês do Pix/Transferência?\n_(hoje, ontem, dia 15, 15/06 — ou *0* para hoje)_"
+        return QUESTIONS["data_compra"]
 
     if step == "dividido":
         n_resps = Responsavel.objects.filter(user=user, ativo=True).count()
@@ -399,6 +449,39 @@ def _parse_field(step: str, text: str, session: dict):
             return (True, n) if 2 <= n <= 120 else (False, None)
         except ValueError:
             return False, None
+
+    if step in ("cartao_adicional", "recorrente", "recorrente_entrada"):
+        if t in ("1", "s", "sim", "yes", "ok"):
+            return True, True
+        if t in ("2", "n", "não", "nao", "no"):
+            return True, False
+        return False, None
+
+    if step == "ajuste_tipo":
+        t_low = t.lower()
+        if t == "1" or "desconto" in t_low:
+            return True, "desconto"
+        if t == "2" or "adi" in t_low:
+            return True, "adicao"
+        return False, None
+
+    if step == "recorrente_meses":
+        if t == "1":
+            return True, "12"
+        if t == "2":
+            return True, "24"
+        if t == "3":
+            return True, "36"
+        if t == "4" or t.lower() == "sempre":
+            return True, "sempre"
+        try:
+            n = int(t)
+            return (True, str(n)) if 2 <= n <= 60 else (False, None)
+        except ValueError:
+            return False, None
+
+    if step == "observacao":
+        return True, ("" if t == "0" else t)
 
     if step == "cartao_id":
         opts = session.get("options_map", {})
@@ -519,8 +602,13 @@ def _parse_field(step: str, text: str, session: dict):
 def _error_for_step(step: str) -> str:
     msgs = {
         "valor":           "❌ Valor inválido. Digite apenas o número. _(ex: 150 ou 49,90)_",
-        "tipo_pagamento":  "❌ Digite 1, 2, 3, 4 ou 5.",
+        "tipo_pagamento":  "❌ Digite um número de 1 a 6.",
         "total_parcelas":  "❌ Digite o número de parcelas (mínimo 2).",
+        "cartao_adicional":"❌ Digite 1 para Sim ou 2 para Não.",
+        "ajuste_tipo":     "❌ Digite 1 para Desconto ou 2 para Adição.",
+        "recorrente":      "❌ Digite 1 para Sim ou 2 para Não.",
+        "recorrente_meses":"❌ Digite 1, 2, 3, 4 ou o número de meses (2-60).",
+        "recorrente_entrada": "❌ Digite 1 para Sim ou 2 para Não.",
         "tipo_entrada":    "❌ Digite 1, 2 ou 3.",
         "bandeira":        "❌ Digite 1, 2, 3, 4 ou 5.",
         "cartao_id":       "❌ Digite o número do cartão.",
@@ -546,10 +634,22 @@ def _build_confirm(entity: str, fields: dict) -> str:
         tipo      = fields.get("tipo_pagamento", "")
         parcelas  = f" {fields['total_parcelas']}x" if fields.get("total_parcelas") else ""
         cartao    = f" · {fields.get('cartao_nome', '')}" if fields.get("cartao_nome") else ""
+        adicional = "\n• Cartão adicional" if fields.get("cartao_adicional") else ""
+        ajuste    = f"\n• Tipo do ajuste: {AJUSTE_TIPO_LABEL.get(fields.get('ajuste_tipo', ''), '')}" if tipo == "ajuste_fatura" else ""
         conta_org = f"\n• Conta débito: {fields.get('conta_origem_nome', '')}" if fields.get("conta_origem_nome") else ""
         cat       = f"\n• Categoria: {fields.get('categoria_nome', '')}" if fields.get("categoria_nome") else ""
+        obs       = f"\n• Observação: {fields.get('observacao', '')}" if fields.get("observacao") else ""
         data_c    = _str_to_date(fields.get("data_compra"))
-        data_txt  = f"\n• Data da compra: {data_c.strftime('%d/%m/%Y')}" if data_c else ""
+        data_label = "Mês da fatura" if tipo == "ajuste_fatura" else "Data da compra"
+        data_txt  = f"\n• {data_label}: {data_c.strftime('%d/%m/%Y')}" if data_c else ""
+
+        is_recorrente = tipo == "recorrente" or bool(fields.get("recorrente"))
+        if is_recorrente:
+            rec_val = fields.get("recorrente_meses") or "12"
+            rec_label = "sempre (até dez/2050)" if rec_val == "sempre" else f"{rec_val} meses"
+            rec_txt = f"\n• *Recorrente:* {rec_label}"
+        else:
+            rec_txt = ""
 
         valor_total = fields.get("valor", 0)
         dividido    = fields.get("dividido", False)
@@ -566,20 +666,23 @@ def _build_confirm(entity: str, fields: dict) -> str:
         else:
             div_txt = ""
 
+        resp_txt = "" if tipo == "ajuste_fatura" else f"\n• Responsável: {fields.get('responsavel_nome', '')}"
+
         lines += [
             f"• Valor: {_brl(valor_total)}",
             f"• Descrição: {fields.get('descricao', '')}",
-            f"• Tipo: {TIPO_PAG_LABEL.get(tipo, '')}{parcelas}{cartao}{conta_org}{cat}",
-            f"• Responsável: {fields.get('responsavel_nome', '')}{div_txt}{data_txt}",
+            f"• Tipo: {TIPO_PAG_LABEL.get(tipo, '')}{parcelas}{cartao}{adicional}{ajuste}{conta_org}{cat}{obs}",
+            f"{resp_txt}{div_txt}{rec_txt}{data_txt}".lstrip("\n") or "•",
         ]
 
     elif entity == "entrada":
         desc_txt  = f"\n• Descrição: {fields['descricao_entrada']}" if fields.get("descricao_entrada") else ""
         conta_txt = f"\n• Conta: {fields.get('conta_nome', '')}" if fields.get("conta_nome") else ""
+        rec_txt   = "\n• *Recorrente:* repete todo mês até dez/2050" if fields.get("recorrente_entrada") else ""
         lines += [
             f"• Tipo: {TIPO_ENT_LABEL.get(fields.get('tipo_entrada', ''), '')}",
             f"• Valor: {_brl(fields.get('valor', 0))}{desc_txt}{conta_txt}",
-            f"• Responsável: {fields.get('responsavel_nome', '')}",
+            f"• Responsável: {fields.get('responsavel_nome', '')}{rec_txt}",
         ]
 
     elif entity == "cartao":
@@ -596,12 +699,54 @@ def _build_confirm(entity: str, fields: dict) -> str:
 
 # ── Salvamento ────────────────────────────────────────────────────────────────
 
-def _save_gasto(user, fields: dict) -> str:
+def _save_ajuste_fatura(user, fields: dict, cartao) -> str:
     from apps.gastos.views import _recalcular_saldos_a_partir
 
-    tipo  = fields["tipo_pagamento"]
-    n     = fields.get("total_parcelas") if tipo == "credito_parcelado" else None
-    cartao = Cartao.objects.filter(id=fields["cartao_id"]).first() if fields.get("cartao_id") else None
+    if not cartao:
+        return "❌ Nenhum cartão disponível para ajuste de fatura. Cadastre um cartão primeiro."
+
+    responsavel = (
+        Responsavel.objects.filter(user=user, is_principal=True).first()
+        or Responsavel.objects.filter(user=user, ativo=True).first()
+    )
+    if not responsavel:
+        return "❌ Nenhum responsável cadastrado. Cadastre um responsável antes de registrar gastos."
+
+    categoria   = Categoria.objects.filter(id=fields["categoria_id"]).first() if fields.get("categoria_id") else None
+    ajuste_tipo = fields["ajuste_tipo"]
+    valor_total = Decimal(str(fields["valor"]))
+    descricao   = fields.get("descricao") or "Ajuste Fatura"
+    data_ref    = _str_to_date(fields.get("data_compra")) or date.today()
+    data_compra = date(data_ref.year, data_ref.month, 1)
+
+    Gasto.objects.create(
+        descricao=descricao, valor_total=valor_total, tipo_pagamento="ajuste_fatura",
+        cartao=cartao, responsavel=responsavel, categoria=categoria,
+        data_compra=data_compra, observacao=fields.get("observacao") or "",
+        ajuste_tipo=ajuste_tipo, cartao_adicional=bool(fields.get("cartao_adicional")),
+        user=user,
+    )
+    _recalcular_saldos_a_partir(data_compra.month, data_compra.year, user)
+    sinal = "−" if ajuste_tipo == "desconto" else "+"
+    return (
+        f"✅ *Ajuste de fatura registrado!*\n"
+        f"{descricao} · {sinal}{_brl(valor_total)} · {cartao.nome}\n"
+        f"_Fatura: {_meses_pt()[data_compra.month-1]}/{data_compra.year}_"
+    )
+
+
+def _save_gasto(user, fields: dict) -> str:
+    from apps.gastos.views import _debitar_conta, _recalcular_saldos_a_partir
+
+    tipo_raw = fields["tipo_pagamento"]
+    cartao   = Cartao.objects.filter(id=fields["cartao_id"]).first() if fields.get("cartao_id") else None
+
+    if tipo_raw == "ajuste_fatura":
+        return _save_ajuste_fatura(user, fields, cartao)
+
+    # "recorrente" é um alias de UI: salva como credito_avista com recorrente=True
+    tipo = "credito_avista" if tipo_raw == "recorrente" else tipo_raw
+    n    = fields.get("total_parcelas") if tipo == "credito_parcelado" else None
 
     responsavel = (
         Responsavel.objects.filter(id=fields["responsavel_id"]).first()
@@ -615,15 +760,30 @@ def _save_gasto(user, fields: dict) -> str:
     categoria  = Categoria.objects.filter(id=fields["categoria_id"]).first() if fields.get("categoria_id") else None
     conta_orig = Conta.objects.filter(id=fields["conta_origem_id"]).first() if fields.get("conta_origem_id") else None
 
-    descricao   = fields["descricao"]
-    valor_total = Decimal(str(fields["valor"]))
-    data_compra = _str_to_date(fields.get("data_compra")) or date.today()
+    descricao        = fields["descricao"]
+    observacao       = fields.get("observacao") or ""
+    cartao_adicional = bool(fields.get("cartao_adicional"))
+    valor_total      = Decimal(str(fields["valor"]))
+    data_compra      = _str_to_date(fields.get("data_compra")) or date.today()
 
     # Mês de faturamento correto conforme fechamento do cartão
-    if tipo in ("credito_avista", "credito_parcelado"):
+    if tipo_raw in ("credito_avista", "credito_parcelado", "recorrente"):
         data_inicio = _billing_start(cartao, data_compra)
     else:
         data_inicio = date(data_compra.year, data_compra.month, 1)
+
+    # Recorrência (tipo "recorrente" OU toggle marcado para pix/débito)
+    recorrente = tipo_raw == "recorrente" or bool(fields.get("recorrente"))
+    rec_val    = fields.get("recorrente_meses") or "12"
+    if recorrente:
+        if rec_val == "sempre":
+            fim = date(2050, 12, 1)
+            recorrente_meses = (fim.year - data_inicio.year) * 12 + (fim.month - data_inicio.month) + 1
+        else:
+            recorrente_meses = int(rec_val)
+    else:
+        recorrente_meses = None
+    grupo_recorrente_id = _uuid.uuid4() if recorrente else None
 
     # Divisão
     dividido      = fields.get("dividido", False)
@@ -636,24 +796,38 @@ def _save_gasto(user, fields: dict) -> str:
             valor_total=valor, tipo_pagamento=tipo,
             cartao=cartao, conta_origem=conta_orig,
             responsavel=resp, categoria=categoria,
-            grupo_divisao=grupo,
-            pct_divisao=pct_val,
+            observacao=observacao, cartao_adicional=cartao_adicional,
+            grupo_divisao=grupo, pct_divisao=pct_val,
+            grupo_recorrente=grupo_recorrente_id,
             user=user,
         )
         if n:
-            Gasto.objects.create(descricao=f"{descricao} (1/{n})", data_compra=data_inicio, total_parcelas=n, **base)
+            g = Gasto.objects.create(descricao=f"{descricao} (1/{n})", data_compra=data_inicio, total_parcelas=n, **base)
+            _debitar_conta(g)
             for i in range(2, n + 1):
                 Gasto.objects.create(
                     descricao=f"{descricao} ({i}/{n})",
                     data_compra=data_inicio + relativedelta(months=i - 1),
                     total_parcelas=n, **base,
                 )
+        elif grupo_recorrente_id:
+            for i in range(recorrente_meses):
+                g = Gasto.objects.create(
+                    descricao=descricao, data_compra=data_inicio + relativedelta(months=i), **base,
+                )
+                if i == 0:
+                    _debitar_conta(g)
         else:
-            Gasto.objects.create(descricao=descricao, data_compra=data_inicio, **base)
+            g = Gasto.objects.create(descricao=descricao, data_compra=data_inicio, **base)
+            _debitar_conta(g)
 
     mes_ref, ano_ref = data_inicio.month, data_inicio.year
-    tipo_str  = f"parcelado em {n}x" if n else TIPO_PAG_LABEL.get(tipo, tipo)
+    tipo_str   = f"parcelado em {n}x" if n else TIPO_PAG_LABEL.get(tipo_raw, tipo_raw)
     cartao_txt = f" · {cartao.nome}" if cartao else ""
+    rec_txt    = ""
+    if recorrente:
+        rec_label = "sempre (até dez/2050)" if rec_val == "sempre" else f"{recorrente_meses}x"
+        rec_txt   = f"\n_Recorrente: {rec_label}_"
 
     if grupo_id and responsavel2:
         valor1 = (valor_total * Decimal(pct) / 100).quantize(Decimal("0.01"))
@@ -671,7 +845,7 @@ def _save_gasto(user, fields: dict) -> str:
             f"{descricao} · {_brl(valor_total)} · {tipo_str}{cartao_txt}\n\n"
             f"• {responsavel.nome}: {_brl(valor1)} ({pct}%)\n"
             f"• {responsavel2.nome}: {_brl(valor2)} ({pct2}%)\n"
-            f"_Fatura: {_meses_pt()[mes_ref-1]}/{ano_ref}_"
+            f"_Fatura: {_meses_pt()[mes_ref-1]}/{ano_ref}_{rec_txt}"
         )
     else:
         _criar(responsavel, valor_total, None, None)
@@ -681,26 +855,57 @@ def _save_gasto(user, fields: dict) -> str:
         return (
             f"✅ *Gasto registrado!*\n"
             f"{descricao} · {_brl(valor_total)} · {tipo_str}{cartao_txt}\n"
-            f"_Fatura: {_meses_pt()[mes_ref-1]}/{ano_ref}_"
+            f"_Fatura: {_meses_pt()[mes_ref-1]}/{ano_ref}_{rec_txt}"
         )
 
 
 def _save_entrada(user, fields: dict) -> str:
-    from apps.gastos.views import _recalcular_saldos_a_partir
+    from apps.gastos.views import _creditar_conta, _recalcular_saldos_a_partir
 
     responsavel = Responsavel.objects.filter(id=fields["responsavel_id"]).first() if fields.get("responsavel_id") else None
     conta       = Conta.objects.filter(id=fields["conta_id"]).first() if fields.get("conta_id") else None
     valor       = Decimal(str(fields["valor"]))
-    hoje        = date.today()
+    descricao   = fields.get("descricao_entrada") or ""
+    tipo        = fields["tipo_entrada"]
+    is_recorrente = bool(fields.get("recorrente_entrada"))
 
-    Entrada.objects.create(
-        tipo=fields["tipo_entrada"],
-        descricao=fields.get("descricao_entrada") or "",
-        valor=valor, data=hoje,
+    if is_recorrente:
+        data_inicio = date.today().replace(day=1)
+        grupo_id    = _uuid.uuid4()
+        entrada = Entrada.objects.create(
+            tipo=tipo, descricao=descricao, valor=valor, data=data_inicio,
+            responsavel=responsavel, conta=conta, user=user,
+            recorrente=True, grupo_recorrente=grupo_id,
+        )
+        _creditar_conta(entrada)
+        _recalcular_saldos_a_partir(data_inicio.month, data_inicio.year, user)
+
+        fim = date(2050, 12, 1)
+        proximo = data_inicio + relativedelta(months=1)
+        bulk = []
+        while proximo <= fim:
+            bulk.append(Entrada(
+                tipo=tipo, descricao=descricao, valor=valor, data=proximo,
+                conta=conta, responsavel=responsavel,
+                auto_gerada=True, recorrente=True, grupo_recorrente=grupo_id, user=user,
+            ))
+            proximo += relativedelta(months=1)
+        Entrada.objects.bulk_create(bulk)
+        total = len(bulk) + 1
+        return (
+            f"✅ *Entrada recorrente registrada!*\n"
+            f"{TIPO_ENT_LABEL.get(tipo, '')} · {_brl(valor)}\n"
+            f"_{total} meses gerados até dez/2050_"
+        )
+
+    hoje = date.today()
+    entrada = Entrada.objects.create(
+        tipo=tipo, descricao=descricao, valor=valor, data=hoje,
         responsavel=responsavel, conta=conta, user=user,
     )
+    _creditar_conta(entrada)
     _recalcular_saldos_a_partir(hoje.month, hoje.year, user)
-    return f"✅ *Entrada registrada!*\n{TIPO_ENT_LABEL.get(fields['tipo_entrada'], '')} · {_brl(valor)}"
+    return f"✅ *Entrada registrada!*\n{TIPO_ENT_LABEL.get(tipo, '')} · {_brl(valor)}"
 
 
 def _save_cartao(user, fields: dict) -> str:
@@ -973,6 +1178,21 @@ def _resolve_hints(entity: str, extracted_fields: dict, user) -> dict:
         if ok and parsed:
             extracted_fields["data_compra"] = _date_to_str(parsed)
 
+    # Recorrência (pix/débito mencionados como recorrentes)
+    rec_flag = extracted_fields.pop("recorrente_flag", None)
+    if rec_flag and entity == "gasto":
+        extracted_fields["recorrente"] = True
+
+    # Tipo do ajuste de fatura
+    ajuste_hint = extracted_fields.pop("ajuste_tipo_hint", None)
+    if ajuste_hint in ("desconto", "adicao") and entity == "gasto":
+        extracted_fields["ajuste_tipo"] = ajuste_hint
+
+    # Cartão adicional
+    cartao_ad_hint = extracted_fields.pop("cartao_adicional_hint", None)
+    if cartao_ad_hint is not None and entity == "gasto":
+        extracted_fields["cartao_adicional"] = bool(cartao_ad_hint)
+
     return extracted_fields
 
 
@@ -1012,6 +1232,12 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
 
             result  = _call_llm_intent(text, user=user)
             intent  = result.get("intent", "desconhecido")
+
+            # Salvaguarda: o LLM às vezes confunde um valor de tipo_pagamento
+            # (ex: "ajuste_fatura") com o próprio intent — trata como "gasto".
+            if intent in TIPO_PAG_MAP.values():
+                result.setdefault("fields", {})["tipo_pagamento"] = intent
+                intent = "gasto"
 
             if intent == "resumo":
                 clear_session(phone)

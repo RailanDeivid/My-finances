@@ -11,8 +11,9 @@
     "pix":               ["pix","transferência","transferencia","ted","doc","transf","via pix","pelo pix"],
     "credito_avista":    ["à vista","avista","a vista","crédito à vista","credito a vista","no crédito","no credito","cartão crédito","cartao credito"],
     "credito_parcelado": ["parcelado","parcelas","prestações","prestacoes","em vezes","x de"],
-    "emprestimo":        ["empréstimo","emprestimo"],
-    "debito":            ["débito","debito","no débito","no debito","cartão débito","cartao debito","debit"]
+    "recorrente":        ["recorrente","assinatura","mensalidade fixa","todo mês","todo mes","compra recorrente"],
+    "debito":            ["débito","debito","no débito","no debito","cartão débito","cartao debito","debit"],
+    "ajuste_fatura":     ["ajuste de fatura","ajuste fatura","desconto na fatura","estorno na fatura","adição na fatura","adicao na fatura"]
   },
   "tipo_entrada": {
     "salario": ["salário","salario","sal","pagamento","holerite","contra-cheque","contracheque"],

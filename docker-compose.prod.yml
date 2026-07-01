@@ -35,6 +35,8 @@ services:
     image: evoapicloud/evolution-api:latest
     container_name: my-finances-evolution
     restart: always
+    ports:
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -62,6 +64,8 @@ services:
     build: .
     container_name: my-finances-web
     restart: always
+    ports:
+      - "127.0.0.1:8000:8000"
     env_file: .env.prod
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
