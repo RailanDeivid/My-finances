@@ -21,7 +21,7 @@ def send_presence(to: str, delay_ms: int = 5000) -> None:
     url = f"{_base_url()}/chat/sendPresence/{settings.EVOLUTION_INSTANCE_NAME}"
     payload = {"number": to, "delay": delay_ms, "presence": "composing"}
     try:
-        with httpx.Client(timeout=5) as client:
+        with httpx.Client(timeout=20) as client:
             client.post(url, json=payload, headers=_headers())
     except Exception as e:
         logger.warning("Presence error: %s", e)
@@ -32,7 +32,7 @@ def send_message(to: str, text: str) -> None:
     url = f"{_base_url()}/message/sendText/{settings.EVOLUTION_INSTANCE_NAME}"
 
     chunks = [text[i : i + CHUNK_SIZE] for i in range(0, len(text), CHUNK_SIZE)]
-    with httpx.Client(timeout=15) as client:
+    with httpx.Client(timeout=30) as client:
         for chunk in chunks:
             try:
                 client.post(url, json={"number": to, "text": chunk}, headers=_headers())

@@ -49,8 +49,7 @@ services:
       SERVER_TYPE: http
       AUTHENTICATION_TYPE: apikey
       AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
-      WEBHOOK_GLOBAL_URL: http://web:8000/webhook/whatsapp/
-      WEBHOOK_GLOBAL_ENABLED: "true"
+      WEBHOOK_GLOBAL_ENABLED: "false"
       WEBHOOK_EVENTS_MESSAGES_UPSERT: "true"
       QRCODE_LIMIT: 30
       LOG_LEVEL: ERROR
