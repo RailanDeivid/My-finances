@@ -26,15 +26,17 @@ _USER = (
     '"recorrente_flag":bool,"ajuste_tipo_hint":"desconto|adicao",'
     '"cartao_adicional_hint":bool,'
     '"consulta_tipo":"responsavel|cartao","mes_ano_hint":str,'
-    '"serie_mensal":bool,"mes_ano_fim_hint":str}}\n\n'
+    '"serie_mensal":bool,"mes_ano_fim_hint":str,'
+    '"resumo_metrica":"saldo|gastos|receitas|cartao|completo"}}\n\n'
     "Regras:\n"
     "intent: gasto→gastei/comprei/paguei/desconto ou ajuste na fatura | entrada→recebi/salário | "
-    "cartao→cadastrar cartão | resumo→pergunta sobre 'eu/minha/meu' saldo ou quanto EU gastei, sem "
-    "citar nome de pessoa nem de cartão | consulta→pergunta que cita o NOME de uma pessoa específica "
-    "(ex: 'quanto a Ana gastou em julho') OU o nome de um CARTÃO específico (ex: 'total do cartão "
-    "nubank em junho', 'gasto mês a mês do cartão X') — se não houver nome citado, é sempre resumo, "
-    "nunca consulta. REGRA CRÍTICA: se cartao_nome_hint OU responsavel_nome_hint for preenchido, o "
-    "intent OBRIGATORIAMENTE é 'consulta', nunca 'resumo'\n"
+    "cartao→cadastrar cartão | resumo→pergunta sobre 'eu/minha/meu' saldo/gasto/receita, sem citar nome "
+    "de pessoa nem de cartão — pode ter mês específico ou mês a mês (ex: 'qual meu saldo em julho', "
+    "'meu saldo mês a mês até dezembro', 'meus gastos totais até dez') | consulta→pergunta que cita o "
+    "NOME de uma pessoa específica (ex: 'quanto a Ana gastou em julho') OU o nome de um CARTÃO específico "
+    "(ex: 'total do cartão nubank em junho', 'gasto mês a mês do cartão X') — se não houver nome citado, "
+    "é sempre resumo, nunca consulta. REGRA CRÍTICA: se cartao_nome_hint OU responsavel_nome_hint for "
+    "preenchido, o intent OBRIGATORIAMENTE é 'consulta', nunca 'resumo'\n"
     "IMPORTANTE: intent só pode ser gasto|entrada|cartao|resumo|consulta|menu|desconhecido — 'ajuste_fatura' "
     "NUNCA é um intent, é sempre um valor de tipo_pagamento dentro de intent='gasto'\n"
     "pgto: pix→pix/transf/ted | avista→à vista/no crédito | parcelado→Nx/parcelado | debito→débito/no débito | "
@@ -52,18 +54,45 @@ _USER = (
     "cartao_adicional_hint: true se menciona cartão adicional/extra, senão null\n"
     "consulta_tipo: só para intent=consulta — 'responsavel' se pergunta é sobre uma pessoa, "
     "'cartao' se é sobre um cartão\n"
-    "mes_ano_hint: só para intent=consulta — mês perguntado como string ('julho', 'esse mês', "
+    "mes_ano_hint: para intent=consulta OU resumo — mês perguntado como string ('julho', 'esse mês', "
     "'06/2026', 'mês passado'); se serie_mensal=true, é o mês INICIAL do período; null = mês atual\n"
     "serie_mensal: true se a pergunta pede quebra mês a mês / mensal / mês por mês / evolução "
     "('mês a mês', 'todo mês', 'mês por mês', 'de X até Y'), senão null\n"
     "mes_ano_fim_hint: só quando serie_mensal=true — mês FINAL do período citado ('até dez/2026', "
     "'até dezembro') como string, ou null se não citado (assume 12 meses a partir do mês inicial)\n"
+    "resumo_metrica: só para intent=resumo — qual valor da visão mensal a pessoa quer: 'saldo' (saldo "
+    "atual/quanto sobrou), 'gastos' (total gasto), 'receitas' (total recebido), 'cartao' (gastos totais "
+    "nos cartões), ou 'completo' (saldo anterior + receitas + gastos + saldo atual + cartões, a visão "
+    "inteira) se não especificar ou pedir 'resumo'/'extrato' geral\n"
     "null em campos não mencionados"
 )
 
 
-def make_intent_messages(message: str) -> list:
+_CONTEXTO = (
+    "\n\nContexto da última consulta (use só se esta mensagem for uma continuação/pergunta de "
+    "acompanhamento — ex: só um nome, 'e da/do X', 'e em [mês]', 'e o [cartão]', 'e só os gastos?'; "
+    "NÃO use para registrar gasto/entrada/cartão novo. Se a mensagem perguntar sobre 'eu/minha/meu' "
+    "(sem nome de pessoa/cartão), o intent é sempre 'resumo' — mas ainda pode reaproveitar mês/período/"
+    "métrica do contexto se fizer sentido como continuação, só NUNCA reaproveite "
+    "cartao_nome_hint/responsavel_nome_hint num resumo, pois resumo é sempre sobre o próprio usuário): "
+    "{context}\n"
+    "Exemplo 1 (troca de pessoa) — contexto tem responsavel_nome_hint='pablo', serie_mensal=true, "
+    "mes_ano_fim_hint='dez/2026', mensagem é só 'e da daniela?'. Resposta "
+    "(SEMPRE no formato intent + fields aninhado, nunca campos soltos):\n"
+    '{"intent":"consulta","fields":{"responsavel_nome_hint":"daniela","consulta_tipo":"responsavel",'
+    '"serie_mensal":true,"mes_ano_hint":null,"mes_ano_fim_hint":"dez/2026"}}\n'
+    "Exemplo 2 (troca de métrica no resumo) — contexto tem resumo_metrica='saldo', serie_mensal=true, "
+    "mes_ano_fim_hint='dez/2026', mensagem é só 'e os gastos?'. Resposta:\n"
+    '{"intent":"resumo","fields":{"resumo_metrica":"gastos","serie_mensal":true,"mes_ano_hint":null,'
+    '"mes_ano_fim_hint":"dez/2026"}}'
+)
+
+
+def make_intent_messages(message: str, context: dict | None = None) -> list:
+    user_content = _USER.replace("{message}", message)
+    if context:
+        user_content += _CONTEXTO.replace("{context}", json.dumps(context, ensure_ascii=False))
     return [
         {"role": "system", "content": _SYSTEM},
-        {"role": "user", "content": _USER.replace("{message}", message)},
+        {"role": "user", "content": user_content},
     ]

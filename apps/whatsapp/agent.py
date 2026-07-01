@@ -124,6 +124,18 @@ def welcome_message(user, phone: str = "", push_name: str = "") -> str:
 
 CANCEL_WORDS = {"cancelar", "sair", "parar", "stop", "menu", "início", "inicio", "voltar"}
 
+_SERIE_KEYWORDS = (
+    "mês a mês", "mes a mes", "mensal", "mês por mês", "mes por mes",
+    "evolução", "evolucao", "todo mês", "todo mes",
+)
+
+_METRICA_KEYWORDS = (
+    ("saldo", "saldo"),
+    ("cartão", "cartao"), ("cartao", "cartao"), ("cartões", "cartao"), ("cartoes", "cartao"),
+    ("receita", "receitas"), ("entrada", "receitas"),
+    ("gasto", "gastos"),
+)
+
 
 # ── Mapeamentos de choices ────────────────────────────────────────────────────
 
@@ -1108,6 +1120,26 @@ def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
     return "\n".join(lines)
 
 
+_CONTEXT_GROUPS = (
+    ("mes_ano_hint", "serie_mensal", "mes_ano_fim_hint"),
+    ("cartao_nome_hint", "responsavel_nome_hint", "consulta_tipo"),
+    ("resumo_metrica",),
+)
+
+
+def _merge_context(fields: dict, context: dict, skip_keys: frozenset = frozenset()) -> dict:
+    """Herda campos da última consulta (session['last_consulta']) em blocos por tema —
+    só herda o grupo inteiro (ex: mês/série/mês-fim) se a mensagem atual não citou
+    NADA daquele tema; se citou qualquer parte, usa só o que veio agora, sem misturar."""
+    for group in _CONTEXT_GROUPS:
+        group = [k for k in group if k not in skip_keys]
+        if group and all(fields.get(k) is None for k in group):
+            for k in group:
+                if k in context:
+                    fields[k] = context[k]
+    return fields
+
+
 _SERIE_MENSAL_LIMITE = 24
 
 
@@ -1121,6 +1153,120 @@ def _meses_intervalo(mes_ini: int, ano_ini: int, mes_fim: int, ano_fim: int) -> 
         meses.append((d.month, d.year))
         d += relativedelta(months=1)
     return meses
+
+
+def _resumo_mes_detalhado(user, mes, ano) -> dict:
+    """Espelha a tabela 'Gastos vs Entradas — Visão Mensal' do dashboard do site
+    (mesma fórmula: Gastos usa _impacto_q, Gastos Cartões só credito_avista/parcelado,
+    Saldo Atual reaproveita _calcular_saldo_mes — que já carrega o saldo anterior
+    persistido, sem precisar recalcular o saldo inicial do zero)."""
+    from apps.gastos.views import _calcular_saldo_mes, _impacto_q
+
+    _, _, saldo_atual = _calcular_saldo_mes(mes, ano, user)
+    anterior = date(ano, mes, 1) - relativedelta(months=1)
+    _, _, saldo_anterior = _calcular_saldo_mes(anterior.month, anterior.year, user)
+
+    receitas = (
+        Entrada.objects.filter(user=user, data__year=ano, data__month=mes)
+        .exclude(tipo="saldo_anterior")
+        .aggregate(t=Sum("valor"))["t"] or Decimal("0")
+    )
+    gastos = (
+        Gasto.objects.filter(_impacto_q(user), data_compra__year=ano, data_compra__month=mes)
+        .exclude(tipo_pagamento="ajuste_fatura")
+        .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+    )
+    gastos_cartao = (
+        Gasto.objects.filter(
+            user=user, tipo_pagamento__in=["credito_avista", "credito_parcelado"],
+            data_compra__year=ano, data_compra__month=mes,
+        ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+    )
+    return {
+        "saldo_anterior": saldo_anterior, "receitas": receitas, "gastos": gastos,
+        "saldo_atual": saldo_atual, "gastos_cartao": gastos_cartao,
+    }
+
+
+_RESUMO_METRICA_LABEL = {
+    "saldo":    ("📈", "Saldo Atual"),
+    "gastos":   ("💸", "Gastos"),
+    "receitas": ("💰", "Receitas"),
+    "cartao":   ("💳", "Gastos Totais Cartões"),
+}
+_RESUMO_METRICA_CAMPO = {
+    "saldo": "saldo_atual", "gastos": "gastos", "receitas": "receitas", "cartao": "gastos_cartao",
+}
+
+
+def _handle_resumo(user, fields: dict) -> str:
+    """Resumo do próprio usuário com mês/período — 'qual meu saldo em julho?',
+    'meu saldo mês a mês até dez/2026', 'meus gastos totais até dezembro'."""
+    today = date.today()
+    mes, ano = today.month, today.year
+    mes_ano_hint = fields.get("mes_ano_hint")
+    if mes_ano_hint:
+        ok, mp_, ap_ = _parse_mes_ano(str(mes_ano_hint), today)
+        if ok:
+            mes, ano = mp_, ap_
+
+    metrica = fields.get("resumo_metrica") or "completo"
+    serie_mensal = bool(fields.get("serie_mensal"))
+
+    # Caso simples de sempre: "quanto eu gastei esse mês" sem mês/série/métrica citados.
+    if not serie_mensal and metrica == "completo" and not mes_ano_hint:
+        return _resumo(user) + f"\n\n{MENU_OPTIONS}"
+
+    mp = _meses_pt()
+
+    if serie_mensal:
+        mes_fim, ano_fim = mes, ano
+        mes_fim_hint = fields.get("mes_ano_fim_hint")
+        if mes_fim_hint:
+            ok, mp_, ap_ = _parse_mes_ano(str(mes_fim_hint), today)
+            if ok:
+                mes_fim, ano_fim = mp_, ap_
+        else:
+            fim_padrao = date(ano, mes, 1) + relativedelta(months=11)
+            mes_fim, ano_fim = fim_padrao.month, fim_padrao.year
+
+        meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)
+        if metrica == "completo":
+            blocos = ["📊 *Resumo — mês a mês*"]
+            for m, a in meses:
+                d = _resumo_mes_detalhado(user, m, a)
+                blocos.append(
+                    f"\n*{mp[m-1]}/{a}*\n"
+                    f"Saldo Anterior: {_brl(d['saldo_anterior'])}\n"
+                    f"Receitas: {_brl(d['receitas'])}\n"
+                    f"Gastos: {_brl(d['gastos'])}\n"
+                    f"Saldo Atual: {_brl(d['saldo_atual'])}\n"
+                    f"Gastos Totais Cartões: {_brl(d['gastos_cartao'])}"
+                )
+            return "\n".join(blocos) + f"\n\n{MENU_OPTIONS}"
+
+        emoji, label = _RESUMO_METRICA_LABEL.get(metrica, _RESUMO_METRICA_LABEL["saldo"])
+        campo = _RESUMO_METRICA_CAMPO.get(metrica, "saldo_atual")
+        lines = [f"{emoji} *{label} — mês a mês*\n"]
+        for m, a in meses:
+            d = _resumo_mes_detalhado(user, m, a)
+            lines.append(f"• {mp[m-1]}/{a}: {_brl(d[campo])}")
+        return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
+
+    # Mês único (citado explicitamente, ou uma métrica específica pedida)
+    d = _resumo_mes_detalhado(user, mes, ano)
+    if metrica == "completo":
+        return (
+            f"📊 *Resumo — {mp[mes-1]}/{ano}*\n\n"
+            f"Saldo Anterior: {_brl(d['saldo_anterior'])}\n"
+            f"Receitas: {_brl(d['receitas'])}\n"
+            f"Gastos: {_brl(d['gastos'])}\n"
+            f"Saldo Atual: {_brl(d['saldo_atual'])}\n"
+            f"Gastos Totais Cartões: {_brl(d['gastos_cartao'])}\n\n{MENU_OPTIONS}"
+        )
+    emoji, label = _RESUMO_METRICA_LABEL.get(metrica, _RESUMO_METRICA_LABEL["saldo"])
+    campo = _RESUMO_METRICA_CAMPO.get(metrica, "saldo_atual")
+    return f"{emoji} *{label} — {mp[mes-1]}/{ano}*\n\n{_brl(d[campo])}\n\n{MENU_OPTIONS}"
 
 
 def _total_cartao_mes(user, cartao_id, mes, ano):
@@ -1280,19 +1426,25 @@ def _save_llm_usage(user, operation: str, model: str, usage, latency_ms: int) ->
         logger.warning("Falha ao salvar LLMUsage: %s", e)
 
 
-def _call_llm_intent(message: str, user=None) -> dict:
+def _call_llm_intent(message: str, user=None, context: dict | None = None) -> dict:
     try:
         t0 = time.monotonic()
         resp = _llm.chat.completions.create(
             model=settings.OPENAI_MODEL,
-            messages=make_intent_messages(message),
+            messages=make_intent_messages(message, context=context),
             response_format={"type": "json_object"},
             temperature=float(settings.OPENAI_TEMPERATURE),
             max_tokens=400,
         )
         latency_ms = int((time.monotonic() - t0) * 1000)
         _save_llm_usage(user, "intent_extraction", settings.OPENAI_MODEL, resp.usage, latency_ms)
-        return json.loads(resp.choices[0].message.content)
+        data = json.loads(resp.choices[0].message.content)
+        # Blindagem: às vezes a IA devolve os campos soltos no nível raiz em vez
+        # de aninhados em "fields" — normaliza para o formato esperado.
+        if "fields" not in data:
+            intent = data.pop("intent", "desconhecido")
+            data = {"intent": intent, "fields": data}
+        return data
     except Exception as e:
         logger.error("LLM error: %s", e)
         return {"intent": "desconhecido", "fields": {}}
@@ -1435,38 +1587,76 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
 
-            result  = _call_llm_intent(text, user=user)
+            last_consulta = session.get("last_consulta")
+            result  = _call_llm_intent(text, user=user, context=last_consulta)
             intent  = result.get("intent", "desconhecido")
+            fields  = result.get("fields", {}) or {}
+            raw_mes_ano_hint = fields.get("mes_ano_hint")
 
             # Salvaguarda: o LLM às vezes confunde um valor de tipo_pagamento
             # (ex: "ajuste_fatura") com o próprio intent — trata como "gasto".
             if intent in TIPO_PAG_MAP.values():
-                result.setdefault("fields", {})["tipo_pagamento"] = intent
+                fields["tipo_pagamento"] = intent
                 intent = "gasto"
 
-            # Salvaguarda: se extraiu nome de cartão/responsável mas classificou
-            # como "resumo" (que é só para o próprio usuário, sem nome), é consulta.
-            if intent == "resumo":
-                _f = result.get("fields", {}) or {}
-                if _f.get("cartao_nome_hint") or _f.get("responsavel_nome_hint"):
-                    intent = "consulta"
+            # Salvaguarda: se a MENSAGEM ATUAL cita nome de cartão/responsável mas
+            # a IA classificou como resumo/menu/desconhecido, é consulta (continuação
+            # de uma pergunta anterior, ex: "e da daniela?" logo depois de uma consulta).
+            if intent in ("resumo", "menu", "desconhecido") and (
+                fields.get("cartao_nome_hint") or fields.get("responsavel_nome_hint")
+            ):
+                intent = "consulta"
 
-            if intent == "resumo":
-                clear_session(phone)
-                return _resumo(user)
             if intent == "menu":
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
-            if intent == "consulta":
-                clear_session(phone)
-                return _handle_consulta(user, result.get("fields", {}) or {})
+            if intent in ("resumo", "consulta"):
+                # Blindagem determinística: detecta a métrica pedida pelo texto real da
+                # mensagem (a IA às vezes não extrai "gastos" em fragmentos curtos tipo
+                # "e os gastos?" e acaba herdando a métrica antiga do contexto).
+                if intent == "resumo" and fields.get("resumo_metrica") is None:
+                    for kw, val in _METRICA_KEYWORDS:
+                        if kw in text_lower:
+                            fields["resumo_metrica"] = val
+                            break
+
+                # Preenche campos não citados nesta mensagem com os da consulta anterior
+                # (ex: "e da daniela?" ou "e só os gastos?" herdam mês/período/série de antes),
+                # em blocos por tema — citar QUALQUER parte de um tema (ex: um mês novo) descarta
+                # o resto herdado daquele tema (ex: não herda mais serie_mensal antigo).
+                if last_consulta:
+                    skip = frozenset({"cartao_nome_hint", "responsavel_nome_hint", "consulta_tipo"}) \
+                        if intent == "resumo" else frozenset()
+                    fields = _merge_context(fields, last_consulta, skip_keys=skip)
+
+                # Blindagem determinística: a IA às vezes copia serie_mensal=true do
+                # contexto mesmo quando a mensagem atual só cita um mês único, sem
+                # nenhuma palavra de série — usa o texto real da mensagem, não a IA,
+                # pra decidir. Só entra em série se a mensagem não citar mês nenhum
+                # (aí sim herda a série do contexto, ex: "e os gastos?").
+                if raw_mes_ano_hint and not any(p in text_lower for p in _SERIE_KEYWORDS):
+                    fields["serie_mensal"] = False
+                    fields["mes_ano_fim_hint"] = None
+
+                if intent == "resumo":
+                    new_session = {
+                        "state": "MENU", "entity": None, "fields": {}, "step": None,
+                        "options_map": {}, "last_consulta": fields,
+                    }
+                    save_session(phone, new_session)
+                    return _handle_resumo(user, fields)
+                new_session = {
+                    "state": "MENU", "entity": None, "fields": {}, "step": None,
+                    "options_map": {}, "last_consulta": fields,
+                }
+                save_session(phone, new_session)
+                return _handle_consulta(user, fields)
             if intent not in ("gasto", "entrada", "cartao"):
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
 
             entity = intent
-            llm_fields = result.get("fields", {}) or {}
-            extracted_fields = {k: v for k, v in llm_fields.items() if v is not None}
+            extracted_fields = {k: v for k, v in fields.items() if v is not None}
             extracted_fields = _resolve_hints(entity, extracted_fields, user)
 
         session = {
