@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db.models import Sum
 from openai import OpenAI
 
-from apps.gastos.models import Cartao, Categoria, Conta, Entrada, Gasto, Responsavel
+from apps.gastos.models import Cartao, Categoria, Conta, Entrada, Gasto, Investimento, Responsavel
 from .prompts import get_catalog, make_intent_messages
 from .session import clear_session, get_session, is_first_contact_today, save_session
 
@@ -1122,7 +1122,7 @@ def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
 
 _CONTEXT_GROUPS = (
     ("mes_ano_hint", "serie_mensal", "mes_ano_fim_hint"),
-    ("cartao_nome_hint", "responsavel_nome_hint", "consulta_tipo"),
+    ("cartao_nome_hint", "responsavel_nome_hint", "categoria_hint", "conta_nome_hint", "consulta_tipo"),
     ("resumo_metrica",),
 )
 
@@ -1288,6 +1288,14 @@ def _total_responsavel_mes(user, responsavel: dict, mes, ano):
     return _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
 
 
+def _total_categoria_mes(user, categoria_id, mes, ano):
+    from apps.gastos.views import _agg_sum
+    return _agg_sum(
+        Gasto.objects.filter(user=user, categoria_id=categoria_id, data_compra__month=mes, data_compra__year=ano)
+        .exclude(tipo_pagamento="ajuste_fatura")
+    )
+
+
 def _handle_consulta(user, fields: dict) -> str:
     """Responde perguntas livres do tipo 'quanto a Ana gastou em julho?',
     'total do cartão nubank em junho?' ou 'gastos do pablo mês a mês até dez/2026'."""
@@ -1314,12 +1322,75 @@ def _handle_consulta(user, fields: dict) -> str:
     consulta_tipo = fields.get("consulta_tipo")
     cartao_hint = fields.get("cartao_nome_hint")
     resp_hint   = fields.get("responsavel_nome_hint")
+    cat_hint    = fields.get("categoria_hint")
+    conta_hint  = fields.get("conta_nome_hint")
 
-    # Sem nome de pessoa nem de cartão → é o resumo do próprio usuário, não uma consulta.
-    if not cartao_hint and not resp_hint:
+    # Sem nome/tema nenhum → é o resumo do próprio usuário, não uma consulta.
+    if not (cartao_hint or resp_hint or cat_hint or conta_hint or consulta_tipo == "investimento"):
         return _resumo(user) + f"\n\n{MENU_OPTIONS}"
 
     mp = _meses_pt()
+
+    if consulta_tipo == "investimento":
+        investimentos = list(
+            Investimento.objects.filter(user=user, liquidado=False)
+            .values("descricao", "saldo_atual")
+            .order_by("-saldo_atual")
+        )
+        if not investimentos:
+            return f"📈 *Investimentos*\n\nNenhum investimento ativo cadastrado.\n\n{MENU_OPTIONS}"
+        total = sum((i["saldo_atual"] for i in investimentos), Decimal("0"))
+        lines = ["📈 *Investimentos*\n"]
+        for i in investimentos:
+            lines.append(f"• {i['descricao']}: {_brl(i['saldo_atual'])}")
+        lines.append(f"\n*Total investido: {_brl(total)}*")
+        return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
+
+    if consulta_tipo == "conta" or conta_hint:
+        if not conta_hint:
+            return f"❌ Não entendi qual conta você quer consultar.\n\n{MENU_OPTIONS}"
+        contas = list(Conta.objects.filter(user=user, ativo=True).values("id", "nome"))
+        hint_low = conta_hint.lower()
+        conta_id = None
+        for c in contas:
+            if hint_low in c["nome"].lower() or c["nome"].lower() in hint_low:
+                conta_id = c["id"]
+                break
+        if not conta_id:
+            nomes = ", ".join(c["nome"] for c in contas) or "nenhuma cadastrada"
+            return f"❌ Não encontrei uma conta chamada \"{conta_hint}\".\nContas cadastradas: {nomes}\n\n{MENU_OPTIONS}"
+        return _rel_saldo_conta_especifica(user, conta_id) + f"\n\n{MENU_OPTIONS}"
+
+    if consulta_tipo == "categoria" or cat_hint:
+        if not cat_hint:
+            return f"❌ Não entendi qual categoria você quer consultar.\n\n{MENU_OPTIONS}"
+        categorias = list(Categoria.objects.filter(user=user, ativo=True).values("id", "nome"))
+        hint_low = cat_hint.lower()
+        categoria_id = categoria_nome = None
+        for c in categorias:
+            if hint_low in c["nome"].lower() or c["nome"].lower() in hint_low:
+                categoria_id, categoria_nome = c["id"], c["nome"]
+                break
+        if not categoria_id:
+            nomes = ", ".join(c["nome"] for c in categorias) or "nenhuma cadastrada"
+            return f"❌ Não encontrei uma categoria chamada \"{cat_hint}\".\nCategorias cadastradas: {nomes}\n\n{MENU_OPTIONS}"
+
+        if serie_mensal:
+            meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)
+            lines = [f"🏷️ *{categoria_nome} — mês a mês*\n"]
+            total_periodo = Decimal("0")
+            for m, a in meses:
+                t = _total_categoria_mes(user, categoria_id, m, a)
+                total_periodo += t
+                lines.append(f"• {mp[m-1]}/{a}: {_brl(t)}")
+            lines.append(f"\n*Total do período: {_brl(total_periodo)}*")
+            return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
+
+        total = _total_categoria_mes(user, categoria_id, mes, ano)
+        return (
+            f"🏷️ *{categoria_nome} — {mp[mes-1]}/{ano}*\n\n"
+            f"Total de gastos: {_brl(total)}\n\n{MENU_OPTIONS}"
+        )
 
     if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
         if not cartao_hint:
@@ -1604,6 +1675,8 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             # de uma pergunta anterior, ex: "e da daniela?" logo depois de uma consulta).
             if intent in ("resumo", "menu", "desconhecido") and (
                 fields.get("cartao_nome_hint") or fields.get("responsavel_nome_hint")
+                or fields.get("categoria_hint") or fields.get("conta_nome_hint")
+                or fields.get("consulta_tipo") == "investimento"
             ):
                 intent = "consulta"
 
@@ -1625,8 +1698,10 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
                 # em blocos por tema — citar QUALQUER parte de um tema (ex: um mês novo) descarta
                 # o resto herdado daquele tema (ex: não herda mais serie_mensal antigo).
                 if last_consulta:
-                    skip = frozenset({"cartao_nome_hint", "responsavel_nome_hint", "consulta_tipo"}) \
-                        if intent == "resumo" else frozenset()
+                    skip = frozenset({
+                        "cartao_nome_hint", "responsavel_nome_hint",
+                        "categoria_hint", "conta_nome_hint", "consulta_tipo",
+                    }) if intent == "resumo" else frozenset()
                     fields = _merge_context(fields, last_consulta, skip_keys=skip)
 
                 # Blindagem determinística: a IA às vezes copia serie_mensal=true do
