@@ -35,7 +35,7 @@ MENU_OPTIONS = (
     "O que deseja fazer?\n\n"
     "1️⃣  Registrar gasto\n"
     "2️⃣  Registrar entrada\n"
-    "3️⃣  📊 Relatórios\n"
+    "3️⃣  Relatórios\n"
     "4️⃣  Cadastrar cartão\n\n"
     "_Ou me conte diretamente, ex: \"gastei 50 no mercado no pix\"_"
 )
@@ -295,6 +295,25 @@ def _parse_date(text: str, today: date) -> tuple[bool, date | None]:
         except ValueError:
             pass
     return False, None
+
+
+def _parse_mes_ano(text: str, today: date) -> tuple[bool, int, int]:
+    """Interpreta mês/ano para relatórios. Retorna (ok, mes, ano)."""
+    t = text.strip().lower()
+    if t in ("0", "", "hoje", "atual"):
+        return True, today.month, today.year
+    m = re.match(r"^(\d{1,2})[/\-](\d{4})$", t)
+    if m:
+        mes, ano = int(m.group(1)), int(m.group(2))
+        if 1 <= mes <= 12:
+            return True, mes, ano
+        return False, 0, 0
+    m = re.match(r"^(\d{1,2})$", t)
+    if m:
+        mes = int(m.group(1))
+        if 1 <= mes <= 12:
+            return True, mes, today.year
+    return False, 0, 0
 
 
 def _billing_start(cartao, data_compra: date) -> date:
@@ -964,24 +983,27 @@ def _rel_gastos_cartoes(user) -> str:
     return "\n".join(lines)
 
 
-def _rel_gastos_cartao_especifico(user, cartao_id) -> str:
+def _rel_gastos_cartao_especifico(user, cartao_id, mes=None, ano=None) -> str:
+    from apps.gastos.views import _agg_sum, _agg_sum_signed
+
     hoje = date.today()
-    mes, ano = hoje.month, hoje.year
+    mes = mes or hoje.month
+    ano = ano or hoje.year
     mp = _meses_pt()
     cartao = Cartao.objects.filter(id=cartao_id, user=user).first()
     if not cartao:
         return "❌ Cartão não encontrado."
-    total = (
-        Gasto.objects.filter(user=user, cartao_id=cartao_id,
-                             data_compra__month=mes, data_compra__year=ano)
-        .aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+    qs = Gasto.objects.filter(
+        user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano,
     )
-    gastos = list(
-        Gasto.objects.filter(user=user, cartao_id=cartao_id,
-                             data_compra__month=mes, data_compra__year=ano)
-        .order_by("-data_compra")[:10]
-    )
-    lines = [f"💳 *{cartao.nome} — {mp[mes-1]}/{ano}*\n", f"Total: {_brl(total)}\n"]
+    total_valor_gasto = _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
+    total_valor_total = _agg_sum_signed(qs)
+    gastos = list(qs.order_by("-data_compra")[:10])
+    lines = [
+        f"💳 *{cartao.nome} — {mp[mes-1]}/{ano}*\n",
+        f"Valor Gasto: {_brl(total_valor_gasto)}",
+        f"Valor Total: {_brl(total_valor_total)}\n",
+    ]
     for g in gastos:
         lines.append(f"• {g.descricao}: {_brl(g.valor_total)}")
     if not gastos:
@@ -1017,9 +1039,10 @@ def _rel_saldo_conta_especifica(user, conta_id) -> str:
     )
 
 
-def _rel_gastos_responsavel(user) -> str:
+def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
     hoje = date.today()
-    mes, ano = hoje.month, hoje.year
+    mes = mes or hoje.month
+    ano = ano or hoje.year
     mp = _meses_pt()
     rows = (
         Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
@@ -1297,7 +1320,6 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             "1": lambda: _resumo(user),
             "2": lambda: _rel_gastos_cartoes(user),
             "4": lambda: _rel_saldos_contas(user),
-            "6": lambda: _rel_gastos_responsavel(user),
         }
 
         if text in actions:
@@ -1324,6 +1346,12 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             save_session(phone, session)
             return q
 
+        if text == "6":
+            session["rel_tipo"] = "responsavel_mes"
+            session["state"]    = "RELATORIO_MES"
+            save_session(phone, session)
+            return "📅 Qual mês? _(ex: 06/2026, 6, ou 0 para o mês atual)_"
+
         return RELATORIO_MENU_TEXT
 
     # ── RELATORIO_SUB ─────────────────────────────────────────────────────────
@@ -1341,8 +1369,11 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
                         cartao_id = c["id"]
                         break
             if cartao_id:
-                clear_session(phone)
-                return _rel_gastos_cartao_especifico(user, cartao_id) + f"\n\n{MENU_OPTIONS}"
+                session["rel_cartao_id"] = cartao_id
+                session["rel_tipo"]      = "cartao_mes"
+                session["state"]         = "RELATORIO_MES"
+                save_session(phone, session)
+                return "📅 Qual mês? _(ex: 06/2026, 6, ou 0 para o mês atual)_"
             return "❌ Digite o número do cartão listado."
 
         if rel_tipo == "conta":
@@ -1358,6 +1389,25 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
                 clear_session(phone)
                 return _rel_saldo_conta_especifica(user, conta_id) + f"\n\n{MENU_OPTIONS}"
             return "❌ Digite o número da conta listada."
+
+        clear_session(phone)
+        return MENU_OPTIONS
+
+    # ── RELATORIO_MES ─────────────────────────────────────────────────────────
+    if state == "RELATORIO_MES":
+        rel_tipo = session.get("rel_tipo")
+        ok, mes, ano = _parse_mes_ano(text, date.today())
+        if not ok:
+            return "❌ Mês inválido. Use MM/AAAA, só o mês (ex: 6) ou *0* para o mês atual."
+
+        if rel_tipo == "cartao_mes":
+            cartao_id = session.get("rel_cartao_id")
+            clear_session(phone)
+            return _rel_gastos_cartao_especifico(user, cartao_id, mes, ano) + f"\n\n{MENU_OPTIONS}"
+
+        if rel_tipo == "responsavel_mes":
+            clear_session(phone)
+            return _rel_gastos_responsavel(user, mes, ano) + f"\n\n{MENU_OPTIONS}"
 
         clear_session(phone)
         return MENU_OPTIONS
