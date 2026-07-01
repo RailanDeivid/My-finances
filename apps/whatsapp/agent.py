@@ -1124,6 +1124,7 @@ _CONTEXT_GROUPS = (
     ("mes_ano_hint", "serie_mensal", "mes_ano_fim_hint"),
     ("cartao_nome_hint", "responsavel_nome_hint", "categoria_hint", "conta_nome_hint", "consulta_tipo"),
     ("resumo_metrica",),
+    ("consulta_formato",),
 )
 
 
@@ -1288,6 +1289,27 @@ def _total_responsavel_mes(user, responsavel: dict, mes, ano):
     return _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
 
 
+_LISTA_GASTOS_LIMITE = 40
+
+
+def _itens_gastos_responsavel_mes(user, responsavel: dict, mes, ano) -> list:
+    """Lista (descrição, valor) de cada gasto lançado pro responsável naquele mês —
+    mesma regra de inclusão de _total_responsavel_mes (própria pessoa logada inclui
+    gastos atribuídos por outro login)."""
+    from apps.gastos.views import _impacto_q
+    if responsavel["usuario_vinculado_id"] == user.id:
+        qs = Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
+    else:
+        qs = Gasto.objects.filter(
+            user=user, responsavel_id=responsavel["id"], data_compra__month=mes, data_compra__year=ano,
+        )
+    return list(
+        qs.exclude(tipo_pagamento="ajuste_fatura")
+        .order_by("-data_compra")
+        .values("descricao", "valor_total")
+    )
+
+
 def _total_categoria_mes(user, categoria_id, mes, ano):
     from apps.gastos.views import _agg_sum
     return _agg_sum(
@@ -1436,6 +1458,39 @@ def _handle_consulta(user, fields: dict) -> str:
         if not responsavel:
             nomes = ", ".join(r["nome"] for r in resps) or "nenhum cadastrado"
             return f"❌ Não encontrei um responsável chamado \"{resp_hint}\".\nResponsáveis cadastrados: {nomes}\n\n{MENU_OPTIONS}"
+
+        formato = fields.get("consulta_formato") or "total"
+
+        if formato == "lista":
+            if serie_mensal:
+                meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)
+                blocos = [f"👤 *{responsavel['nome']} — mês a mês*"]
+                total_periodo = Decimal("0")
+                for m, a in meses:
+                    itens = _itens_gastos_responsavel_mes(user, responsavel, m, a)
+                    subtotal = sum((i["valor_total"] for i in itens), Decimal("0"))
+                    total_periodo += subtotal
+                    if itens:
+                        itens_txt = "\n".join(
+                            f"  • {i['descricao']}: {_brl(i['valor_total'])}" for i in itens[:_LISTA_GASTOS_LIMITE]
+                        )
+                    else:
+                        itens_txt = "  (nenhum gasto)"
+                    blocos.append(f"\n*{mp[m-1]}/{a}*\n{itens_txt}\n  Subtotal: {_brl(subtotal)}")
+                blocos.append(f"\n*Total do período: {_brl(total_periodo)}*")
+                return "\n".join(blocos) + f"\n\n{MENU_OPTIONS}"
+
+            itens = _itens_gastos_responsavel_mes(user, responsavel, mes, ano)
+            if not itens:
+                return f"👤 *{responsavel['nome']} — {mp[mes-1]}/{ano}*\n\nNenhum gasto neste mês.\n\n{MENU_OPTIONS}"
+            total = sum((i["valor_total"] for i in itens), Decimal("0"))
+            lines = [f"👤 *{responsavel['nome']} — {mp[mes-1]}/{ano}*\n"]
+            for i in itens[:_LISTA_GASTOS_LIMITE]:
+                lines.append(f"• {i['descricao']}: {_brl(i['valor_total'])}")
+            if len(itens) > _LISTA_GASTOS_LIMITE:
+                lines.append(f"\n_(mostrando os {_LISTA_GASTOS_LIMITE} mais recentes de {len(itens)})_")
+            lines.append(f"\n*Total: {_brl(total)}*")
+            return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
 
         if serie_mensal:
             meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)

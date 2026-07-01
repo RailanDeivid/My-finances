@@ -28,7 +28,8 @@ _USER = (
     '"consulta_tipo":"responsavel|cartao|categoria|conta|investimento","mes_ano_hint":str,'
     '"conta_nome_hint":str,'
     '"serie_mensal":bool,"mes_ano_fim_hint":str,'
-    '"resumo_metrica":"saldo|gastos|receitas|cartao|completo"}}\n\n'
+    '"resumo_metrica":"saldo|gastos|receitas|cartao|completo",'
+    '"consulta_formato":"total|lista"}}\n\n'
     "Regras:\n"
     "intent: gasto→gastei/comprei/paguei/desconto ou ajuste na fatura | entrada→recebi/salário | "
     "cartao→cadastrar cartão | resumo→pergunta sobre 'eu/minha/meu' saldo/gasto/receita, sem citar nome "
@@ -70,6 +71,10 @@ _USER = (
     "atual/quanto sobrou), 'gastos' (total gasto), 'receitas' (total recebido), 'cartao' (gastos totais "
     "nos cartões), ou 'completo' (saldo anterior + receitas + gastos + saldo atual + cartões, a visão "
     "inteira) se não especificar ou pedir 'resumo'/'extrato' geral\n"
+    "consulta_formato: só para consulta_tipo=responsavel — 'lista' se pede os ITENS/lançamentos "
+    "individuais (ex: 'quais são os gastos da Ana', 'lista de gastos do Pablo', 'quais gastos foram "
+    "lançados pra Daniela', 'me mostra os gastos dela', 'detalha os gastos'), 'total' se pergunta só o "
+    "valor total (ex: 'quanto a Ana gastou', 'qual o total') — 'total' se não especificar\n"
     "null em campos não mencionados"
 )
 
