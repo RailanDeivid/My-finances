@@ -18,6 +18,10 @@ TIPOS = {
     "ERROS_500":      ("🔥", "#e67e22", "Erros 500 em Sequência"),
     "TUNNEL_FORA":    ("🌐", "#c0392b", "Tunnel Cloudflare Fora"),
     "BRUTE_FORCE":    ("🛡️", "#8e44ad", "Possível Ataque Brute Force"),
+    "WA_WEBHOOK_ERRO": ("🤖", "#e74c3c", "Erro no Agente WhatsApp"),
+    "WA_LLM_ERRO":      ("🧠", "#e67e22", "Erro na IA (OpenAI)"),
+    "WA_LLM_CREDITO":   ("💳", "#c0392b", "Possível Falta de Crédito OpenAI"),
+    "WA_SEND_ERRO":     ("📵", "#e67e22", "Falha ao Enviar Mensagem WhatsApp"),
 }
 
 

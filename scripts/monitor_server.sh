@@ -61,9 +61,9 @@ docker_stats=$(docker stats --no-stream --format "{{.Name}}|{{.CPUPerc}}|{{.MemU
 
 # ── NGINX LOGS (últimas 24h) ─────────────────────────────────────
 nginx_logs=$(docker logs --since 24h my-finances-nginx 2>&1)
-nginx_500=$(echo "$nginx_logs" | grep -c '" 5' 2>/dev/null || echo 0)
-nginx_404=$(echo "$nginx_logs" | grep -c '" 404' 2>/dev/null || echo 0)
-nginx_401=$(echo "$nginx_logs" | grep -c '" 401\|" 403' 2>/dev/null || echo 0)
+nginx_500=$(echo "$nginx_logs" | grep -c '" 5' 2>/dev/null || true)
+nginx_404=$(echo "$nginx_logs" | grep -c '" 404' 2>/dev/null || true)
+nginx_401=$(echo "$nginx_logs" | grep -c '" 401\|" 403' 2>/dev/null || true)
 top_ips=$(echo "$nginx_logs" | awk '/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ - / {print $1}' | sort | uniq -c | sort -rn | head -5 | awk '{print $2"|"$1}')
 
 # ── BANCO DE DADOS ───────────────────────────────────────────────
@@ -74,8 +74,18 @@ if [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_DB" ]; then
     db_connections=$( $psql_cmd "SELECT count(*) FROM pg_stat_activity WHERE state='active';" 2>/dev/null | tr -d ' \n')
     user_count=$(     $psql_cmd "SELECT count(*) FROM auth_user;" 2>/dev/null | tr -d ' \n')
     db_tables=$(      $psql_cmd "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | tr -d ' \n')
+
+    # ── AGENTE WHATSAPP — USO E CUSTO DA IA (whatsapp_llmusage) ───
+    llm_cost_total=$( $psql_cmd "SELECT COALESCE(SUM(cost_usd),0)::text FROM whatsapp_llmusage;" 2>/dev/null | tr -d ' \n')
+    llm_calls_total=$($psql_cmd "SELECT COUNT(*) FROM whatsapp_llmusage;" 2>/dev/null | tr -d ' \n')
+    llm_cost_mes=$(    $psql_cmd "SELECT COALESCE(SUM(cost_usd),0)::text FROM whatsapp_llmusage WHERE date_trunc('month', timestamp) = date_trunc('month', now());" 2>/dev/null | tr -d ' \n')
+    llm_calls_mes=$(   $psql_cmd "SELECT COUNT(*) FROM whatsapp_llmusage WHERE date_trunc('month', timestamp) = date_trunc('month', now());" 2>/dev/null | tr -d ' \n')
+    llm_cost_mes_ant=$($psql_cmd "SELECT COALESCE(SUM(cost_usd),0)::text FROM whatsapp_llmusage WHERE date_trunc('month', timestamp) = date_trunc('month', now() - interval '1 month');" 2>/dev/null | tr -d ' \n')
+    wa_users_ativos=$( $psql_cmd "SELECT COUNT(*) FROM whatsapp_whatsappaccess WHERE ativo = true;" 2>/dev/null | tr -d ' \n')
 else
     db_size="N/A"; db_connections="N/A"; user_count="N/A"; db_tables="N/A"
+    llm_cost_total="N/A"; llm_calls_total="N/A"; llm_cost_mes="N/A"; llm_calls_mes="N/A"
+    llm_cost_mes_ant="N/A"; wa_users_ativos="N/A"
 fi
 
 # ── SAÍDA ────────────────────────────────────────────────────────
@@ -105,6 +115,12 @@ echo "DB_SIZE=$db_size"
 echo "DB_CONNECTIONS=$db_connections"
 echo "USER_COUNT=$user_count"
 echo "DB_TABLES=$db_tables"
+echo "LLM_COST_TOTAL=$llm_cost_total"
+echo "LLM_CALLS_TOTAL=$llm_calls_total"
+echo "LLM_COST_MES=$llm_cost_mes"
+echo "LLM_CALLS_MES=$llm_calls_mes"
+echo "LLM_COST_MES_ANT=$llm_cost_mes_ant"
+echo "WA_USERS_ATIVOS=$wa_users_ativos"
 echo "CONTAINERS_RUNNING<<EOF"
 echo "$containers"
 echo "EOF"

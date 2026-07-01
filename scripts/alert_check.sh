@@ -56,7 +56,7 @@ if [ "$tunnel_status" != "running" ]; then
 fi
 
 # ── ERROS 500 (últimos 5 min) ────────────────────────────────────
-errors_500=$(docker logs --since 5m my-finances-nginx 2>&1 | grep -c '" 5' 2>/dev/null || echo 0)
+errors_500=$(docker logs --since 5m my-finances-nginx 2>&1 | grep -c '" 5' 2>/dev/null || true)
 if [ "${errors_500:-0}" -ge 5 ]; then
     check_cooldown "erros_500" && \
         echo "ERROS_500|${errors_500} erros HTTP 5xx nos últimos 5 minutos"
@@ -70,4 +70,31 @@ fail_ip=$(echo "$top_fail" | awk '{print $2}')
 if [ "${fail_count:-0}" -ge 10 ] && [ -n "$fail_ip" ]; then
     check_cooldown "brute_${fail_ip}" && \
         echo "BRUTE_FORCE|${fail_count} tentativas do IP ${fail_ip} em 5 minutos"
+fi
+
+# ── AGENTE WHATSAPP — ERROS (últimos 5 min) ──────────────────────
+wa_logs=$(docker logs --since 5m my-finances-web 2>&1)
+
+wa_webhook_errors=$(echo "$wa_logs" | grep -c "Webhook error phone=" 2>/dev/null || true)
+if [ "${wa_webhook_errors:-0}" -ge 3 ]; then
+    check_cooldown "wa_webhook_erro" && \
+        echo "WA_WEBHOOK_ERRO|${wa_webhook_errors} erros no webhook do agente WhatsApp nos últimos 5 minutos"
+fi
+
+wa_llm_errors=$(echo "$wa_logs" | grep -c "LLM error:" 2>/dev/null || true)
+if [ "${wa_llm_errors:-0}" -ge 3 ]; then
+    check_cooldown "wa_llm_erro" && \
+        echo "WA_LLM_ERRO|${wa_llm_errors} erros na chamada da IA (OpenAI) nos últimos 5 minutos"
+fi
+
+wa_llm_credito=$(echo "$wa_logs" | grep -Eic "insufficient_quota|exceeded your current quota|invalid_api_key|AuthenticationError|RateLimitError" 2>/dev/null || true)
+if [ "${wa_llm_credito:-0}" -ge 1 ]; then
+    check_cooldown "wa_llm_credito" && \
+        echo "WA_LLM_CREDITO|Possível falta de crédito ou chave inválida da OpenAI detectada nos logs"
+fi
+
+wa_send_errors=$(echo "$wa_logs" | grep -c "Evolution API send error" 2>/dev/null || true)
+if [ "${wa_send_errors:-0}" -ge 3 ]; then
+    check_cooldown "wa_send_erro" && \
+        echo "WA_SEND_ERRO|${wa_send_errors} falhas ao enviar mensagem pelo WhatsApp (Evolution API) nos últimos 5 minutos"
 fi

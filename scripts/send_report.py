@@ -176,6 +176,38 @@ def section(title: str, content: str) -> str:
   </td></tr>"""
 
 
+def _usd(value_str: str) -> str:
+    try:
+        v = float(value_str)
+    except (ValueError, TypeError):
+        return "N/A"
+    return f"US$ {v:.2f}" if v >= 1 else f"US$ {v:.4f}"
+
+
+def build_whatsapp_section(d: dict) -> str:
+    cost_total   = d.get("LLM_COST_TOTAL", "N/A")
+    cost_mes     = d.get("LLM_COST_MES", "N/A")
+    cost_mes_ant = d.get("LLM_COST_MES_ANT", "N/A")
+    calls_total  = d.get("LLM_CALLS_TOTAL", "N/A")
+    calls_mes    = d.get("LLM_CALLS_MES", "N/A")
+    users_ativos = d.get("WA_USERS_ATIVOS", "N/A")
+
+    content = f"""
+      <table width="100%" style="border-spacing:8px;"><tr>
+        {stat_box("Custo do mês",       _usd(cost_mes),     "#e67e22", f"{calls_mes} chamadas")}
+        <td width="2%"></td>
+        {stat_box("Custo mês anterior", _usd(cost_mes_ant),  "#888")}
+        <td width="2%"></td>
+        {stat_box("Custo acumulado",    _usd(cost_total),    "#333",   f"{calls_total} chamadas no total")}
+        <td width="2%"></td>
+        {stat_box("Números ativos",     str(users_ativos),   "#333")}
+      </tr></table>
+      <div style="margin-top:10px;font-size:11px;color:#888;">
+        Custo calculado a partir do uso real de tokens (OpenAI), registrado em cada chamada do agente.
+      </div>"""
+    return section("🤖 Agente WhatsApp — Uso e Custo da IA", content)
+
+
 def build_oci_section(d: dict = None) -> str:
     if d is None:
         d = {}
@@ -364,6 +396,7 @@ def build_html(d: dict) -> str:
 
     # ── Oracle Cloud ─────────────────────────────────────────────
     oci_section = build_oci_section(d)
+    whatsapp_section = build_whatsapp_section(d)
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -393,6 +426,7 @@ def build_html(d: dict) -> str:
   {section("📈 Containers — Uso de Recursos", stats_content)}
   {section("🗄️ Banco de Dados (PostgreSQL)", db_content)}
   {section("🛡️ Segurança (últimas 24h)", sec_content)}
+  {whatsapp_section}
   {oci_section}
 
   <tr><td style="padding:24px 32px;border-top:1px solid #f0f0f0;margin-top:20px;">
