@@ -983,6 +983,8 @@ def _resumo(user) -> str:
 
 
 def _rel_gastos_cartoes(user) -> str:
+    from django.db.models import Case, DecimalField, F, When
+
     hoje = date.today()
     mes, ano = hoje.month, hoje.year
     mp = _meses_pt()
@@ -991,9 +993,12 @@ def _rel_gastos_cartoes(user) -> str:
             user=user, data_compra__month=mes, data_compra__year=ano,
             cartao__isnull=False,
         )
-        .exclude(tipo_pagamento="ajuste_fatura")
         .values("cartao__nome")
-        .annotate(total=Sum("valor_total"))
+        .annotate(total=Sum(Case(
+            When(tipo_pagamento="ajuste_fatura", ajuste_tipo="desconto", then=-F("valor_total")),
+            default=F("valor_total"),
+            output_field=DecimalField(),
+        )))
         .order_by("-total")
     )
     if not rows:
@@ -1005,7 +1010,7 @@ def _rel_gastos_cartoes(user) -> str:
 
 
 def _rel_gastos_cartao_especifico(user, cartao_id, mes=None, ano=None) -> str:
-    from apps.gastos.views import _agg_sum
+    from apps.gastos.views import _agg_sum, _agg_sum_signed
 
     hoje = date.today()
     mes = mes or hoje.month
@@ -1016,12 +1021,14 @@ def _rel_gastos_cartao_especifico(user, cartao_id, mes=None, ano=None) -> str:
         return "❌ Cartão não encontrado."
     qs = Gasto.objects.filter(
         user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano,
-    ).exclude(tipo_pagamento="ajuste_fatura")
-    total_valor_gasto = _agg_sum(qs)
+    )
+    total_valor_gasto = _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
+    total_valor_total = _agg_sum_signed(qs)
     gastos = list(qs.order_by("-data_compra")[:10])
     lines = [
         f"💳 *{cartao.nome} — {mp[mes-1]}/{ano}*\n",
-        f"Valor Gasto: {_brl(total_valor_gasto)}\n",
+        f"Valor Gasto: {_brl(total_valor_gasto)}",
+        f"Valor Total: {_brl(total_valor_total)}\n",
     ]
     for g in gastos:
         lines.append(f"• {g.descricao}: {_brl(g.valor_total)}")
@@ -1075,14 +1082,16 @@ def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
     )
     meu_nome = (user.first_name or user.username).strip() or "Você"
 
-    # Demais responsáveis (dependentes sem vínculo a nenhum login) sempre são
-    # lançados neste próprio login, então Gasto.user=user já é suficiente aqui.
+    # Demais responsáveis: qualquer um que não seja vinculado a ESTE login — inclui
+    # tanto dependentes sem login próprio (usuario_vinculado nulo) quanto parceiros
+    # com login próprio vinculado a ELES MESMOS (não a "user"). Sempre lançados
+    # neste login, então Gasto.user=user já é suficiente para achá-los.
     outros = (
         Gasto.objects.filter(
             user=user, data_compra__month=mes, data_compra__year=ano,
-            responsavel__usuario_vinculado__isnull=True,
         )
         .exclude(tipo_pagamento="ajuste_fatura")
+        .exclude(responsavel__usuario_vinculado=user)
         .values("responsavel__nome")
         .annotate(total=Sum("valor_total"))
     )
@@ -1119,7 +1128,7 @@ def _handle_consulta(user, fields: dict) -> str:
         return _resumo(user) + f"\n\n{MENU_OPTIONS}"
 
     if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
-        from apps.gastos.views import _agg_sum
+        from apps.gastos.views import _agg_sum_signed
 
         if not cartao_hint:
             return f"❌ Não entendi qual cartão você quer consultar.\n\n{MENU_OPTIONS}"
@@ -1134,13 +1143,12 @@ def _handle_consulta(user, fields: dict) -> str:
             nomes = ", ".join(c["nome"] for c in cartoes) or "nenhum cadastrado"
             return f"❌ Não encontrei um cartão chamado \"{cartao_hint}\".\nCartões cadastrados: {nomes}\n\n{MENU_OPTIONS}"
         mp = _meses_pt()
-        total = _agg_sum(
+        total = _agg_sum_signed(
             Gasto.objects.filter(user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano)
-            .exclude(tipo_pagamento="ajuste_fatura")
         )
         return (
             f"💳 *{cartao_nome} — {mp[mes-1]}/{ano}*\n\n"
-            f"Valor Gasto: {_brl(total)}\n\n{MENU_OPTIONS}"
+            f"Valor Total: {_brl(total)}\n\n{MENU_OPTIONS}"
         )
 
     if consulta_tipo == "responsavel" or resp_hint:
