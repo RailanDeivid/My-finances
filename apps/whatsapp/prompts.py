@@ -25,13 +25,16 @@ _USER = (
     '"categoria_hint":str,"data_compra_hint":str,'
     '"recorrente_flag":bool,"ajuste_tipo_hint":"desconto|adicao",'
     '"cartao_adicional_hint":bool,'
-    '"consulta_tipo":"responsavel|cartao","mes_ano_hint":str}}\n\n'
+    '"consulta_tipo":"responsavel|cartao","mes_ano_hint":str,'
+    '"serie_mensal":bool,"mes_ano_fim_hint":str}}\n\n'
     "Regras:\n"
     "intent: gasto→gastei/comprei/paguei/desconto ou ajuste na fatura | entrada→recebi/salário | "
     "cartao→cadastrar cartão | resumo→pergunta sobre 'eu/minha/meu' saldo ou quanto EU gastei, sem "
     "citar nome de pessoa nem de cartão | consulta→pergunta que cita o NOME de uma pessoa específica "
     "(ex: 'quanto a Ana gastou em julho') OU o nome de um CARTÃO específico (ex: 'total do cartão "
-    "nubank em junho') — se não houver nome citado, é sempre resumo, nunca consulta\n"
+    "nubank em junho', 'gasto mês a mês do cartão X') — se não houver nome citado, é sempre resumo, "
+    "nunca consulta. REGRA CRÍTICA: se cartao_nome_hint OU responsavel_nome_hint for preenchido, o "
+    "intent OBRIGATORIAMENTE é 'consulta', nunca 'resumo'\n"
     "IMPORTANTE: intent só pode ser gasto|entrada|cartao|resumo|consulta|menu|desconhecido — 'ajuste_fatura' "
     "NUNCA é um intent, é sempre um valor de tipo_pagamento dentro de intent='gasto'\n"
     "pgto: pix→pix/transf/ted | avista→à vista/no crédito | parcelado→Nx/parcelado | debito→débito/no débito | "
@@ -50,7 +53,11 @@ _USER = (
     "consulta_tipo: só para intent=consulta — 'responsavel' se pergunta é sobre uma pessoa, "
     "'cartao' se é sobre um cartão\n"
     "mes_ano_hint: só para intent=consulta — mês perguntado como string ('julho', 'esse mês', "
-    "'06/2026', 'mês passado') ou null (assume mês atual)\n"
+    "'06/2026', 'mês passado'); se serie_mensal=true, é o mês INICIAL do período; null = mês atual\n"
+    "serie_mensal: true se a pergunta pede quebra mês a mês / mensal / mês por mês / evolução "
+    "('mês a mês', 'todo mês', 'mês por mês', 'de X até Y'), senão null\n"
+    "mes_ano_fim_hint: só quando serie_mensal=true — mês FINAL do período citado ('até dez/2026', "
+    "'até dezembro') como string, ou null se não citado (assume 12 meses a partir do mês inicial)\n"
     "null em campos não mencionados"
 )
 

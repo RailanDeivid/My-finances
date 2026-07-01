@@ -1108,9 +1108,43 @@ def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
     return "\n".join(lines)
 
 
+_SERIE_MENSAL_LIMITE = 24
+
+
+def _meses_intervalo(mes_ini: int, ano_ini: int, mes_fim: int, ano_fim: int) -> list[tuple[int, int]]:
+    d = date(ano_ini, mes_ini, 1)
+    fim = date(ano_fim, mes_fim, 1)
+    if fim < d:
+        d, fim = fim, d
+    meses = []
+    while d <= fim and len(meses) < _SERIE_MENSAL_LIMITE:
+        meses.append((d.month, d.year))
+        d += relativedelta(months=1)
+    return meses
+
+
+def _total_cartao_mes(user, cartao_id, mes, ano):
+    from apps.gastos.views import _agg_sum_signed
+    return _agg_sum_signed(
+        Gasto.objects.filter(user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano)
+    )
+
+
+def _total_responsavel_mes(user, responsavel: dict, mes, ano):
+    from apps.gastos.views import _agg_sum, _impacto_q
+    if responsavel["usuario_vinculado_id"] == user.id:
+        # É a própria pessoa logada: inclui gastos que outros logins atribuíram a ela também.
+        qs = Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
+    else:
+        qs = Gasto.objects.filter(
+            user=user, responsavel_id=responsavel["id"], data_compra__month=mes, data_compra__year=ano,
+        )
+    return _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
+
+
 def _handle_consulta(user, fields: dict) -> str:
-    """Responde perguntas livres do tipo 'quanto a Ana gastou em julho?' ou
-    'total do cartão nubank em junho?' extraídas pelo LLM."""
+    """Responde perguntas livres do tipo 'quanto a Ana gastou em julho?',
+    'total do cartão nubank em junho?' ou 'gastos do pablo mês a mês até dez/2026'."""
     today = date.today()
     mes, ano = today.month, today.year
     mes_ano_hint = fields.get("mes_ano_hint")
@@ -1118,6 +1152,18 @@ def _handle_consulta(user, fields: dict) -> str:
         ok, mes_p, ano_p = _parse_mes_ano(str(mes_ano_hint), today)
         if ok:
             mes, ano = mes_p, ano_p
+
+    serie_mensal = bool(fields.get("serie_mensal"))
+    mes_fim, ano_fim = mes, ano
+    if serie_mensal:
+        mes_fim_hint = fields.get("mes_ano_fim_hint")
+        if mes_fim_hint:
+            ok, mp_, ap_ = _parse_mes_ano(str(mes_fim_hint), today)
+            if ok:
+                mes_fim, ano_fim = mp_, ap_
+        else:
+            fim_padrao = date(ano, mes, 1) + relativedelta(months=11)
+            mes_fim, ano_fim = fim_padrao.month, fim_padrao.year
 
     consulta_tipo = fields.get("consulta_tipo")
     cartao_hint = fields.get("cartao_nome_hint")
@@ -1127,9 +1173,9 @@ def _handle_consulta(user, fields: dict) -> str:
     if not cartao_hint and not resp_hint:
         return _resumo(user) + f"\n\n{MENU_OPTIONS}"
 
-    if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
-        from apps.gastos.views import _agg_sum_signed
+    mp = _meses_pt()
 
+    if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
         if not cartao_hint:
             return f"❌ Não entendi qual cartão você quer consultar.\n\n{MENU_OPTIONS}"
         cartoes = list(Cartao.objects.filter(user=user, ativo=True).values("id", "nome"))
@@ -1142,18 +1188,25 @@ def _handle_consulta(user, fields: dict) -> str:
         if not cartao_id:
             nomes = ", ".join(c["nome"] for c in cartoes) or "nenhum cadastrado"
             return f"❌ Não encontrei um cartão chamado \"{cartao_hint}\".\nCartões cadastrados: {nomes}\n\n{MENU_OPTIONS}"
-        mp = _meses_pt()
-        total = _agg_sum_signed(
-            Gasto.objects.filter(user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano)
-        )
+
+        if serie_mensal:
+            meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)
+            lines = [f"💳 *{cartao_nome} — mês a mês*\n"]
+            total_periodo = Decimal("0")
+            for m, a in meses:
+                t = _total_cartao_mes(user, cartao_id, m, a)
+                total_periodo += t
+                lines.append(f"• {mp[m-1]}/{a}: {_brl(t)}")
+            lines.append(f"\n*Total do período: {_brl(total_periodo)}*")
+            return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
+
+        total = _total_cartao_mes(user, cartao_id, mes, ano)
         return (
             f"💳 *{cartao_nome} — {mp[mes-1]}/{ano}*\n\n"
             f"Valor Total: {_brl(total)}\n\n{MENU_OPTIONS}"
         )
 
     if consulta_tipo == "responsavel" or resp_hint:
-        from apps.gastos.views import _agg_sum, _impacto_q
-
         if not resp_hint:
             return f"❌ Não entendi de quem você quer consultar o gasto.\n\n{MENU_OPTIONS}"
         resps = list(Responsavel.objects.filter(user=user, ativo=True).values("id", "nome", "usuario_vinculado_id"))
@@ -1166,20 +1219,19 @@ def _handle_consulta(user, fields: dict) -> str:
         if not responsavel:
             nomes = ", ".join(r["nome"] for r in resps) or "nenhum cadastrado"
             return f"❌ Não encontrei um responsável chamado \"{resp_hint}\".\nResponsáveis cadastrados: {nomes}\n\n{MENU_OPTIONS}"
-        mp = _meses_pt()
-        if responsavel["usuario_vinculado_id"] == user.id:
-            # É a própria pessoa logada: inclui gastos que outros logins atribuíram a ela também.
-            total = _agg_sum(
-                Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
-                .exclude(tipo_pagamento="ajuste_fatura")
-            )
-        else:
-            total = _agg_sum(
-                Gasto.objects.filter(
-                    user=user, responsavel_id=responsavel["id"],
-                    data_compra__month=mes, data_compra__year=ano,
-                ).exclude(tipo_pagamento="ajuste_fatura")
-            )
+
+        if serie_mensal:
+            meses = _meses_intervalo(mes, ano, mes_fim, ano_fim)
+            lines = [f"👤 *{responsavel['nome']} — mês a mês*\n"]
+            total_periodo = Decimal("0")
+            for m, a in meses:
+                t = _total_responsavel_mes(user, responsavel, m, a)
+                total_periodo += t
+                lines.append(f"• {mp[m-1]}/{a}: {_brl(t)}")
+            lines.append(f"\n*Total do período: {_brl(total_periodo)}*")
+            return "\n".join(lines) + f"\n\n{MENU_OPTIONS}"
+
+        total = _total_responsavel_mes(user, responsavel, mes, ano)
         return (
             f"👤 *{responsavel['nome']} — {mp[mes-1]}/{ano}*\n\n"
             f"Total de gastos: {_brl(total)}\n\n{MENU_OPTIONS}"
@@ -1391,6 +1443,13 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             if intent in TIPO_PAG_MAP.values():
                 result.setdefault("fields", {})["tipo_pagamento"] = intent
                 intent = "gasto"
+
+            # Salvaguarda: se extraiu nome de cartão/responsável mas classificou
+            # como "resumo" (que é só para o próprio usuário, sem nome), é consulta.
+            if intent == "resumo":
+                _f = result.get("fields", {}) or {}
+                if _f.get("cartao_nome_hint") or _f.get("responsavel_nome_hint"):
+                    intent = "consulta"
 
             if intent == "resumo":
                 clear_session(phone)
