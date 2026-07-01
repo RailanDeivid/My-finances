@@ -297,11 +297,22 @@ def _parse_date(text: str, today: date) -> tuple[bool, date | None]:
     return False, None
 
 
+_MES_NOME_TO_NUM = {
+    alias.lower(): int(num)
+    for num, aliases in _catalog.get("datas", {}).get("meses", {}).items()
+    for alias in aliases
+}
+
+
 def _parse_mes_ano(text: str, today: date) -> tuple[bool, int, int]:
-    """Interpreta mês/ano para relatórios. Retorna (ok, mes, ano)."""
+    """Interpreta mês/ano para relatórios e consultas. Retorna (ok, mes, ano)."""
     t = text.strip().lower()
-    if t in ("0", "", "hoje", "atual"):
+    if t in ("0", "", "hoje", "agora", "atual", "esse mes", "esse mês",
+              "este mes", "este mês", "mes atual", "mês atual"):
         return True, today.month, today.year
+    if t in ("mes passado", "mês passado", "mes anterior", "mês anterior"):
+        d = today.replace(day=1) - relativedelta(days=1)
+        return True, d.month, d.year
     m = re.match(r"^(\d{1,2})[/\-](\d{4})$", t)
     if m:
         mes, ano = int(m.group(1)), int(m.group(2))
@@ -313,6 +324,15 @@ def _parse_mes_ano(text: str, today: date) -> tuple[bool, int, int]:
         mes = int(m.group(1))
         if 1 <= mes <= 12:
             return True, mes, today.year
+    # nome do mês: "julho", "julho 2026", "julho de 2026", "julho/2026"
+    parts = [p for p in t.replace("/", " ").replace("-", " ").split() if p != "de"]
+    if parts and parts[0] in _MES_NOME_TO_NUM:
+        mes = _MES_NOME_TO_NUM[parts[0]]
+        ano = today.year
+        for p in parts[1:]:
+            if p.isdigit() and len(p) == 4:
+                ano = int(p)
+        return True, mes, ano
     return False, 0, 0
 
 
@@ -1058,6 +1078,77 @@ def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
     return "\n".join(lines)
 
 
+def _handle_consulta(user, fields: dict) -> str:
+    """Responde perguntas livres do tipo 'quanto a Ana gastou em julho?' ou
+    'total do cartão nubank em junho?' extraídas pelo LLM."""
+    today = date.today()
+    mes, ano = today.month, today.year
+    mes_ano_hint = fields.get("mes_ano_hint")
+    if mes_ano_hint:
+        ok, mes_p, ano_p = _parse_mes_ano(str(mes_ano_hint), today)
+        if ok:
+            mes, ano = mes_p, ano_p
+
+    consulta_tipo = fields.get("consulta_tipo")
+    cartao_hint = fields.get("cartao_nome_hint")
+    resp_hint   = fields.get("responsavel_nome_hint")
+
+    # Sem nome de pessoa nem de cartão → é o resumo do próprio usuário, não uma consulta.
+    if not cartao_hint and not resp_hint:
+        return _resumo(user) + f"\n\n{MENU_OPTIONS}"
+
+    if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
+        from apps.gastos.views import _agg_sum_signed
+
+        if not cartao_hint:
+            return f"❌ Não entendi qual cartão você quer consultar.\n\n{MENU_OPTIONS}"
+        cartoes = list(Cartao.objects.filter(user=user, ativo=True).values("id", "nome"))
+        hint_low = cartao_hint.lower()
+        cartao_id = cartao_nome = None
+        for c in cartoes:
+            if hint_low in c["nome"].lower() or c["nome"].lower() in hint_low:
+                cartao_id, cartao_nome = c["id"], c["nome"]
+                break
+        if not cartao_id:
+            nomes = ", ".join(c["nome"] for c in cartoes) or "nenhum cadastrado"
+            return f"❌ Não encontrei um cartão chamado \"{cartao_hint}\".\nCartões cadastrados: {nomes}\n\n{MENU_OPTIONS}"
+        mp = _meses_pt()
+        total = _agg_sum_signed(
+            Gasto.objects.filter(user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano)
+        )
+        return (
+            f"💳 *{cartao_nome} — {mp[mes-1]}/{ano}*\n\n"
+            f"Valor Total: {_brl(total)}\n\n{MENU_OPTIONS}"
+        )
+
+    if consulta_tipo == "responsavel" or resp_hint:
+        if not resp_hint:
+            return f"❌ Não entendi de quem você quer consultar o gasto.\n\n{MENU_OPTIONS}"
+        resps = list(Responsavel.objects.filter(user=user, ativo=True).values("id", "nome"))
+        hint_low = resp_hint.lower()
+        responsavel_id = responsavel_nome = None
+        for r in resps:
+            if hint_low in r["nome"].lower() or r["nome"].lower() in hint_low:
+                responsavel_id, responsavel_nome = r["id"], r["nome"]
+                break
+        if not responsavel_id:
+            nomes = ", ".join(r["nome"] for r in resps) or "nenhum cadastrado"
+            return f"❌ Não encontrei um responsável chamado \"{resp_hint}\".\nResponsáveis cadastrados: {nomes}\n\n{MENU_OPTIONS}"
+        mp = _meses_pt()
+        total = (
+            Gasto.objects.filter(
+                user=user, responsavel_id=responsavel_id,
+                data_compra__month=mes, data_compra__year=ano,
+            ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+        )
+        return (
+            f"👤 *{responsavel_nome} — {mp[mes-1]}/{ano}*\n\n"
+            f"Total de gastos: {_brl(total)}\n\n{MENU_OPTIONS}"
+        )
+
+    return f"❌ Não entendi a pergunta. Tenta reformular, ex: \"quanto a Ana gastou em julho?\"\n\n{MENU_OPTIONS}"
+
+
 def _question_rel_cartao(user, session: dict) -> str | None:
     cartoes = list(Cartao.objects.filter(user=user, ativo=True).values("id", "nome"))
     if not cartoes:
@@ -1268,6 +1359,9 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             if intent == "menu":
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
+            if intent == "consulta":
+                clear_session(phone)
+                return _handle_consulta(user, result.get("fields", {}) or {})
             if intent not in ("gasto", "entrada", "cartao"):
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
