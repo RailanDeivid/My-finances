@@ -969,7 +969,7 @@ def _resumo(user) -> str:
     ).exclude(tipo="saldo_anterior").aggregate(t=Sum("valor"))["t"] or Decimal("0")
     total_gas = Gasto.objects.filter(
         user=user, data_compra__month=mes, data_compra__year=ano,
-    ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
+    ).exclude(tipo_pagamento="ajuste_fatura").aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
     saldo = total_ent - total_gas
     saldo_icon = "📈" if saldo >= 0 else "📉"
     saldo_color = "+" if saldo >= 0 else ""
@@ -989,8 +989,9 @@ def _rel_gastos_cartoes(user) -> str:
     rows = (
         Gasto.objects.filter(
             user=user, data_compra__month=mes, data_compra__year=ano,
-            tipo_pagamento__in=["credito_avista", "credito_parcelado"],
+            cartao__isnull=False,
         )
+        .exclude(tipo_pagamento="ajuste_fatura")
         .values("cartao__nome")
         .annotate(total=Sum("valor_total"))
         .order_by("-total")
@@ -1004,7 +1005,7 @@ def _rel_gastos_cartoes(user) -> str:
 
 
 def _rel_gastos_cartao_especifico(user, cartao_id, mes=None, ano=None) -> str:
-    from apps.gastos.views import _agg_sum, _agg_sum_signed
+    from apps.gastos.views import _agg_sum
 
     hoje = date.today()
     mes = mes or hoje.month
@@ -1015,14 +1016,12 @@ def _rel_gastos_cartao_especifico(user, cartao_id, mes=None, ano=None) -> str:
         return "❌ Cartão não encontrado."
     qs = Gasto.objects.filter(
         user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano,
-    )
-    total_valor_gasto = _agg_sum(qs.exclude(tipo_pagamento="ajuste_fatura"))
-    total_valor_total = _agg_sum_signed(qs)
+    ).exclude(tipo_pagamento="ajuste_fatura")
+    total_valor_gasto = _agg_sum(qs)
     gastos = list(qs.order_by("-data_compra")[:10])
     lines = [
         f"💳 *{cartao.nome} — {mp[mes-1]}/{ano}*\n",
-        f"Valor Gasto: {_brl(total_valor_gasto)}",
-        f"Valor Total: {_brl(total_valor_total)}\n",
+        f"Valor Gasto: {_brl(total_valor_gasto)}\n",
     ]
     for g in gastos:
         lines.append(f"• {g.descricao}: {_brl(g.valor_total)}")
@@ -1060,21 +1059,43 @@ def _rel_saldo_conta_especifica(user, conta_id) -> str:
 
 
 def _rel_gastos_responsavel(user, mes=None, ano=None) -> str:
+    from apps.gastos.views import _agg_sum, _impacto_q
+
     hoje = date.today()
     mes = mes or hoje.month
     ano = ano or hoje.year
     mp = _meses_pt()
-    rows = (
-        Gasto.objects.filter(user=user, data_compra__month=mes, data_compra__year=ano)
+
+    # Minha linha: próprios gastos + o que outros logins me atribuíram na divisão
+    # (mesmo critério do "Total Gasto" do dashboard do site — não é só Gasto.user=user).
+    # Ajuste de fatura nunca entra em soma de gasto por responsável.
+    meu_total = _agg_sum(
+        Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
+        .exclude(tipo_pagamento="ajuste_fatura")
+    )
+    meu_nome = (user.first_name or user.username).strip() or "Você"
+
+    # Demais responsáveis (dependentes sem vínculo a nenhum login) sempre são
+    # lançados neste próprio login, então Gasto.user=user já é suficiente aqui.
+    outros = (
+        Gasto.objects.filter(
+            user=user, data_compra__month=mes, data_compra__year=ano,
+            responsavel__usuario_vinculado__isnull=True,
+        )
+        .exclude(tipo_pagamento="ajuste_fatura")
         .values("responsavel__nome")
         .annotate(total=Sum("valor_total"))
-        .order_by("-total")
     )
-    if not rows:
+
+    linhas = [(meu_nome, meu_total)] if meu_total else []
+    linhas += [(r["responsavel__nome"] or "Sem responsável", r["total"]) for r in outros]
+    linhas.sort(key=lambda x: -x[1])
+
+    if not linhas:
         return f"👤 *Gastos por Responsável — {mp[mes-1]}/{ano}*\n\nNenhum gasto neste mês."
     lines = [f"👤 *Gastos por Responsável — {mp[mes-1]}/{ano}*\n"]
-    for r in rows:
-        lines.append(f"• {r['responsavel__nome'] or 'Sem responsável'}: {_brl(r['total'])}")
+    for nome, total in linhas:
+        lines.append(f"• {nome}: {_brl(total)}")
     return "\n".join(lines)
 
 
@@ -1098,7 +1119,7 @@ def _handle_consulta(user, fields: dict) -> str:
         return _resumo(user) + f"\n\n{MENU_OPTIONS}"
 
     if consulta_tipo == "cartao" or (cartao_hint and not resp_hint):
-        from apps.gastos.views import _agg_sum_signed
+        from apps.gastos.views import _agg_sum
 
         if not cartao_hint:
             return f"❌ Não entendi qual cartão você quer consultar.\n\n{MENU_OPTIONS}"
@@ -1113,36 +1134,46 @@ def _handle_consulta(user, fields: dict) -> str:
             nomes = ", ".join(c["nome"] for c in cartoes) or "nenhum cadastrado"
             return f"❌ Não encontrei um cartão chamado \"{cartao_hint}\".\nCartões cadastrados: {nomes}\n\n{MENU_OPTIONS}"
         mp = _meses_pt()
-        total = _agg_sum_signed(
+        total = _agg_sum(
             Gasto.objects.filter(user=user, cartao_id=cartao_id, data_compra__month=mes, data_compra__year=ano)
+            .exclude(tipo_pagamento="ajuste_fatura")
         )
         return (
             f"💳 *{cartao_nome} — {mp[mes-1]}/{ano}*\n\n"
-            f"Valor Total: {_brl(total)}\n\n{MENU_OPTIONS}"
+            f"Valor Gasto: {_brl(total)}\n\n{MENU_OPTIONS}"
         )
 
     if consulta_tipo == "responsavel" or resp_hint:
+        from apps.gastos.views import _agg_sum, _impacto_q
+
         if not resp_hint:
             return f"❌ Não entendi de quem você quer consultar o gasto.\n\n{MENU_OPTIONS}"
-        resps = list(Responsavel.objects.filter(user=user, ativo=True).values("id", "nome"))
+        resps = list(Responsavel.objects.filter(user=user, ativo=True).values("id", "nome", "usuario_vinculado_id"))
         hint_low = resp_hint.lower()
-        responsavel_id = responsavel_nome = None
+        responsavel = None
         for r in resps:
             if hint_low in r["nome"].lower() or r["nome"].lower() in hint_low:
-                responsavel_id, responsavel_nome = r["id"], r["nome"]
+                responsavel = r
                 break
-        if not responsavel_id:
+        if not responsavel:
             nomes = ", ".join(r["nome"] for r in resps) or "nenhum cadastrado"
             return f"❌ Não encontrei um responsável chamado \"{resp_hint}\".\nResponsáveis cadastrados: {nomes}\n\n{MENU_OPTIONS}"
         mp = _meses_pt()
-        total = (
-            Gasto.objects.filter(
-                user=user, responsavel_id=responsavel_id,
-                data_compra__month=mes, data_compra__year=ano,
-            ).aggregate(t=Sum("valor_total"))["t"] or Decimal("0")
-        )
+        if responsavel["usuario_vinculado_id"] == user.id:
+            # É a própria pessoa logada: inclui gastos que outros logins atribuíram a ela também.
+            total = _agg_sum(
+                Gasto.objects.filter(_impacto_q(user), data_compra__month=mes, data_compra__year=ano)
+                .exclude(tipo_pagamento="ajuste_fatura")
+            )
+        else:
+            total = _agg_sum(
+                Gasto.objects.filter(
+                    user=user, responsavel_id=responsavel["id"],
+                    data_compra__month=mes, data_compra__year=ano,
+                ).exclude(tipo_pagamento="ajuste_fatura")
+            )
         return (
-            f"👤 *{responsavel_nome} — {mp[mes-1]}/{ano}*\n\n"
+            f"👤 *{responsavel['nome']} — {mp[mes-1]}/{ano}*\n\n"
             f"Total de gastos: {_brl(total)}\n\n{MENU_OPTIONS}"
         )
 
