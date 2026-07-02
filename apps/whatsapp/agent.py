@@ -1348,7 +1348,10 @@ def _handle_consulta(user, fields: dict) -> str:
     conta_hint  = fields.get("conta_nome_hint")
 
     # Sem nome/tema nenhum → é o resumo do próprio usuário, não uma consulta.
-    if not (cartao_hint or resp_hint or cat_hint or conta_hint or consulta_tipo == "investimento"):
+    if not (
+        cartao_hint or resp_hint or cat_hint or conta_hint
+        or consulta_tipo in ("investimento", "conta")
+    ):
         return _resumo(user) + f"\n\n{MENU_OPTIONS}"
 
     mp = _meses_pt()
@@ -1370,7 +1373,7 @@ def _handle_consulta(user, fields: dict) -> str:
 
     if consulta_tipo == "conta" or conta_hint:
         if not conta_hint:
-            return f"❌ Não entendi qual conta você quer consultar.\n\n{MENU_OPTIONS}"
+            return _rel_saldos_contas(user) + f"\n\n{MENU_OPTIONS}"
         contas = list(Conta.objects.filter(user=user, ativo=True).values("id", "nome"))
         hint_low = conta_hint.lower()
         conta_id = None
@@ -1731,7 +1734,7 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
             if intent in ("resumo", "menu", "desconhecido") and (
                 fields.get("cartao_nome_hint") or fields.get("responsavel_nome_hint")
                 or fields.get("categoria_hint") or fields.get("conta_nome_hint")
-                or fields.get("consulta_tipo") == "investimento"
+                or fields.get("consulta_tipo") in ("investimento", "conta")
             ):
                 intent = "consulta"
 
@@ -1739,6 +1742,18 @@ def process_message(phone: str, user, text: str, push_name: str = "") -> str:
                 clear_session(phone)
                 return welcome_message(user, phone, push_name)
             if intent in ("resumo", "consulta"):
+                # Blindagem determinística: pergunta sobre saldo em conta(s) bancária(s)
+                # (dinheiro guardado) é sempre consulta_tipo="conta", nunca "resumo" (que
+                # é o saldo DO MÊS = receitas-gastos) — mesmo que a IA erre e classifique
+                # como resumo por conter a palavra "saldo".
+                if (
+                    intent == "resumo" and fields.get("consulta_tipo") is None
+                    and fields.get("resumo_metrica") in (None, "saldo")
+                    and ("conta" in text_lower or "contas" in text_lower)
+                ):
+                    intent = "consulta"
+                    fields["consulta_tipo"] = "conta"
+
                 # Blindagem determinística: detecta a métrica pedida pelo texto real da
                 # mensagem (a IA às vezes não extrai "gastos" em fragmentos curtos tipo
                 # "e os gastos?" e acaba herdando a métrica antiga do contexto).
